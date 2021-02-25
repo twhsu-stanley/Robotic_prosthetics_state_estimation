@@ -1,5 +1,3 @@
-
-
 import numpy as np 
 
 from model_framework import model_loader
@@ -7,7 +5,6 @@ from dynamic_model import Gait_Dynamic_Model
 
 
 class Extended_Kalman_Filter:
-
 	def __init__(self,initial_state,initial_covariance,dynamic_model,process_noise,measurement_model,observation_noise):
 		self. dynamic_model = dynamic_model
 		self.measurement_model = measurement_model

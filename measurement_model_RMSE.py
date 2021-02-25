@@ -14,8 +14,24 @@ def Measurement_model_RMSE(mode):
         Measurement_model_RMSE = np.load(file, allow_pickle = True)
         RMSE = Measurement_model_RMSE[mode]
 
+    # plot errorbar for RMSE of each subject
+    plt.figure('rmse')
+    plt.errorbar(range(10), [RMSE.item()[subject].mean() for subject in subject_names], fmt='ko',\
+                 yerr = [np.std(RMSE.item()[subject]) for subject in subject_names])
+    plt.plot(range(10),  [RMSE.item()[subject].max() for subject in subject_names], 'ro')
+    plt.plot(range(10),  [RMSE.item()[subject].min() for subject in subject_names], 'bo')           
+    plt.xticks(range(10), [str(subject) for subject in subject_names])
+    plt.title(str(mode)+' : Mean/Max/Min RMSE of each subject')
+    plt.legend(['Mean+/-stdev', 'Max', 'Min'])
+    plt.grid()
+
+    
     for subject in subject_names:
     #for subject in ['AB01', 'AB02', 'AB03']:
+        print("mode: ", str(mode), "; Subject: ", str(subject))
+        print("RMSE mean: ", RMSE.item()[subject].mean())
+        print("RMSE max: ", RMSE.item()[subject].max())
+        
         if mode == 'global_thigh_angle_Y':
             model = m_model.models[0]
             with open('Global_thigh_angle.npz', 'rb') as file:
@@ -44,10 +60,6 @@ def Measurement_model_RMSE(mode):
         step_lengths = get_step_length(subject)
         ramps = get_ramp(subject)
 
-        print("mode: ", str(mode), "; Subject: ", str(subject))
-        print("RMSE mean: ", RMSE.item()[subject].mean())
-        print("RMSE max: ", RMSE.item()[subject].max())
-        
         index_max = np.where(RMSE.item()[subject] == RMSE.item()[subject].max())
         for index in index_max[0]:
             plt.figure(index)
@@ -61,8 +73,8 @@ def Measurement_model_RMSE(mode):
         for index in index_med[0]:
             plt.figure(index)
             measurement_pred = model_prediction(model, psi.item()[subject], phases[index,:], phase_dots[index,:], step_lengths[index,:], ramps[index,:])
-            plt.plot(measurement_pred, 'r--')
-            plt.plot(measurement_input[index,:], 'r-')
+            plt.plot(measurement_pred, 'k--')
+            plt.plot(measurement_input[index,:], 'k-')
             plt.legend(['prediction', 'actual'])
             plt.title(str(subject) + " / "+ str(mode)+' : Median RMSE = ' + str(RMSE.item()[subject][index, 0]))
 
@@ -79,27 +91,10 @@ def Measurement_model_RMSE(mode):
 
 if __name__ == '__main__':
 
+
     #Measurement_model_RMSE(mode = 'global_thigh_angle_Y')
     #Measurement_model_RMSE(mode = 'reaction_force_z_ankle')
-    Measurement_model_RMSE(mode = 'reaction_force_x_ankle')
-    #Measurement_model_RMSE(mode = 'reaction_moment_y_ankle')
-    plt.show()
+    #Measurement_model_RMSE(mode = 'reaction_force_x_ankle')
+    Measurement_model_RMSE(mode = 'reaction_moment_y_ankle')
 
-    mode = 'reaction_force_x_ankle'
-    with open('Measurement_model_RMSE_12 3.npz', 'rb') as file:
-        Measurement_model_RMSE = np.load(file, allow_pickle = True)
-        RMSE = Measurement_model_RMSE[mode]
-        subject_names = RMSE.item().keys()
-        for subject in subject_names:
-            print("mode: ", str(mode), "; Subject: ", str(subject))
-            print("RMSE mean: ", RMSE.item()[subject].mean())
-            print("RMSE max: ", RMSE.item()[subject].max())
-    
-    with open('Measurement_model_RMSE.npz', 'rb') as file:
-        Measurement_model_RMSE = np.load(file, allow_pickle = True)
-        RMSE = Measurement_model_RMSE[mode]
-        subject_names = RMSE.item().keys()
-        for subject in subject_names:
-            print("mode: ", str(mode), "; Subject: ", str(subject))
-            print("RMSE mean: ", RMSE.item()[subject].mean())
-            print("RMSE max: ", RMSE.item()[subject].max())
+    plt.show()
