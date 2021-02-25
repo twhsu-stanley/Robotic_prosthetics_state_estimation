@@ -1,0 +1,9 @@
+local-storage/
+example-code/
+__pycache__/
+__pycache__/*
+utils/__pycache__/*
+utils/__pycache__/
+*.npz
+*.npy
+*.pickle
