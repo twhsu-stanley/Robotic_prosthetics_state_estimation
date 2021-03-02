@@ -25,7 +25,6 @@ step_lengths = get_step_length(subject)
 ramps = get_ramp(subject)
 
 m_model = model_loader('Measurement_model.pickle')
-model = m_model.models[0]
 
 with open('Measurement_model_coeff.npz', 'rb') as file:
     Measurement_model_coeff = np.load(file, allow_pickle = True)

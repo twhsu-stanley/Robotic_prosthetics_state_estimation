@@ -1,111 +1,201 @@
-import numpy as np 
+import numpy as np
+from model_framework import *
+from data_generators import *
+import matplotlib.pyplot as plt
+import h5py
 
-from model_framework import model_loader
-from dynamic_model import Gait_Dynamic_Model
+# load data
+subject = 'AB01'
+stride_id = 1
 
+with open('Measurement_model_coeff.npz', 'rb') as file:
+    Measurement_model_coeff = np.load(file, allow_pickle = True)
+    psi_thigh_Y = Measurement_model_coeff['global_thigh_angle_Y']
+    psi_force_z = Measurement_model_coeff['reaction_force_z_ankle']
+    psi_force_x = Measurement_model_coeff['reaction_force_x_ankle']
+    psi_moment_y = Measurement_model_coeff['reaction_moment_y_ankle']
+Psi = np.array([psi_thigh_Y.item()[subject],\
+                psi_force_z.item()[subject],\
+                psi_force_x.item()[subject],\
+                psi_moment_y.item()[subject]]) # Psi: 4 x 336
 
-class Extended_Kalman_Filter:
-	def __init__(self,initial_state,initial_covariance,dynamic_model,process_noise,measurement_model,observation_noise):
-		self. dynamic_model = dynamic_model
-		self.measurement_model = measurement_model
-		self.x = initial_state
-		self.P = initial_covariance
-		self.Q = process_noise
-		self.R = observation_noise
+with open('Global_thigh_angle.npz', 'rb') as file:
+    g_t = np.load(file)
+    global_thigh_angle_Y = g_t[subject][0]
 
+with open('Reaction_wrench.npz', 'rb') as file:
+    r_w = np.load(file)
+    force_x_ankle = r_w[subject][0]
+    force_z_ankle = r_w[subject][2]
+    moment_y_ankle = r_w[subject][4]
 
-	#Calculate the next estimate of the kalman filter
-	def calculate_next_estimates(self, time_step, control_input_u, sensor_measurements):
-		
-		predicted_state, predicted_covariance = self.preditction_step(time_step)
+phases = get_phase(global_thigh_angle_Y)
+phase_dots = get_phase_dot(subject)
+step_lengths = get_step_length(subject)
+ramps = get_ramp(subject)
 
-		updated_state, updated_covariance = self.update_step(predicted_state, predicted_covariance, sensor_measurements)
+n = 20
+global_thigh_angle_Y = global_thigh_angle_Y[stride_id: stride_id + n,:].ravel()
+force_z_ankle = force_z_ankle[stride_id: stride_id + n,:].ravel()
+force_x_ankle = force_x_ankle[stride_id: stride_id + n,:].ravel()
+moment_y_ankle = moment_y_ankle[stride_id: stride_id + n,:].ravel()
 
-		self.x = updated_state
-		self.P = updated_covariance
+phases = phases[stride_id: stride_id + n,:].ravel()
+phase_dots = phase_dots[stride_id: stride_id + n,:].ravel()
+step_lengths = step_lengths[stride_id: stride_id + n,:].ravel()
+ramps = ramps[stride_id: stride_id + n,:].ravel()
 
-		return updated_state, updated_covariance
+"""
+# plot results
+plt.figure()
+plt.subplot(411)
+#plt.plot(x[:, 0, 0])
+plt.plot(phases)
 
+plt.subplot(412)
+plt.plot(phase_dots)
 
-	#Call this function to get the next state 
-	def preditction_step(self, time_step,control_input_u=0):
-		
-		#Calculate the new step with the prediction function
-		new_state = self.dynamic_model.f_function(self.x, time_step)
+plt.subplot(413)
+plt.plot(step_lengths.ravel())
 
-		#Calculate the jacobian of f_function
-		F = self.dynamic_model.f_jacobean(self.x, time_step)
+plt.subplot(414)
+plt.plot(ramps.ravel())
+    
+plt.show()
+"""
 
-		#Get the new measurements
-		new_covariance = F @ self.P @ F.T + self.Q
+def warpToOne(phase):
+    phase_wrap = np.remainder(phase, 1)
+    while np.abs(phase_wrap) > 1:
+        phase_wrap = phase_wrap - np.sign(phase_wrap)
+    return phase_wrap
 
-		return (new_state, new_covariance)
+class myStruct:
+    pass
 
-	
-	#This function will calculate the new state based on the predicted state
-	def update_step(self, predicted_state, predicted_covariance, measurements):
+class extended_kalman_filter:
+    def __init__(self, system, init):
+        # EKF Construct an instance of this class
+        # Inputs:
+        #   system: system and noise models
+        #   init:   initial state mean and covariance
+        self.f = system.f  # process model
+        self.A = system.A  # system matrix Jacobian
+        self.Q = system.Q  # process model noise covariance
 
-		#Calculate the expected measurements (z)
-		expected_measurements = self.measurement_model.evaluate_h_func(*predicted_state)
+        self.h = system.h  # measurement model
+        self.R = system.R  # measurement noise covariance
+        
+        self.x = init.x  # state mean
+        self.Sigma = init.Sigma  # state covariance
 
-		#Calculate the innovation
-		y_hat = measurements - expected_measurements
+    def prediction(self):
+        # EKF propagation (prediction) step
+        self.x_pred = self.f(self.x)  # predicted state
 
-		#Get the jacobian for the measurement function
-		H = self.measurement_model.evaluate_dh_func(*predicted_state)
+        self.x_pred[0, 0] = warpToOne(self.x_pred[0, 0])
 
-		#Calculate the innovation covariance
-		S = H @ predicted_covariance @ H.T + self.R
+        self.Sigma_pred = self.A @ self.Sigma @ self.A.T + self.Q  # predicted state covariance
 
-		#Calculate the Kalman Gain
-		K = predicted_covariance @ H.T @ np.linalg.inv(S)
+    def correction(self, z):
+        # EKF correction step
+        # Inputs:
+        #   z:  measurement
 
-		#Calculate the updated state
-		updated_state = predicted_state + K @ y_hat
+        # evaluate measurement Jacobian at current operating point
+        H = self.h.evaluate_dh_func(Psi, self.x_pred[0,0], self.x_pred[1,0], self.x_pred[2,0], self.x_pred[3,0])
 
-		#Calculate the updated covariance
-		updated_covariance = predicted_covariance - K @ H @ predicted_covariance
+        # predicted measurements
+        z_hat = self.h.evaluate_h_func(Psi, self.x_pred[0,0], self.x_pred[1,0], self.x_pred[2,0], self.x_pred[3,0])
+        
+        # TEST H nad h
+        #h0 = self.h.evaluate_h_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
+        #H0 = self.h.evaluate_dh_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
+        #print("h': ", z_hat)
+        #print("dx: ", self.x_pred - self.x[0,0])
+        #print("h0 + H0 dx: ", h0 + H0 @ (self.x_pred - self.x))
+        #print("linearization error= ", h0 + H0 @ (self.x_pred - self.x) - z_hat)
 
-		return updated_state, updated_covariance
+        # innovation
+        z = np.array([[z[0]], [z[1]], [z[2]], [z[3]]])
+        self.v = z - z_hat
 
+        # innovation covariance
+        S = H @ self.Sigma_pred @ H.T + self.R  
 
+        # filter gain)
+        K = self.Sigma_pred @ H.T @ np.linalg.inv(S)
 
+        # correct the predicted state statistics
+        self.x = self.x_pred + K @ self.v
+        self.x[0, 0] = warpToOne(self.x[0, 0])
 
+        I = np.eye(np.shape(self.x)[0])
+        self.Sigma = (I - K @ H) @ self.Sigma_pred
 
+def process_model(x):
+    dt = 0.01 # data sampling rate: 100 Hz
+    A = np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+    return A @ x
 
-################################################################################################
-################################################################################################
-#Unit testing
+if __name__ == '__main__':
+    dt = 0.01 # data sampling rate: 100 Hz
+    A = np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+    
+    # build the system
+    sys = myStruct()
+    sys.f = process_model
+    sys.A = A
+    
+    sys.h = model_loader('Measurement_model.pickle')
+    sys.Q = np.diag([0, 1e-5, 1e-7, 1e-7]) # process model noise covariance
+    sys.R = 10000 *np.diag([0.3, 10, 10, 20]) # measurement noise covariance
 
+    # initialize the state
+    init = myStruct()
+    init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
+    init.Sigma = 0 * np.eye(4)
 
-def ekf_unit_test():
-	
-	#Phase, Phase Dot, Ramp, Step Length, 6 
-	state = np.array([0,1,0,0,
-					  0,0,0,0,0,0]).T
+    ekf = extended_kalman_filter(sys, init)
 
-	n = state.shape[0]
-	state_covariance = np.zeros((n,n))
+    z = np.array([[global_thigh_angle_Y],\
+                  [force_z_ankle], \
+                  [force_x_ankle],\
+                  [moment_y_ankle]])
+    z = np.squeeze(z)
 
-	R = np.eye(2)
+    x = []  # state
+    x.append(init.x)
+    for i in range(np.shape(z)[1]):
+        ekf.prediction()
+        ekf.correction(z[:, i])
+        x.append(ekf.x)
 
-	Q = np.eye(n)
+    x = np.array(x).squeeze()
+    print(np.shape(x))
 
-	m_model = model_loader('H_model.pickle')
-	d_model = Gait_Dynamic_Model()
+    # plot results
+    plt.figure()
+    plt.subplot(411)
+    plt.plot(phases)
+    plt.plot(x[:, 0], '--')
+    plt.ylabel('phase')
 
-	ekf = Extended_Kalman_Filter(state,state_covariance, d_model, Q, m_model, R)
+    plt.subplot(412)
+    plt.plot(phase_dots)
+    plt.plot(x[:, 1], '--')
+    plt.ylabel('phase dot')
+    plt.ylim(phase_dots.min()-0.2, phase_dots.max() +0.2)
 
-	time_step = 0.5
+    plt.subplot(413)
+    plt.plot(step_lengths)
+    plt.plot(x[:, 2], '--')
+    plt.ylim(step_lengths.min()-0.02, step_lengths.max() +0.02)
+    plt.ylabel('step length')
 
-
-	#Really just want to prove that we can do one interation of this
-	#Dont really want to pove much more than this since we would need actual data for that
-	
-	next_state = ekf.calculate_next_estimates(time_step, 0, (1,1))
-
-	print(next_state)
-
-
-if(__name__=='__main__'):
-	ekf_unit_test()
+    plt.subplot(414)
+    plt.plot(ramps)
+    plt.plot(x[:, 3], '--')
+    plt.ylabel('ramp')
+    plt.ylim(ramps.min()-0.5, ramps.max() + 0.5)
+    plt.show()

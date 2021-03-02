@@ -64,6 +64,7 @@ def Measurement_model_RMSE(mode):
         print(index_max)
         for index in index_max[0]:
             plt.figure(index)
+            print(np.shape(psi.item()[subject]))
             measurement_pred = model_prediction(model, psi.item()[subject], phases[index,:], phase_dots[index,:], step_lengths[index,:], ramps[index,:])
             plt.plot(measurement_pred, 'r--')
             plt.plot(measurement_input[index,:], 'r-')

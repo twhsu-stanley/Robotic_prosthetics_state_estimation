@@ -106,9 +106,7 @@ class Kronecker_Model:
 
 		self.size = size
 		self.num_states = len(funcs)
-		self.pca_axis = []
-		self.pca_coefficients = []
-        #Todo: Add average pca coefficient
+
         
 	#Evaluate the models at the function inputs that are received
 	#The function inputs are expected in the same order as they where defined
@@ -118,7 +116,7 @@ class Kronecker_Model:
 		
 		#Crop so that you are only using the number of states and not the gait fingerprint
 		states = function_inputs[:self.num_states]
-		
+
 		#Verify that you have the correct input 
 		if(len(states) != len(self.funcs)):
 			err_string = 'Wrong amount of inputs. Received:'  + str(len(states)) + ', expected:' + str(len(self.funcs))
@@ -137,7 +135,7 @@ class Kronecker_Model:
 			curr_val, curr_func, curr_buf = values
 			
 			#If you get a dictionary, then get the correct input for the function
-			if( isinstance(states, dict) == True):
+			if(isinstance(states, dict) == True):
 				#Get the value from the var_name in the dictionary
 				curr_val = states[curr_func.var_name]
 
@@ -165,20 +163,24 @@ class Measurement_Model():
 	def __init__(self, *models):
 		self.models = models
 
-	def evaluate_h_func(self, *states):
-		#get the output
-		result = [model.evaluate_scalar_output(*states) for model in self.models]
-		return np.array(result)
-
-	def evaluate_dh_func(self,*states):
-		result = []
+	def evaluate_h_func(self, Psi, *states):
+		h = np.zeros((4,1))
+		k = 0
 		for model in self.models:
-			state_derivatives = [model.evaluate_scalar_output(*states,partial_derivative=func.var_name) for func in model.funcs]
-			gait_fingerprint_derivatives = [model.evaluate(*states)@axis for axis in model.pca_axis]
-			total_derivatives = state_derivatives + gait_fingerprint_derivatives
-			result.append(total_derivatives)
+			h[k] = model.evaluate(*states) @ Psi[k,:].T
+			k = k + 1
+		return h
 
-		return np.array(result)
+	def evaluate_dh_func(self, Psi, *states):
+		H = np.zeros((4, 4))
+		k = 0
+		for model in self.models:
+			j = 0
+			for func in model.funcs:
+				H[k, j] = model.evaluate(*states, partial_derivative = func.var_name) @ Psi[k, :].T
+				j = j + 1
+			k = k + 1
+		return H
 
 #Calculate the least squares based on the data
 def least_squares(model, output, *data):
@@ -225,7 +227,6 @@ def fast_kronecker(a, b, buff=None):
 	#276.738 secs with 1 param
 	else:
 		return np.kron(a, b)
-
 
 #############################################################################################################
 
