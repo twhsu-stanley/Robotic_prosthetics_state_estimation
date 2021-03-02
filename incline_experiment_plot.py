@@ -11,12 +11,14 @@ from incline_experiment_utils import *
 
 # load data
 mat = hp.File("../InclineExperiment.mat", "r")
-markers = mat['Continuous']['AB07']['s0x8i0']['kinematics']['markers']
-jointangles = mat['Continuous']['AB07']['s0x8i0']['kinematics']['jointangles'] #deg
-forceplate = mat['Continuous']['AB07']['s0x8i0']['kinetics']['forceplate']
-jointmoment = mat['Continuous']['AB07']['s0x8i0']['kinetics']['jointmoment']
-jointforce = mat['Continuous']['AB07']['s0x8i0']['kinetics']['jointforce']
-subject = mat['Continuous']['AB07']['subjectdetails']
+subject = 'AB01'
+task = 's0x8i0'
+markers = mat['Continuous'][subject][task]['kinematics']['markers']
+jointangles = mat['Continuous'][subject][task]['kinematics']['jointangles'] #deg
+forceplate = mat['Continuous'][subject][task]['kinetics']['forceplate']
+jointmoment = mat['Continuous'][subject][task]['kinetics']['jointmoment']
+jointforce = mat['Continuous'][subject][task]['kinetics']['jointforce']
+subject = mat['Continuous'][subject]['subjectdetails']
 
 step_ndx = 445
 
@@ -105,7 +107,7 @@ plt.ylabel("Moment [N-m]")
 plt.legend(('X','Y','Z'))
 
 # plot force & moment in {ankle frame}
-n_s = 600
+n_s = 6000
 force_ankle_x_L = np.zeros((1, n_s))
 force_ankle_y_L = np.zeros((1, n_s))
 force_ankle_z_L = np.zeros((1, n_s))
@@ -176,7 +178,7 @@ plt.ylabel("angles [deg]")
 plt.legend(('-x=Y','y=X','z=Z'))
 
 # plot global thigh angle
-n_s = 600
+n_s = 6000
 Y_th_L = np.zeros((1, n_s))
 X_th_L = np.zeros((1, n_s))
 Z_th_L = np.zeros((1, n_s))

@@ -22,12 +22,12 @@ def Measurement_model_RMSE(mode):
     plt.plot(range(10),  [RMSE.item()[subject].min() for subject in subject_names], 'bo')           
     plt.xticks(range(10), [str(subject) for subject in subject_names])
     plt.title(str(mode)+' : Mean/Max/Min RMSE of each subject')
-    plt.legend(['Mean+/-stdev', 'Max', 'Min'])
+    plt.legend([ 'Max', 'Min','Mean+/-stdev'])
     plt.grid()
 
     
-    for subject in subject_names:
-    #for subject in ['AB01', 'AB02', 'AB03']:
+    #for subject in subject_names:
+    for subject in ['AB01', 'AB02', 'AB03']:
         print("mode: ", str(mode), "; Subject: ", str(subject))
         print("RMSE mean: ", RMSE.item()[subject].mean())
         print("RMSE max: ", RMSE.item()[subject].max())
@@ -61,6 +61,7 @@ def Measurement_model_RMSE(mode):
         ramps = get_ramp(subject)
 
         index_max = np.where(RMSE.item()[subject] == RMSE.item()[subject].max())
+        print(index_max)
         for index in index_max[0]:
             plt.figure(index)
             measurement_pred = model_prediction(model, psi.item()[subject], phases[index,:], phase_dots[index,:], step_lengths[index,:], ramps[index,:])
@@ -68,7 +69,7 @@ def Measurement_model_RMSE(mode):
             plt.plot(measurement_input[index,:], 'r-')
             plt.legend(['prediction', 'actual'])
             plt.title(str(subject) + " / "+ str(mode)+' : Max RMSE = ' + str(RMSE.item()[subject][index, 0]))
-
+        """
         index_med = np.where(RMSE.item()[subject] == np.median(RMSE.item()[subject]))
         for index in index_med[0]:
             plt.figure(index)
@@ -77,7 +78,7 @@ def Measurement_model_RMSE(mode):
             plt.plot(measurement_input[index,:], 'k-')
             plt.legend(['prediction', 'actual'])
             plt.title(str(subject) + " / "+ str(mode)+' : Median RMSE = ' + str(RMSE.item()[subject][index, 0]))
-
+        """
         """
         index_min = np.where(RMSE.item()[subject] == RMSE.item()[subject].min())
         for index in index_min[0]:
@@ -93,8 +94,8 @@ if __name__ == '__main__':
 
 
     #Measurement_model_RMSE(mode = 'global_thigh_angle_Y')
-    #Measurement_model_RMSE(mode = 'reaction_force_z_ankle')
+    Measurement_model_RMSE(mode = 'reaction_force_z_ankle')
     #Measurement_model_RMSE(mode = 'reaction_force_x_ankle')
-    Measurement_model_RMSE(mode = 'reaction_moment_y_ankle')
+    #Measurement_model_RMSE(mode = 'reaction_moment_y_ankle')
 
     plt.show()

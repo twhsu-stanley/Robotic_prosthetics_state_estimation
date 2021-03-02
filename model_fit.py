@@ -88,7 +88,7 @@ def model_fit(model, mode):
         #print("mode: ", str(mode), "; Subject: ", str(subject))
         print("RMSE mean: ", rmse.mean())
         print("RMSE max: ", rmse.max())
-
+        
         # Vizualization
         """
         #Predict the average line 
