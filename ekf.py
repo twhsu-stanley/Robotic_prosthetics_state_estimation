@@ -6,7 +6,9 @@ import h5py
 
 # load data
 subject = 'AB01'
-stride_id = 1
+stride_id = 50
+
+m_model = model_loader('Measurement_model.pickle')
 
 with open('Measurement_model_coeff.npz', 'rb') as file:
     Measurement_model_coeff = np.load(file, allow_pickle = True)
@@ -45,25 +47,6 @@ phase_dots = phase_dots[stride_id: stride_id + n,:].ravel()
 step_lengths = step_lengths[stride_id: stride_id + n,:].ravel()
 ramps = ramps[stride_id: stride_id + n,:].ravel()
 
-"""
-# plot results
-plt.figure()
-plt.subplot(411)
-#plt.plot(x[:, 0, 0])
-plt.plot(phases)
-
-plt.subplot(412)
-plt.plot(phase_dots)
-
-plt.subplot(413)
-plt.plot(step_lengths.ravel())
-
-plt.subplot(414)
-plt.plot(ramps.ravel())
-    
-plt.show()
-"""
-
 def warpToOne(phase):
     phase_wrap = np.remainder(phase, 1)
     while np.abs(phase_wrap) > 1:
@@ -92,9 +75,7 @@ class extended_kalman_filter:
     def prediction(self):
         # EKF propagation (prediction) step
         self.x_pred = self.f(self.x)  # predicted state
-
-        self.x_pred[0, 0] = warpToOne(self.x_pred[0, 0])
-
+        self.x_pred[0, 0] = warpToOne(self.x_pred[0, 0]) # wrap to be between 0 and 1
         self.Sigma_pred = self.A @ self.Sigma @ self.A.T + self.Q  # predicted state covariance
 
     def correction(self, z):
@@ -123,7 +104,7 @@ class extended_kalman_filter:
         # innovation covariance
         S = H @ self.Sigma_pred @ H.T + self.R  
 
-        # filter gain)
+        # filter gain
         K = self.Sigma_pred @ H.T @ np.linalg.inv(S)
 
         # correct the predicted state statistics
@@ -138,6 +119,42 @@ def process_model(x):
     A = np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
     return A @ x
 
+def measurement_data_cov(plot = False):
+    global_thigh_angle_Y_pred = model_prediction(m_model.models[0], Psi[0], phases, phase_dots, step_lengths, ramps)
+    force_z_ankle_pred = model_prediction(m_model.models[1], Psi[1], phases, phase_dots, step_lengths, ramps)
+    force_x_ankle_pred = model_prediction(m_model.models[2], Psi[2], phases, phase_dots, step_lengths, ramps)
+    moment_y_ankle_pred = model_prediction(m_model.models[3], Psi[3], phases, phase_dots, step_lengths, ramps)
+    err_gthY = global_thigh_angle_Y - global_thigh_angle_Y_pred
+    err_fz = force_z_ankle - force_z_ankle_pred
+    err_fx = force_x_ankle - force_x_ankle_pred
+    err_my = moment_y_ankle - moment_y_ankle_pred
+    err = np.stack((err_gthY, err_fz, err_fx, err_my))
+    R_data = np.cov(err)
+    
+    if plot:
+        plt.figure('Measurement Data vs. Prediction')
+        plt.subplot(411)
+        plt.plot(global_thigh_angle_Y, 'b-')
+        plt.plot(global_thigh_angle_Y_pred,'k--')
+        plt.legend(['actual','predicted'])
+        plt.ylabel('global_thigh_angle_Y')
+        plt.subplot(412)
+        plt.plot(force_z_ankle, 'b-')
+        plt.plot(force_z_ankle_pred, 'k--')
+        plt.legend(['actual','predicted'])
+        plt.ylabel('force_z_ankle')
+        plt.subplot(413)
+        plt.plot(force_x_ankle, 'b-')
+        plt.plot(force_x_ankle_pred, 'k--')
+        plt.legend(['actual','predicted'])
+        plt.ylabel('force_x_ankle')
+        plt.subplot(414)
+        plt.plot(moment_y_ankle, 'b-')
+        plt.plot(moment_y_ankle_pred, 'k--')
+        plt.legend(['actual','predicted'])
+        plt.ylabel('moment_y_ankle')
+    return R_data
+
 if __name__ == '__main__':
     dt = 0.01 # data sampling rate: 100 Hz
     A = np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
@@ -147,14 +164,15 @@ if __name__ == '__main__':
     sys.f = process_model
     sys.A = A
     
-    sys.h = model_loader('Measurement_model.pickle')
-    sys.Q = np.diag([0, 1e-5, 1e-7, 1e-7]) # process model noise covariance
-    sys.R = 10000 *np.diag([0.3, 10, 10, 20]) # measurement noise covariance
+    sys.h = m_model
+    sys.Q = 1 * np.diag([1e-14, 1e-10, 1e-14, 1e-14]) # process model noise covariance
+    #sys.R = measurement_data_cov()
+    sys.R = np.diag([10, 1400, 350, 2100]) # measurement noise covariance
 
     # initialize the state
     init = myStruct()
     init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
-    init.Sigma = 0 * np.eye(4)
+    init.Sigma = 1e-14 * np.diag([1, 1, 1, 1])
 
     ekf = extended_kalman_filter(sys, init)
 
@@ -166,6 +184,9 @@ if __name__ == '__main__':
 
     x = []  # state
     x.append(init.x)
+
+    v = []
+
     for i in range(np.shape(z)[1]):
         ekf.prediction()
         ekf.correction(z[:, i])
@@ -199,3 +220,6 @@ if __name__ == '__main__':
     plt.ylabel('ramp')
     plt.ylim(ramps.min()-0.5, ramps.max() + 0.5)
     plt.show()
+    
+
+    
