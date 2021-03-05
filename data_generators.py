@@ -46,6 +46,9 @@ def get_step_length(subject):
 def get_ramp(subject):
     return np.concatenate(list(ramp_generator(subject)), axis = 0)
 
+def get_time_step(subject):
+    return np.concatenate(list(time_step_generator(subject)), axis = 0)
+
 #====================================== Generator functions ===============================================#
 def joint_angle_generator(subject, joint, direction = 'x', left=True, right=True):
     #Note: coords of the dataset are different from coords of the world frame
@@ -193,9 +196,7 @@ def ramp_generator(subject):
         time_info = raw_walking_data['Gaitcycle'][subject][trial]['cycles']['left']['time']
        
         for step in time_info:        
-            #Yield for the left leg
             yield np.full((1,150), ramp)
-            #Yield for the right leg
 
     #Generate for the right leg
     for trial in raw_walking_data['Gaitcycle'][subject].keys():
@@ -210,9 +211,23 @@ def ramp_generator(subject):
         time_info = raw_walking_data['Gaitcycle'][subject][trial]['cycles']['right']['time']
        
         for step in time_info:        
-            #Yield for the left leg
             yield np.full((1,150), ramp)
-            #Yield for the right leg
+
+def time_step_generator(subject):
+    for trial in raw_walking_data['Gaitcycle'][subject].keys():
+        if trial == 'subjectdetails':
+            continue
+        #Get the h5py object pointer for the walking speed
+        time_info_left = raw_walking_data['Gaitcycle'][subject][trial]['cycles']['left']['time']
+        time_info_right = raw_walking_data['Gaitcycle'][subject][trial]['cycles']['right']['time']
+
+        for step_left in time_info_left:        
+            delta_time_left = step_left[1] - step_left[0]
+            yield np.full((1,150), delta_time_left)
+
+        for step_right in time_info_right:        
+            delta_time_right = step_right[1] - step_right[0]
+            yield np.full((1,150), delta_time_right)
 
 if __name__ == '__main__':
     subject_names = get_subject_names()

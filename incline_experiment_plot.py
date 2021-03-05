@@ -20,13 +20,6 @@ jointmoment = mat['Continuous'][subject][task]['kinetics']['jointmoment']
 jointforce = mat['Continuous'][subject][task]['kinetics']['jointforce']
 subject = mat['Continuous'][subject]['subjectdetails']
 
-step_ndx = 445
-
-ax = plt.gcf().add_subplot(111, projection='3d')
-
-#plot markers of joints
-stick_plot_3d(ax, markers, step_ndx = step_ndx)
-
 # forceplate origin location
 # in Vicon frame 
 vicon_leftbelt_offset = np.array([-768, 885])*1e-3 #[m]
@@ -34,6 +27,14 @@ vicon_rightbelt_offset = np.array([-255, 885])*1e-3 #[m]
 # in world frame
 left_plate_origin = np.array([vicon_leftbelt_offset[1], -vicon_leftbelt_offset[0], 0.0]) 
 right_plate_origin = np.array([vicon_rightbelt_offset[1], -vicon_rightbelt_offset[0], 0.0])
+
+step_ndx = 445
+
+ax = plt.gcf().add_subplot(111, projection='3d')
+"""
+#plot markers of joints
+stick_plot_3d(ax, markers, step_ndx = step_ndx)
+
 # plot forceplate origin in world frame
 plot3d(ax, left_plate_origin, 'kx', zorder=15, ms=5)
 plot3d(ax, right_plate_origin, 'kx', zorder=15, ms=5)
@@ -55,30 +56,22 @@ cop_force(ax, forceplate['right']['cop'], forceplate['right']['force'], step_ndx
 #joint_moment(ax, markers['right']['asi'], jointmoment['right']['hip'], step_ndx, 'c')
 
 # plot force in at ankle in anfle frame
-wrench_ankle_conti(ax, forceplate['left']['force'], forceplate['left']['moment'], markers['left'], vicon_leftbelt_offset, step_ndx, plot = True, N2m = 1/1000.)
-wrench_ankle_conti(ax, forceplate['right']['force'], forceplate['right']['moment'], markers['right'], vicon_rightbelt_offset, step_ndx, plot = True, N2m = 1/1000.)
+print(np.shape(forceplate['left']['force'][:,step_ndx]))
+marker_list = dict()
+marker_list['toe'] = markers['left']['toe'][:,step_ndx]
+marker_list['heel'] = markers['left']['heel'][:,step_ndx]
+marker_list['knee'] = markers['left']['knee'][:,step_ndx]
+marker_list['ankle'] = markers['left']['ankle'][:,step_ndx]
+
+print(marker_list['toe'])
+wrench_ankle_conti(ax, forceplate['left']['force'][:,step_ndx], forceplate['left']['moment'][:,step_ndx], marker_list, vicon_leftbelt_offset, plot = True, N2m = 1/1000.)
 
 simulate_bounding_box(ax)
 #plt.show()
-
-# Global thigh angle
-#Left
-R_wp_L = YXZ_Euler_rotation(-jointangles['left']['pelvis'][0, step_ndx], jointangles['left']['pelvis'][1, step_ndx], -jointangles['left']['pelvis'][2, step_ndx])
-R_pt_L = YXZ_Euler_rotation(jointangles['left']['hip'][0, step_ndx], -jointangles['left']['hip'][1, step_ndx], -jointangles['left']['hip'][2, step_ndx])
-R_wt_L = R_wp_L @ R_pt_L
-Y_th_L, X_th_L, Z_th_L = YXZ_Euler_angles(R_wt_L) #[deg]
-print("(Y_th_L, X_th_L, Z_th_L) = ", Y_th_L, X_th_L, Z_th_L)
-
-#Right
-R_wp_R = YXZ_Euler_rotation(-jointangles['right']['pelvis'][0, step_ndx], -jointangles['right']['pelvis'][1, step_ndx], jointangles['right']['pelvis'][2, step_ndx])
-R_pt_R = YXZ_Euler_rotation(jointangles['right']['hip'][0, step_ndx], jointangles['right']['hip'][1, step_ndx], jointangles['right']['hip'][2, step_ndx])
-R_wt_R = R_wp_R @ R_pt_R
-Y_th_R, X_th_R, Z_th_R = YXZ_Euler_angles(R_wt_R) #[deg]
-print("(Y_th_R, X_th_R, Z_th_R) = ", Y_th_R, X_th_R, Z_th_R)
-
+"""
 # Plot Time Series ##########################################################################################################################################
 n_s = np.size(jointangles['left']['pelvis'][0,:]) # number of steps
-
+"""
 # plot wrench in {ankle frame} ######################################################################################################################
 # plot force at forceplate in {world frame}
 plt.figure(2)
@@ -105,7 +98,8 @@ plt.title("Ground reaction moment at forceplate in world frame: right")
 plt.plot(range(n_s), forceplate['right']['moment'][1,:]*1e-3, range(n_s), -forceplate['right']['moment'][0,:]*1e-3, range(n_s), -forceplate['right']['moment'][2,:]*1e-3)
 plt.ylabel("Moment [N-m]")
 plt.legend(('X','Y','Z'))
-
+"""
+"""
 # plot force & moment in {ankle frame}
 n_s = 6000
 force_ankle_x_L = np.zeros((1, n_s))
@@ -121,10 +115,22 @@ moment_ankle_x_R = np.zeros((1, n_s))
 moment_ankle_y_R = np.zeros((1, n_s))
 moment_ankle_z_R = np.zeros((1, n_s))
 for i in range(n_s):
+    marker_list = dict()
+    marker_list['toe'] = markers['left']['toe'][:,i]
+    marker_list['heel'] = markers['left']['heel'][:,i]
+    marker_list['knee'] = markers['left']['knee'][:,i]
+    marker_list['ankle'] = markers['left']['ankle'][:,i]
+
     force_ankle_x_L[0, i], force_ankle_y_L[0, i], force_ankle_z_L[0, i], moment_ankle_x_L[0, i], moment_ankle_y_L[0, i], moment_ankle_z_L[0, i] =\
-        wrench_ankle_conti(ax, forceplate['left']['force'], forceplate['left']['moment'], markers['left'], vicon_leftbelt_offset, i, plot = False)
+        wrench_ankle_conti(forceplate['left']['force'][:,i], forceplate['left']['moment'][:,i], marker_list, vicon_leftbelt_offset)
+    
+    marker_list['toe'] = markers['right']['toe'][:,i]
+    marker_list['heel'] = markers['right']['heel'][:,i]
+    marker_list['knee'] = markers['right']['knee'][:,i]
+    marker_list['ankle'] = markers['right']['ankle'][:,i]
     force_ankle_x_R[0, i], force_ankle_y_R[0, i], force_ankle_z_R[0, i], moment_ankle_x_R[0, i], moment_ankle_y_R[0, i], moment_ankle_z_R[0, i] =\
-        wrench_ankle_conti(ax, forceplate['right']['force'], forceplate['right']['moment'], markers['right'], vicon_rightbelt_offset, i, plot = False)
+        wrench_ankle_conti(forceplate['right']['force'][:,i], forceplate['right']['moment'][:,i], marker_list, vicon_rightbelt_offset)
+
 plt.figure(4)
 plt.subplot(211)
 plt.title("Ground reaction force in ankle frame: left")
@@ -148,6 +154,7 @@ plt.title("Ground reaction moment in ankle frame: right")
 plt.plot(range(n_s), moment_ankle_x_R[0,:], range(n_s), moment_ankle_y_R[0,:], range(n_s), moment_ankle_z_R[0,:])
 plt.ylabel("Moment [N-m]")
 plt.legend(('X_ankle','Y_ankle','Z_ankle'))
+"""
 
 # plot Global thigh angle ##########################################################################################################################
 # plot joint angles: pelvis

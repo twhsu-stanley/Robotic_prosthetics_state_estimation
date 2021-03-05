@@ -56,16 +56,16 @@ def cop_force(ax, COP, force, step_ndx, *args, offset=[1000,0], N2m = 1/1000., *
   ax.plot(Xs, Ys, Zs, *args, **kwargs)
 
 # Wrench in {ankle frame} for Continuous structure / plot
-def wrench_ankle_conti(ax, force, moment, markers, vicon_offset, step_ndx, plot = True, N2m = 1/1000.):
+def wrench_ankle_conti(force, moment, markers, vicon_offset):
   #force, moment, markers in CONTINUOUS structure
   # form xyz coords. for the {ankle frame}
-  x_ankle = np.array([markers['toe'][1,step_ndx]*1e-3 - markers['heel'][1,step_ndx]*1e-3, 
-                      -markers['toe'][0,step_ndx]*1e-3 + markers['heel'][0,step_ndx]*1e-3,
-                      markers['toe'][2,step_ndx]*1e-3 - markers['heel'][2,step_ndx]*1e-3]) #in {world frame}
+  x_ankle = np.array([markers['toe'][1]*1e-3 - markers['heel'][1]*1e-3, 
+                      -markers['toe'][0]*1e-3 + markers['heel'][0]*1e-3,
+                      markers['toe'][2]*1e-3 - markers['heel'][2]*1e-3]) #in {world frame}
   x_ankle = x_ankle / np.linalg.norm(x_ankle) # normalize
-  v = np.array([markers['knee'][1,step_ndx]*1e-3 - markers['ankle'][1,step_ndx]*1e-3, 
-                -markers['knee'][0,step_ndx]*1e-3 + markers['ankle'][0,step_ndx]*1e-3,
-                markers['knee'][2,step_ndx]*1e-3 - markers['ankle'][2,step_ndx]*1e-3]) #in {world frame}
+  v = np.array([markers['knee'][1]*1e-3 - markers['ankle'][1]*1e-3, 
+                -markers['knee'][0]*1e-3 + markers['ankle'][0]*1e-3,
+                markers['knee'][2]*1e-3 - markers['ankle'][2]*1e-3]) #in {world frame}
   y_ankle = np.cross(v, x_ankle) #in {world frame}
   y_ankle = y_ankle / np.linalg.norm(y_ankle) # normalize
   z_ankle = np.cross(x_ankle, y_ankle) #in {world frame}
@@ -77,9 +77,9 @@ def wrench_ankle_conti(ax, force, moment, markers, vicon_offset, step_ndx, plot 
                    [x_ankle[2], y_ankle[2], z_ankle[2]]])
   
   #force in {forceplate frame}
-  force_f = np.array([[force[1,step_ndx]],
-                      [-force[0,step_ndx]], 
-                      [-force[2,step_ndx]]]) #[N]
+  force_f = np.array([[force[1]],
+                      [-force[0]], 
+                      [-force[2]]]) #[N]
 
   #force in {ankle frame}         
   force_ankle = R_fa.T @ force_f
@@ -88,14 +88,14 @@ def wrench_ankle_conti(ax, force, moment, markers, vicon_offset, step_ndx, plot 
   force_ankle_z = force_ankle[2]
 
   #moment in {forceplate frame}
-  moment_f = np.array([[moment[1,step_ndx]*1e-3],
-                       [-moment[0,step_ndx]*1e-3], 
-                       [-moment[2,step_ndx]*1e-3]]) #[N-m]
+  moment_f = np.array([[moment[1]*1e-3],
+                       [-moment[0]*1e-3], 
+                       [-moment[2]*1e-3]]) #[N-m]
   
   #translation from {forceplate frame} to {ankle frame}
-  p_fa = np.array([markers['ankle'][1,step_ndx]*1e-3 - vicon_offset[1],
-                  -markers['ankle'][0,step_ndx]*1e-3 + vicon_offset[0],
-                   markers['ankle'][2,step_ndx]*1e-3]) #[m]
+  p_fa = np.array([markers['ankle'][1]*1e-3 - vicon_offset[1],
+                  -markers['ankle'][0]*1e-3 + vicon_offset[0],
+                   markers['ankle'][2]*1e-3]) #[m]
   p_fa_hat = np.array([[0, -p_fa[2], p_fa[1]], [p_fa[2], 0, -p_fa[0]], [-p_fa[1], p_fa[0], 0]])
       
   #moment in {ankle frame}
@@ -104,8 +104,9 @@ def wrench_ankle_conti(ax, force, moment, markers, vicon_offset, step_ndx, plot 
   moment_ankle_y = moment_ankle[1]
   moment_ankle_z = moment_ankle[2]
 
+  """
   if plot == True:
-    ankle = [markers['ankle'][1,step_ndx]*1e-3, -markers['ankle'][0,step_ndx]*1e-3, markers['ankle'][2,step_ndx]*1e-3]
+    ankle = [markers['ankle'][1]*1e-3, -markers['ankle'][0]*1e-3, markers['ankle'][2]*1e-3]
     for coord in [x_ankle, y_ankle, z_ankle]:
       Xc = [ankle[0], ankle[0] + coord[0]] # in {world frame}
       Yc = [ankle[1], ankle[1] + coord[1]] # in {world frame}
@@ -114,6 +115,7 @@ def wrench_ankle_conti(ax, force, moment, markers, vicon_offset, step_ndx, plot 
       print("x_ankle norm: ", np.linalg.norm(x_ankle))
       print("y_ankle norm: ", np.linalg.norm(y_ankle))
       print("z_ankle norm: ", np.linalg.norm(z_ankle))
+  """
 
   return force_ankle_x, force_ankle_y, force_ankle_z, moment_ankle_x, moment_ankle_y, moment_ankle_z
 

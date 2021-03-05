@@ -4,7 +4,7 @@ from data_generators import *
 from model_framework import *
 
 subject = 'AB01'
-stride_id = 1000
+stride_id = 11
 n = 10
 
 with open('Global_thigh_angle.npz', 'rb') as file:
@@ -69,8 +69,6 @@ print("std my ", np.std(err_my))
 err = np.stack((err_gthY, err_fz, err_fx, err_my))
 R = np.cov(err)
 print("R = ", R)
-#with open('R.npy', 'wb') as file:
-    #np.save(file, R)
 
 plt.figure()
 plt.subplot(411)

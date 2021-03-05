@@ -6,7 +6,7 @@ import h5py
 
 # load data
 subject = 'AB01'
-stride_id = 50
+stride_id = 710
 
 m_model = model_loader('Measurement_model.pickle')
 
@@ -35,8 +35,9 @@ phases = get_phase(global_thigh_angle_Y)
 phase_dots = get_phase_dot(subject)
 step_lengths = get_step_length(subject)
 ramps = get_ramp(subject)
+dt = get_time_step(subject)
 
-n = 20
+n = 30
 global_thigh_angle_Y = global_thigh_angle_Y[stride_id: stride_id + n,:].ravel()
 force_z_ankle = force_z_ankle[stride_id: stride_id + n,:].ravel()
 force_x_ankle = force_x_ankle[stride_id: stride_id + n,:].ravel()
@@ -46,6 +47,7 @@ phases = phases[stride_id: stride_id + n,:].ravel()
 phase_dots = phase_dots[stride_id: stride_id + n,:].ravel()
 step_lengths = step_lengths[stride_id: stride_id + n,:].ravel()
 ramps = ramps[stride_id: stride_id + n,:].ravel()
+dt = dt[stride_id: stride_id + n,:].ravel()
 
 def warpToOne(phase):
     phase_wrap = np.remainder(phase, 1)
@@ -72,11 +74,11 @@ class extended_kalman_filter:
         self.x = init.x  # state mean
         self.Sigma = init.Sigma  # state covariance
 
-    def prediction(self):
+    def prediction(self, dt):
         # EKF propagation (prediction) step
-        self.x_pred = self.f(self.x)  # predicted state
+        self.x_pred = self.f(self.x, dt)  # predicted state
         self.x_pred[0, 0] = warpToOne(self.x_pred[0, 0]) # wrap to be between 0 and 1
-        self.Sigma_pred = self.A @ self.Sigma @ self.A.T + self.Q  # predicted state covariance
+        self.Sigma_pred = self.A(dt) @ self.Sigma @ self.A(dt).T + self.Q  # predicted state covariance
 
     def correction(self, z):
         # EKF correction step
@@ -89,14 +91,6 @@ class extended_kalman_filter:
         # predicted measurements
         z_hat = self.h.evaluate_h_func(Psi, self.x_pred[0,0], self.x_pred[1,0], self.x_pred[2,0], self.x_pred[3,0])
         
-        # TEST H nad h
-        #h0 = self.h.evaluate_h_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
-        #H0 = self.h.evaluate_dh_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
-        #print("h': ", z_hat)
-        #print("dx: ", self.x_pred - self.x[0,0])
-        #print("h0 + H0 dx: ", h0 + H0 @ (self.x_pred - self.x))
-        #print("linearization error= ", h0 + H0 @ (self.x_pred - self.x) - z_hat)
-
         # innovation
         z = np.array([[z[0]], [z[1]], [z[2]], [z[3]]])
         self.v = z - z_hat
@@ -114,10 +108,12 @@ class extended_kalman_filter:
         I = np.eye(np.shape(self.x)[0])
         self.Sigma = (I - K @ H) @ self.Sigma_pred
 
-def process_model(x):
-    dt = 0.01 # data sampling rate: 100 Hz
-    A = np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
-    return A @ x
+def A(dt):
+    return np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+
+def process_model(x, dt):
+    #dt = 0.01 # data sampling rate: 100 Hz
+    return A(dt) @ x
 
 def measurement_data_cov(plot = False):
     global_thigh_angle_Y_pred = model_prediction(m_model.models[0], Psi[0], phases, phase_dots, step_lengths, ramps)
@@ -156,23 +152,20 @@ def measurement_data_cov(plot = False):
     return R_data
 
 if __name__ == '__main__':
-    dt = 0.01 # data sampling rate: 100 Hz
-    A = np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
-    
     # build the system
     sys = myStruct()
     sys.f = process_model
     sys.A = A
     
     sys.h = m_model
-    sys.Q = 1 * np.diag([1e-14, 1e-10, 1e-14, 1e-14]) # process model noise covariance
-    #sys.R = measurement_data_cov()
-    sys.R = np.diag([10, 1400, 350, 2100]) # measurement noise covariance
+    sys.Q = np.diag([0, 1e-6, 1e-7, 100000]) # process model noise covariance
+    sys.R = measurement_data_cov()
+    #sys.R = np.diag([10, 1400, 350, 2100]) # measurement noise covariance
 
     # initialize the state
     init = myStruct()
     init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
-    init.Sigma = 1e-14 * np.diag([1, 1, 1, 1])
+    init.Sigma = np.diag([1e-14, 1e-14, 1e-14, 1e-14])
 
     ekf = extended_kalman_filter(sys, init)
 
@@ -182,18 +175,16 @@ if __name__ == '__main__':
                   [moment_y_ankle]])
     z = np.squeeze(z)
 
-    x = []  # state
+    x = []  # state estimate
     x.append(init.x)
-
-    v = []
-
     for i in range(np.shape(z)[1]):
-        ekf.prediction()
+        ekf.prediction(dt[i])
         ekf.correction(z[:, i])
         x.append(ekf.x)
-
+    
     x = np.array(x).squeeze()
-    print(np.shape(x))
+
+    print(ekf.Sigma)
 
     # plot results
     plt.figure()
@@ -206,19 +197,25 @@ if __name__ == '__main__':
     plt.plot(phase_dots)
     plt.plot(x[:, 1], '--')
     plt.ylabel('phase dot')
-    plt.ylim(phase_dots.min()-0.2, phase_dots.max() +0.2)
+    #plt.ylim(phase_dots.min()-0.2, phase_dots.max() +0.2)
 
     plt.subplot(413)
     plt.plot(step_lengths)
     plt.plot(x[:, 2], '--')
-    plt.ylim(step_lengths.min()-0.02, step_lengths.max() +0.02)
+    #plt.ylim(step_lengths.min()-0.02, step_lengths.max() +0.02)
     plt.ylabel('step length')
 
     plt.subplot(414)
     plt.plot(ramps)
     plt.plot(x[:, 3], '--')
     plt.ylabel('ramp')
-    plt.ylim(ramps.min()-0.5, ramps.max() + 0.5)
+    #plt.ylim(ramps.min()-1, ramps.max()+1)
+
+    #plt.subplot(515)
+    #plt.plot(dt)
+    #plt.ylabel('dt')
+    
+
     plt.show()
     
 
