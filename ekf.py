@@ -75,7 +75,7 @@ def process_model(x, dt):
     return A(dt) @ x
     
 if __name__ == '__main__':
-    subject = 'AB01'
+    subject = 'AB02'
     trial= 's1x2i5'
     side = 'right'
 
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     sys.A = A
     
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-7, 1e-8, 1e-14]) # process model noise covariance
+    sys.Q = np.diag([0, 1e-8, 1e-8, 0]) # process model noise covariance
     
     with open('Measurement_error_cov.pickle', 'rb') as file:
         R = pickle.load(file)
@@ -100,8 +100,8 @@ if __name__ == '__main__':
 
     # initialize the state
     init = myStruct()
-    init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
-    init.Sigma = np.diag([1e-14, 1e-14, 1e-14, 1e-14])
+    init.x = np.array([[phases[0]+0.2], [phase_dots[0]], [step_lengths[0]], [ramps[0]+0.1]])
+    init.Sigma = np.diag([0, 1e-14, 1e-14, 10])
 
     ekf = extended_kalman_filter(sys, init)
 
@@ -112,22 +112,28 @@ if __name__ == '__main__':
     z = np.squeeze(z)
 
     x = []  # state estimate
-    x.append(init.x)
+    #x.append(init.x)
 
-    Sigma = []
-    Sigma.append(np.diag(init.Sigma))
+    #Sigma = []
+    #Sigma.append(np.diag(init.Sigma))
     
     for i in range(np.shape(z)[1]):
         ekf.prediction(dt)
         ekf.correction(z[:, i])
 
         x.append(ekf.x)
-        Sigma.append(np.diag(ekf.Sigma))
+        #Sigma.append(np.diag(ekf.Sigma))
         
     x = np.array(x).squeeze()
-    Sigma = np.array(Sigma)
+    #Sigma = np.array(Sigma)
 
     print("Sigma at final step: \n", ekf.Sigma)
+
+    time_step = 100
+    track = all(e < 0.01 for e in abs(x[time_step:, 0] - phases[time_step:]))
+    plt.figure()
+    plt.plot(abs(x[time_step:, 0] - phases[time_step:]))
+    plt.show()
 
     # plot results
     plt.figure()
@@ -151,13 +157,17 @@ if __name__ == '__main__':
     plt.ylabel('ramp')
     #plt.ylim(ramps.min()-1, ramps.max()+1)
 
+    """
     plt.figure()
     plt.subplot(411)
-
+    plt.plot(Sigma[:,0])
     plt.subplot(412)
-
+    plt.plot(Sigma[:,1])
     plt.subplot(413)
-
+    plt.plot(Sigma[:,2])
     plt.subplot(414)
-    
+    plt.plot(Sigma[:,3])
+    """
+    plot_Conti_data(subject, trial, side)
+
     plt.show()

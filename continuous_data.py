@@ -18,6 +18,9 @@ def Conti_start_end(subject, trial, side):
     end_index = heel_strike_index[np.size(heel_strike_index)-1]
     return int(start_index), int(end_index)
 
+def Conti_heel_strikes(subject, trial, side):
+    heel_strike_index = raw_walking_data['Gaitcycle'][subject][trial]['cycles'][side]['frame'][:]
+
 def Conti_global_thigh_angle_Y(subject, trial, side):
     jointangles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'] #deg
     n_s = np.size(jointangles[side]['pelvis'][0,:]) # number of data poitns
