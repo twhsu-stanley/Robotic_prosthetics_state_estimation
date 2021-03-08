@@ -268,4 +268,3 @@ if __name__ == '__main__':
         GT = np.load(file)
         for subject in subject_names:
             print(np.shape(GT[subject][0]))
-

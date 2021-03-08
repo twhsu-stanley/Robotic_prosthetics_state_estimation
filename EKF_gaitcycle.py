@@ -1,33 +1,12 @@
 import numpy as np
 from model_framework import *
 from data_generators import *
-from continuous_data import *
 import matplotlib.pyplot as plt
 import h5py
 
 # load data
 subject = 'AB01'
-trial= 's1x2i5'
-side = 'right'
-
-dt = 1/100
-
-start_index, end_index = Conti_start_end(subject, trial, side)
-
-phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
-
-phases = phases[start_index:end_index]
-phase_dots = phase_dots[start_index:end_index]
-step_lengths = step_lengths[start_index:end_index]
-ramps = ramps[start_index:end_index]
-
-with open('Continuous_measurement_data.pickle', 'rb') as file:
-    Continuous_measurement_data = pickle.load(file)
-
-global_thigh_angle_Y = Continuous_measurement_data[subject][trial][side]['global_thigh_angle_Y'][0, start_index:end_index]
-force_z_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_z'][0, start_index:end_index]
-force_x_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_x'][0, start_index:end_index]
-moment_y_ankle = Continuous_measurement_data[subject][trial][side]['moment_ankle_y'][0, start_index:end_index]
+stride_id = 710
 
 m_model = model_loader('Measurement_model.pickle')
 
@@ -41,6 +20,34 @@ Psi = np.array([psi_thigh_Y.item()[subject],\
                 psi_force_z.item()[subject],\
                 psi_force_x.item()[subject],\
                 psi_moment_y.item()[subject]]) # Psi: 4 x 336
+
+with open('Global_thigh_angle.npz', 'rb') as file:
+    g_t = np.load(file)
+    global_thigh_angle_Y = g_t[subject][0]
+
+with open('Reaction_wrench.npz', 'rb') as file:
+    r_w = np.load(file)
+    force_x_ankle = r_w[subject][0]
+    force_z_ankle = r_w[subject][2]
+    moment_y_ankle = r_w[subject][4]
+
+phases = get_phase(global_thigh_angle_Y)
+phase_dots = get_phase_dot(subject)
+step_lengths = get_step_length(subject)
+ramps = get_ramp(subject)
+dt = get_time_step(subject)
+
+n = 30
+global_thigh_angle_Y = global_thigh_angle_Y[stride_id: stride_id + n,:].ravel()
+force_z_ankle = force_z_ankle[stride_id: stride_id + n,:].ravel()
+force_x_ankle = force_x_ankle[stride_id: stride_id + n,:].ravel()
+moment_y_ankle = moment_y_ankle[stride_id: stride_id + n,:].ravel()
+
+phases = phases[stride_id: stride_id + n,:].ravel()
+phase_dots = phase_dots[stride_id: stride_id + n,:].ravel()
+step_lengths = step_lengths[stride_id: stride_id + n,:].ravel()
+ramps = ramps[stride_id: stride_id + n,:].ravel()
+dt = dt[stride_id: stride_id + n,:].ravel()
 
 def warpToOne(phase):
     phase_wrap = np.remainder(phase, 1)
@@ -79,6 +86,8 @@ class extended_kalman_filter:
         #   z:  measurement
 
         # evaluate measurement Jacobian at current operating point
+        print(self.x_pred[0,0])
+        print(np.shape(Psi))
         H = self.h.evaluate_dh_func(Psi, self.x_pred[0,0], self.x_pred[1,0], self.x_pred[2,0], self.x_pred[3,0])
 
         # predicted measurements
@@ -87,14 +96,12 @@ class extended_kalman_filter:
         # innovation
         z = np.array([[z[0]], [z[1]], [z[2]], [z[3]]])
         self.v = z - z_hat
-        #print("innov: \n", self.v)
 
         # innovation covariance
         S = H @ self.Sigma_pred @ H.T + self.R  
 
         # filter gain
         K = self.Sigma_pred @ H.T @ np.linalg.inv(S)
-        #print("K: \n", K)
 
         # correct the predicted state statistics
         self.x = self.x_pred + K @ self.v
@@ -144,8 +151,6 @@ def measurement_data_cov(plot = False):
         plt.plot(moment_y_ankle_pred, 'k--')
         plt.legend(['actual','predicted'])
         plt.ylabel('moment_y_ankle')
-        plt.show()
-    
     return R_data
 
 if __name__ == '__main__':
@@ -155,13 +160,14 @@ if __name__ == '__main__':
     sys.A = A
     
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-7, 1e-8, 1e-14]) # process model noise covariance
+    sys.Q = np.diag([0, 1e-6, 1e-7, 100000]) # process model noise covariance
     sys.R = measurement_data_cov()
     #sys.R = np.diag([10, 1400, 350, 2100]) # measurement noise covariance
 
     # initialize the state
     init = myStruct()
     init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
+    print(init.x)
     init.Sigma = np.diag([1e-14, 1e-14, 1e-14, 1e-14])
 
     ekf = extended_kalman_filter(sys, init)
@@ -174,15 +180,14 @@ if __name__ == '__main__':
 
     x = []  # state estimate
     x.append(init.x)
-    
     for i in range(np.shape(z)[1]):
-        ekf.prediction(dt)
+        ekf.prediction(dt[i])
         ekf.correction(z[:, i])
         x.append(ekf.x)
-        
+    
     x = np.array(x).squeeze()
 
-    print("Sigma at final step: \n", ekf.Sigma)
+    print(ekf.Sigma)
 
     # plot results
     plt.figure()
@@ -208,9 +213,13 @@ if __name__ == '__main__':
     plt.plot(x[:, 3], '--')
     plt.ylabel('ramp')
     #plt.ylim(ramps.min()-1, ramps.max()+1)
-    
-    plt.show()
 
+    #plt.subplot(515)
+    #plt.plot(dt)
+    #plt.ylabel('dt')
+    
+
+    plt.show()
     
 
     
