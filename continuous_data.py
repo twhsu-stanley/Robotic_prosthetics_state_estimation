@@ -3,6 +3,7 @@ import h5py as hp
 import pickle
 from incline_experiment_utils import *
 from model_framework import *
+from model_fit import *
 
 # Generate measurement data from the "Continuous" data structure
 
@@ -10,6 +11,12 @@ raw_walking_data = hp.File("../InclineExperiment.mat", "r")
 
 def Conti_subject_names():
     return raw_walking_data['Continuous'].keys()
+
+def Conti_start_end(subject, trial, side):
+    heel_strike_index = raw_walking_data['Gaitcycle'][subject][trial]['cycles'][side]['frame'][:]
+    start_index = heel_strike_index[0]
+    end_index = heel_strike_index[np.size(heel_strike_index)-1]
+    return int(start_index), int(end_index)
 
 def Conti_global_thigh_angle_Y(subject, trial, side):
     jointangles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'] #deg
@@ -75,14 +82,77 @@ def Conti_state_vars(subject, trial, side):
                 phase[int(heel_strike_index[i]) + k] = k * 1/stride_steps
                 phase_dot[int(heel_strike_index[i]) + k] = 1/stride_steps / dt
                 step_length[int(heel_strike_index[i]) + k] = walking_speed * stride_steps * dt
+
+    # truncate the signal s.t. it starts and ends at heel strikes
+    start_index, end_index = Conti_start_end(subject, trial, side)
+    phase = phase[start_index:end_index]
+    phase_dot = phase_dot[start_index:end_index]
+    step_length = step_length[start_index:end_index]
+    ramp = ramp[start_index:end_index]
     
     return phase, phase_dot, step_length, ramp
 
-def Conti_start_end(subject, trial, side):
-    heel_strike_index = raw_walking_data['Gaitcycle'][subject][trial]['cycles'][side]['frame'][:]
-    start_index = heel_strike_index[0]
-    end_index = heel_strike_index[np.size(heel_strike_index)-1]
-    return int(start_index), int(end_index)
+def load_Conti_measurement_data(subject, trial, side):
+    with open('Continuous_measurement_data.pickle', 'rb') as file:
+        Continuous_measurement_data = pickle.load(file)
+
+    start_index, end_index = Conti_start_end(subject, trial, side)
+
+    global_thigh_angle_Y = Continuous_measurement_data[subject][trial][side]['global_thigh_angle_Y'][0, start_index:end_index]
+    force_z_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_z'][0, start_index:end_index]
+    force_x_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_x'][0, start_index:end_index]
+    moment_y_ankle = Continuous_measurement_data[subject][trial][side]['moment_ankle_y'][0, start_index:end_index]
+
+    return global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle
+
+def plot_Conti_data(subject, trial, side):
+    phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
+    global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle = load_Conti_measurement_data(subject, trial, side)
+    m_model = model_loader('Measurement_model.pickle')
+    Psi = load_Psi(subject)
+
+    global_thigh_angle_Y_pred = model_prediction(m_model.models[0], Psi[0], phases, phase_dots, step_lengths, ramps)
+    force_z_ankle_pred = model_prediction(m_model.models[1], Psi[1], phases, phase_dots, step_lengths, ramps)
+    force_x_ankle_pred = model_prediction(m_model.models[2], Psi[2], phases, phase_dots, step_lengths, ramps)
+    moment_y_ankle_pred = model_prediction(m_model.models[3],Psi[3], phases, phase_dots, step_lengths, ramps)
+
+    plt.figure('measurement')
+    plt.subplot(411)
+    plt.plot(global_thigh_angle_Y, 'b-')
+    plt.plot(global_thigh_angle_Y_pred,'k--')
+    plt.legend(['actual','predicted'])
+    plt.ylabel('global_thigh_angle_Y')
+    plt.subplot(412)
+    plt.plot(force_z_ankle, 'b-')
+    plt.plot(force_z_ankle_pred, 'k--')
+    plt.legend(['actual','predicted'])
+    plt.ylabel('force_z_ankle')
+    plt.subplot(413)
+    plt.plot(force_x_ankle, 'b-')
+    plt.plot(force_x_ankle_pred, 'k--')
+    plt.legend(['actual','predicted'])
+    plt.ylabel('force_x_ankle')
+    plt.subplot(414)
+    plt.plot(moment_y_ankle, 'b-')
+    plt.plot(moment_y_ankle_pred, 'k--')
+    plt.legend(['actual','predicted'])
+    plt.ylabel('moment_y_ankle')
+
+    plt.figure('state')
+    plt.subplot(411)
+    plt.plot(phases)
+    plt.ylabel('phase')
+    plt.subplot(412)
+    plt.plot(phase_dots)
+    plt.ylabel('phase dot')
+    plt.subplot(413)
+    plt.plot(step_lengths)
+    plt.ylabel('step length')
+    plt.subplot(414)
+    plt.plot(ramps)
+    plt.ylabel('ramp')
+    
+    plt.show()
 
 if __name__ == '__main__':
     """
@@ -115,86 +185,5 @@ if __name__ == '__main__':
     """
 
     # Test plot
-    subject = 'AB09'
-    trial= 's1x2i7x5'
-    side = 'left'
-
-    with open('Continuous_measurement_data.pickle', 'rb') as file:
-    	Continuous_measurement_data = pickle.load(file)
-
-    global_thigh_angle_Y = Continuous_measurement_data[subject][trial][side]['global_thigh_angle_Y'][0,:]
-    force_z_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_z'][0,:]
-    force_x_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_x'][0,:]
-    moment_y_ankle = Continuous_measurement_data[subject][trial][side]['moment_ankle_y'][0,:]
-
-    phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
-
-    m_model = model_loader('Measurement_model.pickle')
-
-    with open('Measurement_model_coeff.npz', 'rb') as file:
-        Measurement_model_coeff = np.load(file, allow_pickle = True)
-        psi_thigh_Y = Measurement_model_coeff['global_thigh_angle_Y']
-        psi_force_z = Measurement_model_coeff['reaction_force_z_ankle']
-        psi_force_x = Measurement_model_coeff['reaction_force_x_ankle']
-        psi_moment_y = Measurement_model_coeff['reaction_moment_y_ankle']
-
-    Conti_time = raw_walking_data['Continuous'][subject][trial]['time'][:]
-    n_s = np.size(Conti_time) # number of data poitns
-
-    global_thigh_angle_Y_pred = model_prediction(m_model.models[0], psi_thigh_Y.item()[subject], phases, phase_dots, step_lengths, ramps)
-    force_z_ankle_pred = model_prediction(m_model.models[1], psi_force_z.item()[subject], phases, phase_dots, step_lengths, ramps)
-    force_x_ankle_pred = model_prediction(m_model.models[2], psi_force_x.item()[subject], phases, phase_dots, step_lengths, ramps)
-    moment_y_ankle_pred = model_prediction(m_model.models[3], psi_moment_y.item()[subject], phases, phase_dots, step_lengths, ramps)
-
-    plt.figure()
-    plt.subplot(411)
-    plt.plot(global_thigh_angle_Y, 'b-')
-    plt.plot(global_thigh_angle_Y_pred,'k--')
-    plt.legend(['actual','predicted'])
-    plt.ylabel('global_thigh_angle_Y')
-
-    plt.subplot(412)
-    plt.plot(force_z_ankle, 'b-')
-    plt.plot(force_z_ankle_pred, 'k--')
-    plt.legend(['actual','predicted'])
-    plt.ylabel('force_z_ankle')
-
-    plt.subplot(413)
-    plt.plot(force_x_ankle, 'b-')
-    plt.plot(force_x_ankle_pred, 'k--')
-    plt.legend(['actual','predicted'])
-    plt.ylabel('force_x_ankle')
-
-    plt.subplot(414)
-    plt.plot(moment_y_ankle, 'b-')
-    plt.plot(moment_y_ankle_pred, 'k--')
-    plt.legend(['actual','predicted'])
-    plt.ylabel('moment_y_ankle')
-    
-
-    """
-    plt.figure(4)
-    plt.title("Ground reaction force in ankle frame: left")
-    plt.plot(range(n_s), Continuous_measurement_data[subject][trial][side]['force_ankle_x'][0,:],\
-             range(n_s), Continuous_measurement_data[subject][trial][side]['force_ankle_y'][0,:],\
-             range(n_s), Continuous_measurement_data[subject][trial][side]['force_ankle_z'][0,:])
-    plt.ylabel("force [N]")
-    plt.legend(('X_ankle','Y_ankle','Z_ankle'))
-
-    plt.figure(5)
-    plt.title("Ground reaction moment in ankle frame: left")
-    plt.plot(range(n_s), Continuous_measurement_data[subject][trial][side]['moment_ankle_x'][0,:],\
-             range(n_s), Continuous_measurement_data[subject][trial][side]['moment_ankle_y'][0,:],\
-             range(n_s), Continuous_measurement_data[subject][trial][side]['moment_ankle_z'][0,:])
-    plt.ylabel("Moment [N-m]")
-    plt.legend(('X_ankle','Y_ankle','Z_ankle'))
-    
-    plt.figure(8)
-    plt.title("Global thigh angles: Y")
-    plt.plot(range(n_s), Continuous_measurement_data[subject][trial][side]['global_thigh_angle_Y'] [0,:], range(n_s), phase[0,:], '--')
-    plt.ylabel("angles [deg]")
-    
-    plt.figure()
-    plt.plot(range(n_s), phase[0,:], range(n_s), phase_dot[0,:], range(n_s), step_length[0,:], range(n_s), ramp[0,:])
-    """
-    plt.show()
+    #plot_Conti_data('AB09', 's1x2i7x5', 'left')
+    R = measurement_error_cov('AB09')

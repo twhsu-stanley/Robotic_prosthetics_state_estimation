@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from data_generators import *
 from model_framework import *
+from model_fit import *
 
 subject = 'AB01'
 stride_id = 11
@@ -27,29 +28,24 @@ ramps = get_ramp(subject)
 
 m_model = model_loader('Measurement_model.pickle')
 
-with open('Measurement_model_coeff.npz', 'rb') as file:
-    Measurement_model_coeff = np.load(file, allow_pickle = True)
-    psi_thigh_Y = Measurement_model_coeff['global_thigh_angle_Y']
-    psi_force_z = Measurement_model_coeff['reaction_force_z_ankle']
-    psi_force_x = Measurement_model_coeff['reaction_force_x_ankle']
-    psi_moment_y = Measurement_model_coeff['reaction_moment_y_ankle']
+Psi = load_Psi(subject)
 
-global_thigh_angle_Y_pred = model_prediction(m_model.models[0], psi_thigh_Y.item()[subject], phases[stride_id-n:stride_id+n,:].ravel(),\
+global_thigh_angle_Y_pred = model_prediction(m_model.models[0], Psi[0], phases[stride_id-n:stride_id+n,:].ravel(),\
                                                 phase_dots[stride_id-n:stride_id+n,:].ravel(),\
                                                 step_lengths[stride_id-n:stride_id+n,:].ravel(),\
                                                 ramps[stride_id-n:stride_id+n,:].ravel())
 
-force_z_ankle_pred = model_prediction(m_model.models[1], psi_force_z.item()[subject], phases[stride_id-n:stride_id+n,:].ravel(),\
+force_z_ankle_pred = model_prediction(m_model.models[1], Psi[1], phases[stride_id-n:stride_id+n,:].ravel(),\
                                                 phase_dots[stride_id-n:stride_id+n,:].ravel(),\
                                                 step_lengths[stride_id-n:stride_id+n,:].ravel(),\
                                                 ramps[stride_id-n:stride_id+n,:].ravel())
 
-force_x_ankle_pred = model_prediction(m_model.models[2], psi_force_x.item()[subject], phases[stride_id-n:stride_id+n,:].ravel(),\
+force_x_ankle_pred = model_prediction(m_model.models[2], Psi[2], phases[stride_id-n:stride_id+n,:].ravel(),\
                                                 phase_dots[stride_id-n:stride_id+n,:].ravel(),\
                                                 step_lengths[stride_id-n:stride_id+n,:].ravel(),\
                                                 ramps[stride_id-n:stride_id+n,:].ravel())
 
-moment_y_ankle_pred = model_prediction(m_model.models[3], psi_moment_y.item()[subject], phases[stride_id-n:stride_id+n,:].ravel(),\
+moment_y_ankle_pred = model_prediction(m_model.models[3], Psi[3], phases[stride_id-n:stride_id+n,:].ravel(),\
                                                 phase_dots[stride_id-n:stride_id+n,:].ravel(),\
                                                 step_lengths[stride_id-n:stride_id+n,:].ravel(),\
                                                 ramps[stride_id-n:stride_id+n,:].ravel())

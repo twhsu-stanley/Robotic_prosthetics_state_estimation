@@ -2,45 +2,9 @@ import numpy as np
 from model_framework import *
 from data_generators import *
 from continuous_data import *
+from model_fit import *
 import matplotlib.pyplot as plt
 import h5py
-
-# load data
-subject = 'AB01'
-trial= 's1x2i5'
-side = 'right'
-
-dt = 1/100
-
-start_index, end_index = Conti_start_end(subject, trial, side)
-
-phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
-
-phases = phases[start_index:end_index]
-phase_dots = phase_dots[start_index:end_index]
-step_lengths = step_lengths[start_index:end_index]
-ramps = ramps[start_index:end_index]
-
-with open('Continuous_measurement_data.pickle', 'rb') as file:
-    Continuous_measurement_data = pickle.load(file)
-
-global_thigh_angle_Y = Continuous_measurement_data[subject][trial][side]['global_thigh_angle_Y'][0, start_index:end_index]
-force_z_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_z'][0, start_index:end_index]
-force_x_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_x'][0, start_index:end_index]
-moment_y_ankle = Continuous_measurement_data[subject][trial][side]['moment_ankle_y'][0, start_index:end_index]
-
-m_model = model_loader('Measurement_model.pickle')
-
-with open('Measurement_model_coeff.npz', 'rb') as file:
-    Measurement_model_coeff = np.load(file, allow_pickle = True)
-    psi_thigh_Y = Measurement_model_coeff['global_thigh_angle_Y']
-    psi_force_z = Measurement_model_coeff['reaction_force_z_ankle']
-    psi_force_x = Measurement_model_coeff['reaction_force_x_ankle']
-    psi_moment_y = Measurement_model_coeff['reaction_moment_y_ankle']
-Psi = np.array([psi_thigh_Y.item()[subject],\
-                psi_force_z.item()[subject],\
-                psi_force_x.item()[subject],\
-                psi_moment_y.item()[subject]]) # Psi: 4 x 336
 
 def warpToOne(phase):
     phase_wrap = np.remainder(phase, 1)
@@ -109,46 +73,18 @@ def A(dt):
 def process_model(x, dt):
     #dt = 0.01 # data sampling rate: 100 Hz
     return A(dt) @ x
-
-def measurement_data_cov(plot = False):
-    global_thigh_angle_Y_pred = model_prediction(m_model.models[0], Psi[0], phases, phase_dots, step_lengths, ramps)
-    force_z_ankle_pred = model_prediction(m_model.models[1], Psi[1], phases, phase_dots, step_lengths, ramps)
-    force_x_ankle_pred = model_prediction(m_model.models[2], Psi[2], phases, phase_dots, step_lengths, ramps)
-    moment_y_ankle_pred = model_prediction(m_model.models[3], Psi[3], phases, phase_dots, step_lengths, ramps)
-    err_gthY = global_thigh_angle_Y - global_thigh_angle_Y_pred
-    err_fz = force_z_ankle - force_z_ankle_pred
-    err_fx = force_x_ankle - force_x_ankle_pred
-    err_my = moment_y_ankle - moment_y_ankle_pred
-    err = np.stack((err_gthY, err_fz, err_fx, err_my))
-    R_data = np.cov(err)
     
-    if plot:
-        plt.figure('Measurement Data vs. Prediction')
-        plt.subplot(411)
-        plt.plot(global_thigh_angle_Y, 'b-')
-        plt.plot(global_thigh_angle_Y_pred,'k--')
-        plt.legend(['actual','predicted'])
-        plt.ylabel('global_thigh_angle_Y')
-        plt.subplot(412)
-        plt.plot(force_z_ankle, 'b-')
-        plt.plot(force_z_ankle_pred, 'k--')
-        plt.legend(['actual','predicted'])
-        plt.ylabel('force_z_ankle')
-        plt.subplot(413)
-        plt.plot(force_x_ankle, 'b-')
-        plt.plot(force_x_ankle_pred, 'k--')
-        plt.legend(['actual','predicted'])
-        plt.ylabel('force_x_ankle')
-        plt.subplot(414)
-        plt.plot(moment_y_ankle, 'b-')
-        plt.plot(moment_y_ankle_pred, 'k--')
-        plt.legend(['actual','predicted'])
-        plt.ylabel('moment_y_ankle')
-        plt.show()
-    
-    return R_data
-
 if __name__ == '__main__':
+    subject = 'AB01'
+    trial= 's1x2i5'
+    side = 'right'
+
+    dt = 1/100
+    phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
+    global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle = load_Conti_measurement_data(subject, trial, side)
+    m_model = model_loader('Measurement_model.pickle')
+    Psi = load_Psi(subject)
+
     # build the system
     sys = myStruct()
     sys.f = process_model
@@ -156,8 +92,11 @@ if __name__ == '__main__':
     
     sys.h = m_model
     sys.Q = np.diag([0, 1e-7, 1e-8, 1e-14]) # process model noise covariance
-    sys.R = measurement_data_cov()
-    #sys.R = np.diag([10, 1400, 350, 2100]) # measurement noise covariance
+    
+    with open('Measurement_error_cov.pickle', 'rb') as file:
+        R = pickle.load(file)
+    
+    sys.R = R[subject] # measurement noise covariance
 
     # initialize the state
     init = myStruct()
@@ -174,13 +113,19 @@ if __name__ == '__main__':
 
     x = []  # state estimate
     x.append(init.x)
+
+    Sigma = []
+    Sigma.append(np.diag(init.Sigma))
     
     for i in range(np.shape(z)[1]):
         ekf.prediction(dt)
         ekf.correction(z[:, i])
+
         x.append(ekf.x)
+        Sigma.append(np.diag(ekf.Sigma))
         
     x = np.array(x).squeeze()
+    Sigma = np.array(Sigma)
 
     print("Sigma at final step: \n", ekf.Sigma)
 
@@ -190,27 +135,29 @@ if __name__ == '__main__':
     plt.plot(phases)
     plt.plot(x[:, 0], '--')
     plt.ylabel('phase')
-
     plt.subplot(412)
     plt.plot(phase_dots)
     plt.plot(x[:, 1], '--')
     plt.ylabel('phase dot')
     #plt.ylim(phase_dots.min()-0.2, phase_dots.max() +0.2)
-
     plt.subplot(413)
     plt.plot(step_lengths)
     plt.plot(x[:, 2], '--')
     #plt.ylim(step_lengths.min()-0.02, step_lengths.max() +0.02)
     plt.ylabel('step length')
-
     plt.subplot(414)
     plt.plot(ramps)
     plt.plot(x[:, 3], '--')
     plt.ylabel('ramp')
     #plt.ylim(ramps.min()-1, ramps.max()+1)
+
+    plt.figure()
+    plt.subplot(411)
+
+    plt.subplot(412)
+
+    plt.subplot(413)
+
+    plt.subplot(414)
     
     plt.show()
-
-    
-
-    

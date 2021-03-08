@@ -1,9 +1,5 @@
-from data_generators import get_joint_angle, get_reaction_wrench, get_global_thigh_angle, get_phase, get_phase_dot, get_step_length, get_ramp, get_subject_names
-from model_framework import Fourier_Basis, Polynomial_Basis, Berstein_Basis, Kronecker_Model, Measurement_Model, least_squares, model_prediction, model_saver, model_loader
-import plotly.express as px
-import plotly.graph_objs as go
-import plotly.io as pio
-pio.renderers.default = "browser"
+from data_generators import *
+from model_framework import *
 import matplotlib.pyplot as plt
 import numpy as np
 import h5py
@@ -22,14 +18,6 @@ def model_fit(model, mode):
 
     # dictionary of  RMS error: rmse
     RMSE = dict()
-
-    # Visualization
-    """
-    fig = go.Figure()
-    colors = ['black','green','red','cyan','magenta','yellow','black','white',
-            'cadetblue', 'darkgoldenrod', 'darkseagreen', 'deeppink', 'midnightblue']
-    color_index = 0
-    """
     
     # Calculate a SUBJECT SPECIFIC model
     #for subject in ['AB01', 'AB03']:
@@ -88,34 +76,72 @@ def model_fit(model, mode):
         #print("mode: ", str(mode), "; Subject: ", str(subject))
         print("RMSE mean: ", rmse.mean())
         print("RMSE max: ", rmse.max())
-        
-        # Vizualization
-        """
-        #Predict the average line 
-        draw_measurement_input = measurement_input.mean(0)
-        draw_phases = phases[0]
-        draw_phase_dots = phase_dots.mean(0)
-        draw_ramps = ramps.mean(0)
-        draw_steps = step_lengths.mean(0)
-        #Get prediction
-        y_pred = model_prediction(model, psi, draw_phases.ravel(), draw_phase_dots.ravel(), draw_steps.ravel(), draw_ramps.ravel())
-
-        #Plot the result
-        fig.add_trace(go.Scatter(x = draw_phases, y = draw_measurement_input,
-                                 line = dict(color = colors[color_index], width = 4),
-                                 name = subject +' data'))
-        fig.add_trace(go.Scatter(x = draw_phases, y = y_pred,
-                                 line = dict(color = colors[color_index], width = 4, dash = 'dash'),
-                                 name = subject + ' predicted'))
-        color_index=(color_index + 1) % len(colors)
-        
-    #Plot everything
-    fig.show()
-    """
 
     return PSI, RMSE
 
+def load_Psi(subject):
+    with open('Measurement_model_coeff.npz', 'rb') as file:
+        Measurement_model_coeff = np.load(file, allow_pickle = True)
+        psi_thigh_Y = Measurement_model_coeff['global_thigh_angle_Y']
+        psi_force_z = Measurement_model_coeff['reaction_force_z_ankle']
+        psi_force_x = Measurement_model_coeff['reaction_force_x_ankle']
+        psi_moment_y = Measurement_model_coeff['reaction_moment_y_ankle']
+    Psi = np.array([psi_thigh_Y.item()[subject],\
+                    psi_force_z.item()[subject],\
+                    psi_force_x.item()[subject],\
+                    psi_moment_y.item()[subject]]) # Psi: 4 x 336
+    return Psi
+
+def measurement_error_cov(subject):
+    with open('Global_thigh_angle.npz', 'rb') as file:
+        g_t = np.load(file)
+        global_thigh_angle_Y = g_t[subject][0]
+
+    with open('Reaction_wrench.npz', 'rb') as file:
+        r_w = np.load(file)
+        force_x_ankle = r_w[subject][0]
+        force_y_ankle = r_w[subject][1]
+        force_z_ankle = r_w[subject][2]
+        moment_x_ankle = r_w[subject][3]
+        moment_y_ankle = r_w[subject][4]
+        moment_z_ankle = r_w[subject][5]
+
+    phases = get_phase(global_thigh_angle_Y)
+    phase_dots = get_phase_dot(subject)
+    step_lengths = get_step_length(subject)
+    ramps = get_ramp(subject)
+
+    m_model = model_loader('Measurement_model.pickle')
+
+    Psi = load_Psi(subject)
+
+    global_thigh_angle_Y_pred = model_prediction(m_model.models[0], Psi[0], phases.ravel(), phase_dots.ravel(), step_lengths.ravel(), ramps.ravel())
+    force_z_ankle_pred = model_prediction(m_model.models[1], Psi[1], phases.ravel(), phase_dots.ravel(), step_lengths.ravel(), ramps.ravel())
+    force_x_ankle_pred = model_prediction(m_model.models[2], Psi[2], phases.ravel(), phase_dots.ravel(), step_lengths.ravel(), ramps.ravel())
+    moment_y_ankle_pred = model_prediction(m_model.models[3], Psi[3], phases.ravel(), phase_dots.ravel(), step_lengths.ravel(), ramps.ravel())
+
+    # compute covariance from samples
+    err_gthY = global_thigh_angle_Y.ravel() - global_thigh_angle_Y_pred
+    print("subject: ",  subject)
+    print("mean g_th_Y ", np.mean(err_gthY))
+    print("std g_th_Y ", np.std(err_gthY))
+    err_fz = force_z_ankle.ravel() - force_z_ankle_pred
+    print("mean f_z ", np.mean(err_fz))
+    print("std f_z ", np.std(err_fz))
+    err_fx = force_x_ankle.ravel() - force_x_ankle_pred
+    print("mean f_x ", np.mean(err_fx))
+    print("std f_x ", np.std(err_fx))
+    err_my = moment_y_ankle.ravel() - moment_y_ankle_pred
+    print("mean m_y ", np.mean(err_my))
+    print("std m_y ", np.std(err_my))
+    err = np.stack((err_gthY, err_fz, err_fx, err_my))
+    R = np.cov(err)
+    print("R = ", R)
+
+    return R
+
 if __name__ == '__main__':
+    """
     # dictionary storing all measurement model coefficients
     Measurement_model_coeff = dict()
     Measurement_model_RMSE = dict()
@@ -124,47 +150,36 @@ if __name__ == '__main__':
     F = 11
     N = 3
 
-    # Measrurement model for global_thigh_angle_Y
     phase_model = Fourier_Basis(F, 'phase')
     phase_dot_model = Polynomial_Basis(1, 'phase_dot')
     step_length_model = Berstein_Basis(N,'step_length')
     ramp_model = Berstein_Basis(N, 'ramp')
+
+    # Measrurement model for global_thigh_angle_Y
     model_thigh_Y = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     psi_thigh_Y, RMSE_thigh_Y = model_fit(model_thigh_Y, 'global_thigh_angle_Y')
     Measurement_model_coeff['global_thigh_angle_Y'] = psi_thigh_Y
     Measurement_model_RMSE['global_thigh_angle_Y'] = RMSE_thigh_Y
 
     # Measrurement model for reaction_force_z_ankle
-    phase_model = Fourier_Basis(F, 'phase')
-    phase_dot_model = Polynomial_Basis(1, 'phase_dot')
-    step_length_model = Berstein_Basis(N,'step_length')
-    ramp_model = Berstein_Basis(N, 'ramp')
     model_force_z = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     psi_force_z, RMSE_force_z = model_fit(model_force_z, 'reaction_force_z_ankle')
     Measurement_model_coeff['reaction_force_z_ankle'] = psi_force_z
     Measurement_model_RMSE['reaction_force_z_ankle'] = RMSE_force_z
 
     # Measrurement model for reaction_force_x_ankle
-    phase_model = Fourier_Basis(F, 'phase')
-    phase_dot_model = Polynomial_Basis(1, 'phase_dot')
-    step_length_model = Berstein_Basis(N,'step_length')
-    ramp_model = Berstein_Basis(N, 'ramp')
     model_force_x = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     psi_force_x, RMSE_force_x = model_fit(model_force_x, 'reaction_force_x_ankle')
     Measurement_model_coeff['reaction_force_x_ankle'] = psi_force_x
     Measurement_model_RMSE['reaction_force_x_ankle'] = RMSE_force_x
 
     # Measrurement model for reaction_moment_y_ankle
-    phase_model = Fourier_Basis(F, 'phase')
-    phase_dot_model = Polynomial_Basis(1, 'phase_dot')
-    step_length_model = Berstein_Basis(N,'step_length')
-    ramp_model = Berstein_Basis(N, 'ramp')
     model_moment_y = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     psi_moment_y, RMSE_moment_y = model_fit(model_moment_y, 'reaction_moment_y_ankle')
     Measurement_model_coeff['reaction_moment_y_ankle'] = psi_moment_y
     Measurement_model_RMSE['reaction_moment_y_ankle'] = RMSE_moment_y
 
-    # save measurement model coeffiecients
+    # save measurement model coeffiecients (Psi)
     with open('Measurement_model_coeff.npz', 'wb') as file:
         np.savez(file, **Measurement_model_coeff, allow_pickle = True)
 
@@ -175,3 +190,11 @@ if __name__ == '__main__':
     # save measurement model
     m_model = Measurement_Model(model_thigh_Y, model_force_z, model_force_x, model_moment_y)
     model_saver(m_model, 'Measurement_model.pickle')
+    """
+    
+    R = dict()
+    for subject in subject_names:
+        R[subject] = measurement_error_cov(subject)
+        
+    with open('Measurement_error_cov.pickle', 'wb') as file:
+    	pickle.dump(R, file)

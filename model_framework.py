@@ -205,7 +205,7 @@ def least_squares(model, output, *data):
 	return psi
 
 #Save the model so that you can use them later
-def model_saver(model,filename):
+def model_saver(model, filename):
 	with open(filename, 'wb') as file:
 		pickle.dump(model, file)
 
