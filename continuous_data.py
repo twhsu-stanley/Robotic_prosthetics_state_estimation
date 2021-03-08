@@ -12,14 +12,17 @@ raw_walking_data = hp.File("../InclineExperiment.mat", "r")
 def Conti_subject_names():
     return raw_walking_data['Continuous'].keys()
 
+def Conti_trial_names(subject):
+    raw_walking_data['Continuous'][subject].keys()
+
+def Conti_heel_strikes(subject, trial, side):
+    return raw_walking_data['Gaitcycle'][subject][trial]['cycles'][side]['frame'][:]
+
 def Conti_start_end(subject, trial, side):
-    heel_strike_index = raw_walking_data['Gaitcycle'][subject][trial]['cycles'][side]['frame'][:]
+    heel_strike_index = Conti_heel_strikes(subject, trial, side)
     start_index = heel_strike_index[0]
     end_index = heel_strike_index[np.size(heel_strike_index)-1]
     return int(start_index), int(end_index)
-
-def Conti_heel_strikes(subject, trial, side):
-    heel_strike_index = raw_walking_data['Gaitcycle'][subject][trial]['cycles'][side]['frame'][:]
 
 def Conti_global_thigh_angle_Y(subject, trial, side):
     jointangles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'] #deg

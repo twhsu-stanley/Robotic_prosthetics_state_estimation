@@ -37,7 +37,7 @@ class extended_kalman_filter:
         self.x_pred[0, 0] = warpToOne(self.x_pred[0, 0]) # wrap to be between 0 and 1
         self.Sigma_pred = self.A(dt) @ self.Sigma @ self.A(dt).T + self.Q  # predicted state covariance
 
-    def correction(self, z):
+    def correction(self, z, Psi):
         # EKF correction step
         # Inputs:
         #   z:  measurement
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     sys.A = A
     
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-8, 1e-8, 0]) # process model noise covariance
+    sys.Q = np.diag([0, 1e-7, 1e-8, 1e-10]) # process model noise covariance
     
     with open('Measurement_error_cov.pickle', 'rb') as file:
         R = pickle.load(file)
@@ -100,7 +100,7 @@ if __name__ == '__main__':
 
     # initialize the state
     init = myStruct()
-    init.x = np.array([[phases[0]+0.2], [phase_dots[0]], [step_lengths[0]], [ramps[0]+0.1]])
+    init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
     init.Sigma = np.diag([0, 1e-14, 1e-14, 10])
 
     ekf = extended_kalman_filter(sys, init)
@@ -119,20 +119,32 @@ if __name__ == '__main__':
     
     for i in range(np.shape(z)[1]):
         ekf.prediction(dt)
-        ekf.correction(z[:, i])
+        ekf.correction(z[:, i], Psi)
 
         x.append(ekf.x)
         #Sigma.append(np.diag(ekf.Sigma))
         
     x = np.array(x).squeeze()
     #Sigma = np.array(Sigma)
+    track = True
+    track_tol = 0.035
+    heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
+    for i in range(np.size(heel_strike_index)):
+        if i != np.size(heel_strike_index) - 1:
+            start = int(heel_strike_index[i]) + 5
+            end = int(heel_strike_index[i+1]) - 5
+            track = track and all(abs(phases[start:end] - x[start:end, 0]) < track_tol)
+    
+    print("track? ",track)
 
     print("Sigma at final step: \n", ekf.Sigma)
 
-    time_step = 100
-    track = all(e < 0.01 for e in abs(x[time_step:, 0] - phases[time_step:]))
+    #time_step = 100
+    #track = all(e < 0.01 for e in abs(x[time_step:, 0] - phases[time_step:]))
     plt.figure()
-    plt.plot(abs(x[time_step:, 0] - phases[time_step:]))
+    plt.plot(phases)
+    plt.plot(x[:, 0], '--')
+    plt.plot(heel_strike_index, np.zeros(np.size(heel_strike_index)), 'rx')
     plt.show()
 
     # plot results
@@ -168,6 +180,6 @@ if __name__ == '__main__':
     plt.subplot(414)
     plt.plot(Sigma[:,3])
     """
-    plot_Conti_data(subject, trial, side)
+    #plot_Conti_data(subject, trial, side)
 
     plt.show()
