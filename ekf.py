@@ -4,7 +4,6 @@ from data_generators import *
 from continuous_data import *
 from model_fit import *
 import matplotlib.pyplot as plt
-import h5py
 
 def warpToOne(phase):
     phase_wrap = np.remainder(phase, 1)
@@ -100,7 +99,7 @@ if __name__ == '__main__':
 
     # initialize the state
     init = myStruct()
-    init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
+    init.x = np.array([[phases[0]+0.1], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
     init.Sigma = np.diag([0, 1e-14, 1e-14, 10])
 
     ekf = extended_kalman_filter(sys, init)
@@ -126,13 +125,18 @@ if __name__ == '__main__':
         
     x = np.array(x).squeeze()
     #Sigma = np.array(Sigma)
+
+    # evaluate robustness
+    # compare x and ground truth:
     track = True
-    track_tol = 0.035
+    track_tol = 0.05
     heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
-    for i in range(np.size(heel_strike_index)):
+    # start checking tracking after the 3rd stride
+    for i in range(3, np.size(heel_strike_index)):
         if i != np.size(heel_strike_index) - 1:
-            start = int(heel_strike_index[i]) + 5
-            end = int(heel_strike_index[i+1]) - 5
+            start = int(heel_strike_index[i]) + 10
+            end = int(heel_strike_index[i+1]) - 10
+            print(max(abs(phases[start:end] - x[start:end, 0])))
             track = track and all(abs(phases[start:end] - x[start:end, 0]) < track_tol)
     
     print("track? ",track)
@@ -144,7 +148,7 @@ if __name__ == '__main__':
     plt.figure()
     plt.plot(phases)
     plt.plot(x[:, 0], '--')
-    plt.plot(heel_strike_index, np.zeros(np.size(heel_strike_index)), 'rx')
+    plt.plot(heel_strike_index[3:], np.zeros(np.size(heel_strike_index[3:])), 'rx')
     plt.show()
 
     # plot results

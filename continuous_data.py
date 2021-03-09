@@ -192,4 +192,5 @@ if __name__ == '__main__':
 
     # Test plot
     #plot_Conti_data('AB09', 's1x2i7x5', 'left')
-    R = measurement_error_cov('AB09')
+    #R = measurement_error_cov('AB09')
+    plot_Conti_data('AB09', 's0x8d10', 'left')
