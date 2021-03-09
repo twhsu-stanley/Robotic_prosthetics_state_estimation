@@ -99,8 +99,8 @@ if __name__ == '__main__':
 
     # initialize the state
     init = myStruct()
-    init.x = np.array([[phases[0]+0.1], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
-    init.Sigma = np.diag([0, 1e-14, 1e-14, 10])
+    init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
+    init.Sigma = np.diag([0, 1e-14, 1e-14, 1e-14])
 
     ekf = extended_kalman_filter(sys, init)
 
@@ -113,10 +113,18 @@ if __name__ == '__main__':
     x = []  # state estimate
     #x.append(init.x)
 
-    #Sigma = []
-    #Sigma.append(np.diag(init.Sigma))
+    kidnap_index = 100 # step at which kidnapping occurs
+    phase_kidnap = np.random.uniform(0, 1)
+    phase_dot_kidnap = np.random.uniform(0.65, 1)
+    step_length_kidnap = np.random.uniform(0.95, 1.4)
+    ramp_kidnap = np.random.uniform(-10, 10)
+    state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
     
     for i in range(np.shape(z)[1]):
+        # kidnap
+        if i == kidnap_index:
+            ekf.x = state_kidnap
+
         ekf.prediction(dt)
         ekf.correction(z[:, i], Psi)
 
@@ -124,7 +132,6 @@ if __name__ == '__main__':
         #Sigma.append(np.diag(ekf.Sigma))
         
     x = np.array(x).squeeze()
-    #Sigma = np.array(Sigma)
 
     # evaluate robustness
     # compare x and ground truth:
