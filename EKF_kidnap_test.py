@@ -43,63 +43,63 @@ def kidnap_test(subject, trial, side, ekf):
     # evaluate robustness
     # compare x and ground truth:
     track = True
-    track_tol = 0.05
+    track_tol = 0.075
     heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
     # start checking tracking after the 3-rd stride
-    for i in range(3, np.size(heel_strike_index)):
+    for i in range(4, np.size(heel_strike_index)):
         if i != np.size(heel_strike_index) - 1:
-            start = int(heel_strike_index[i]) + 10
-            end = int(heel_strike_index[i+1]) - 10
+            start = int(heel_strike_index[i]) + 25
+            end = int(heel_strike_index[i+1]) - 25
             track = track and all(abs(phases[start:end] - x[start:end, 0]) < track_tol)
-    
+    print("recover from kidnap? ", track)
     return track
 
 if __name__ == '__main__':
-    #subject = 'AB02'
-    #trial= 's1x2i5'
-    #phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
-
     # build the system
     sys = myStruct()
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    #sys.Q = np.diag([0, 1e-7, 1e-8, 1e-9]) # process model noise covariance  
-    #sys.R = R[subject] # measurement noise covariance
 
     # initialize the state
     init = myStruct()
-    #init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
     init.Sigma = np.diag([1e-14, 1e-14, 1e-14, 1e-14])
     
-    #ekf = extended_kalman_filter(sys, init)
-             
-    #print(kidnap_test(subject, trial, side, ekf))
-
+    Q_best = np.diag([0, 0, 0, 0])
+    robustness = 0
     # iterate through Q
     for Q_phase_dot in [1e-7]:
-        for Q_step_length in [1e-6]:
-            for Q_ramp in [1e-3]:
+        for Q_step_length in [1e-7]:
+            for Q_ramp in [1e-5]:
                 sys.Q = np.diag([0, Q_phase_dot, Q_step_length, Q_ramp]) # process model noise covariance
                 print("Q =\n", sys.Q)
                 track_count = 0
+                total_trials = 0
                 #for subject in Conti_subject_names():
-                for subject in ['AB01', 'AB05', 'AB10']:
+                for subject in ['AB01', 'AB05', 'AB07','AB10']:
                     print("subject: ", subject)
                     for trial in Conti_trial_names(subject):
+                        if trial == 'subjectdetails':
+                            continue
                         print("trial: ", trial)
-                        for side in ['left']:
-                            print("side: ", side)
+                        for side in ['left', 'right']:
+                            #print("side: ", side)
                             sys.R = R[subject]
                             phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
                             init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
                             ekf = extended_kalman_filter(sys, init)
+
+                            total_trials = total_trials + 1
                             if kidnap_test(subject, trial, side, ekf) == True:
                                 track_count = track_count + 1
-                print("track_count: ", track_count)
-
                 
-                
+                print("robustness (%): ", track_count / total_trials * 100)
+                if (track_count / total_trials) > robustness:
+                    robustness = track_count / total_trials
+                    Q_best = np.diag([0, Q_phase_dot, Q_step_length, Q_ramp])
 
-    
-    
+print("Q best =\n", Q_best)
+print("robustness (%): ", robustness * 100)
+
+with open('Process_error_cov.pickle', 'wb') as file:
+    	pickle.dump(Q_best, file)

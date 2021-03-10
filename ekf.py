@@ -74,9 +74,9 @@ def process_model(x, dt):
     return A(dt) @ x
     
 if __name__ == '__main__':
-    subject = 'AB02'
-    trial= 's1x2i0'
-    side = 'right'
+    subject = 'AB01'
+    trial= 's1x2d2x5'
+    side = 'left'
 
     dt = 1/100
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
@@ -90,7 +90,7 @@ if __name__ == '__main__':
     sys.A = A
     
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-7, 1e-6, 1e-3]) # process model noise covariance
+    sys.Q = np.diag([0, 1e-7, 1e-7, 1e-5]) # process model noise covariance
     
     with open('Measurement_error_cov.pickle', 'rb') as file:
         R = pickle.load(file)
@@ -113,17 +113,17 @@ if __name__ == '__main__':
     x = []  # state estimate
     #x.append(init.x)
 
-    #kidnap_index = 100 # step at which kidnapping occurs
-    #phase_kidnap = np.random.uniform(0, 1)
-    #phase_dot_kidnap = np.random.uniform(0.65, 1)
-    #step_length_kidnap = np.random.uniform(0.95, 1.4)
-    #ramp_kidnap = np.random.uniform(-10, 10)
-    #state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
+    kidnap_index = 100 # step at which kidnapping occurs
+    phase_kidnap = np.random.uniform(0, 1)
+    phase_dot_kidnap = np.random.uniform(0.65, 1)
+    step_length_kidnap = np.random.uniform(0.95, 1.4)
+    ramp_kidnap = np.random.uniform(-10, 10)
+    state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
     
     for i in range(np.shape(z)[1]):
         # kidnap
-        #if i == kidnap_index:
-            #ekf.x = state_kidnap
+        if i == kidnap_index:
+            ekf.x = state_kidnap
 
         ekf.prediction(dt)
         ekf.correction(z[:, i], Psi)
@@ -136,28 +136,25 @@ if __name__ == '__main__':
     # evaluate robustness
     # compare x and ground truth:
     track = True
-    track_tol = 0.05
+    track_tol = 0.075
     heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
-    # start checking tracking after the 3rd stride
-    for i in range(3, np.size(heel_strike_index)):
+    # start checking tracking after the 4th stride
+    for i in range(4, np.size(heel_strike_index)):
         if i != np.size(heel_strike_index) - 1:
-            start = int(heel_strike_index[i]) + 10
-            end = int(heel_strike_index[i+1]) - 10
+            start = int(heel_strike_index[i]) + 25
+            end = int(heel_strike_index[i+1]) - 25
             track = track and all(abs(phases[start:end] - x[start:end, 0]) < track_tol)
     
     print("track? ",track)
 
     print("Sigma at final step: \n", ekf.Sigma)
 
-    #time_step = 100
-    #track = all(e < 0.01 for e in abs(x[time_step:, 0] - phases[time_step:]))
-
     # plot results
     plt.figure()
     plt.subplot(411)
     plt.plot(phases)
     plt.plot(x[:, 0], '--')
-    plt.plot(heel_strike_index[3:], np.zeros(np.size(heel_strike_index[3:])), 'rx')
+    plt.plot(heel_strike_index[4:], np.zeros(np.size(heel_strike_index[4:])), 'rx')
     plt.ylabel('phase')
     plt.subplot(412)
     plt.plot(phase_dots)
