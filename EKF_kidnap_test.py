@@ -45,7 +45,7 @@ def kidnap_test(subject, trial, side, ekf):
     track = True
     track_tol = 0.05
     heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
-    # start checking tracking after the 3rd stride
+    # start checking tracking after the 3-rd stride
     for i in range(3, np.size(heel_strike_index)):
         if i != np.size(heel_strike_index) - 1:
             start = int(heel_strike_index[i]) + 10
@@ -55,47 +55,49 @@ def kidnap_test(subject, trial, side, ekf):
     return track
 
 if __name__ == '__main__':
-    subject = 'AB02'
-    trial= 's1x2i5'
-    side = 'right'
-    phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
+    #subject = 'AB02'
+    #trial= 's1x2i5'
+    #phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
 
     # build the system
     sys = myStruct()
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-7, 1e-8, 1e-10]) # process model noise covariance  
-    sys.R = R[subject] # measurement noise covariance
+    #sys.Q = np.diag([0, 1e-7, 1e-8, 1e-9]) # process model noise covariance  
+    #sys.R = R[subject] # measurement noise covariance
 
     # initialize the state
     init = myStruct()
-    init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
+    #init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
     init.Sigma = np.diag([1e-14, 1e-14, 1e-14, 1e-14])
     
-    ekf = extended_kalman_filter(sys, init)
-                            
-    print(kidnap_test(subject, trial, side, ekf))
-    
-    """
+    #ekf = extended_kalman_filter(sys, init)
+             
+    #print(kidnap_test(subject, trial, side, ekf))
+
     # iterate through Q
     for Q_phase_dot in [1e-7]:
-        for Q_step_length in [1e-8]:
-            for Q_ramp in [1e-4, 1e-8, 1e-14]:
+        for Q_step_length in [1e-6]:
+            for Q_ramp in [1e-3]:
                 sys.Q = np.diag([0, Q_phase_dot, Q_step_length, Q_ramp]) # process model noise covariance
+                print("Q =\n", sys.Q)
                 track_count = 0
-
-                for subject in Conti_subject_names():
+                #for subject in Conti_subject_names():
+                for subject in ['AB01', 'AB05', 'AB10']:
+                    print("subject: ", subject)
                     for trial in Conti_trial_names(subject):
-                        for side in ['left', 'right']:
+                        print("trial: ", trial)
+                        for side in ['left']:
+                            print("side: ", side)
+                            sys.R = R[subject]
                             phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
-                            sys.R = R[subject] 
                             init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
                             ekf = extended_kalman_filter(sys, init)
-                            
-                            if robustness_test(subject, trial, side, ekf) == True:
+                            if kidnap_test(subject, trial, side, ekf) == True:
                                 track_count = track_count + 1
-    """
+                print("track_count: ", track_count)
+
                 
                 
 

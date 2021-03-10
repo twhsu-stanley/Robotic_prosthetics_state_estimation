@@ -13,7 +13,7 @@ def Conti_subject_names():
     return raw_walking_data['Continuous'].keys()
 
 def Conti_trial_names(subject):
-    raw_walking_data['Continuous'][subject].keys()
+    return raw_walking_data['Continuous'][subject].keys()
 
 def Conti_heel_strikes(subject, trial, side):
     return raw_walking_data['Gaitcycle'][subject][trial]['cycles'][side]['frame'][:]
@@ -193,4 +193,4 @@ if __name__ == '__main__':
     # Test plot
     #plot_Conti_data('AB09', 's1x2i7x5', 'left')
     #R = measurement_error_cov('AB09')
-    plot_Conti_data('AB09', 's0x8d10', 'left')
+    plot_Conti_data('AB01', 's0x8i0', 'left')
