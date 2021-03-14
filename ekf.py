@@ -11,6 +11,13 @@ def warpToOne(phase):
         phase_wrap = phase_wrap - np.sign(phase_wrap)
     return phase_wrap
 
+def phase_error(phase_est, phase_truth):
+    # measure error between estimated and ground-truth phase
+    if abs(phase_est - phase_truth) < 0.5:
+        return abs(phase_est - phase_truth)
+    else:
+        return 1 - abs(phase_est - phase_truth)
+
 class myStruct:
     pass
 
@@ -113,11 +120,13 @@ if __name__ == '__main__':
     x = []  # state estimate
     #x.append(init.x)
 
-    kidnap_index = 100 # step at which kidnapping occurs
+    heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
+    kidnap_index = np.random.randint(heel_strike_index[0], heel_strike_index[1]) # step at which kidnapping occurs
+
     phase_kidnap = np.random.uniform(0, 1)
-    phase_dot_kidnap = np.random.uniform(0.65, 1)
-    step_length_kidnap = np.random.uniform(0.95, 1.4)
-    ramp_kidnap = np.random.uniform(-10, 10)
+    phase_dot_kidnap = np.random.uniform(0, 5)
+    step_length_kidnap = np.random.uniform(0, 2)
+    ramp_kidnap = np.random.uniform(-45, 45)
     state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
     
     for i in range(np.shape(z)[1]):
@@ -137,14 +146,9 @@ if __name__ == '__main__':
     # compare x and ground truth:
     track = True
     track_tol = 0.075
-    heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
-    # start checking tracking after the 4th stride
-    for i in range(4, np.size(heel_strike_index)):
-        if i != np.size(heel_strike_index) - 1:
-            start = int(heel_strike_index[i]) + 25
-            end = int(heel_strike_index[i+1]) - 25
-            track = track and all(abs(phases[start:end] - x[start:end, 0]) < track_tol)
-    
+    for i in range(int(heel_strike_index[3]), int(heel_strike_index[np.size(heel_strike_index)-1])):
+        track = track and (phase_error(x[i, 0], phases[i]) < track_tol)
+
     print("track? ",track)
 
     print("Sigma at final step: \n", ekf.Sigma)

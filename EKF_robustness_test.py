@@ -10,7 +10,7 @@ with open('Measurement_error_cov.pickle', 'rb') as file:
 
 m_model = model_loader('Measurement_model.pickle')
 
-def kidnap_test(subject, trial, side, ekf):
+def kidnap_test(subject, trial, side, ekf, kidnap = True):
     dt = 1/100
     Psi = load_Psi(subject)
     phases, _, _, _ = Conti_state_vars(subject, trial, side)
@@ -20,19 +20,21 @@ def kidnap_test(subject, trial, side, ekf):
                   [force_z_ankle], \
                   [force_x_ankle],\
                   [moment_y_ankle]])
-    z = np.squeeze(z)
+    z = np.squeeze(z)    
     
-    kidnap_index = 100 # step at which kidnapping occurs
+    heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
+    kidnap_index = np.random.randint(heel_strike_index[0], heel_strike_index[1]) # step at which kidnapping occurs
+    
     phase_kidnap = np.random.uniform(0, 1)
-    phase_dot_kidnap = np.random.uniform(0.65, 1)
-    step_length_kidnap = np.random.uniform(0.95, 1.4)
-    ramp_kidnap = np.random.uniform(-10, 10)
+    phase_dot_kidnap = np.random.uniform(0, 5)
+    step_length_kidnap = np.random.uniform(0, 2)
+    ramp_kidnap = np.random.uniform(-45, 45)
     state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
 
     x = []  # state estimate
     for i in range(np.shape(z)[1]):
         # kidnap
-        if i == kidnap_index:
+        if kidnap == True and i == kidnap_index:
             ekf.x = state_kidnap
 
         ekf.prediction(dt)
@@ -43,15 +45,15 @@ def kidnap_test(subject, trial, side, ekf):
     # evaluate robustness
     # compare x and ground truth:
     track = True
-    track_tol = 0.075
-    heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
-    # start checking tracking after the 3-rd stride
-    for i in range(4, np.size(heel_strike_index)):
-        if i != np.size(heel_strike_index) - 1:
-            start = int(heel_strike_index[i]) + 25
-            end = int(heel_strike_index[i+1]) - 25
-            track = track and all(abs(phases[start:end] - x[start:end, 0]) < track_tol)
-    print("recover from kidnap? ", track)
+    track_tol = 0.075   
+    for i in range(int(heel_strike_index[3]), int(heel_strike_index[np.size(heel_strike_index)-1])):
+        track = track and (phase_error(x[i, 0], phases[i]) < track_tol)
+    
+    if kidnap == True:
+        print("recover from kidnap? ", track)
+    elif kidnap == False:
+        print("track without kidnapping? ", track)
+    
     return track
 
 if __name__ == '__main__':
@@ -70,19 +72,19 @@ if __name__ == '__main__':
     # iterate through Q
     for Q_phase_dot in [1e-7]:
         for Q_step_length in [1e-7]:
-            for Q_ramp in [1e-5]:
+            for Q_ramp in [5e-5]:
                 sys.Q = np.diag([0, Q_phase_dot, Q_step_length, Q_ramp]) # process model noise covariance
                 print("Q =\n", sys.Q)
                 track_count = 0
                 total_trials = 0
                 #for subject in Conti_subject_names():
-                for subject in ['AB01', 'AB05', 'AB07','AB10']:
+                for subject in ['AB01', 'AB05', 'AB10']:
                     print("subject: ", subject)
                     for trial in Conti_trial_names(subject):
                         if trial == 'subjectdetails':
                             continue
                         print("trial: ", trial)
-                        for side in ['left', 'right']:
+                        for side in ['left']:
                             #print("side: ", side)
                             sys.R = R[subject]
                             phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
@@ -90,10 +92,12 @@ if __name__ == '__main__':
                             ekf = extended_kalman_filter(sys, init)
 
                             total_trials = total_trials + 1
-                            if kidnap_test(subject, trial, side, ekf) == True:
+                            if kidnap_test(subject, trial, side, ekf, kidnap = True) == True:
                                 track_count = track_count + 1
                 
+                print("Q =\n", sys.Q)
                 print("robustness (%): ", track_count / total_trials * 100)
+                print("\n")
                 if (track_count / total_trials) > robustness:
                     robustness = track_count / total_trials
                     Q_best = np.diag([0, Q_phase_dot, Q_step_length, Q_ramp])
