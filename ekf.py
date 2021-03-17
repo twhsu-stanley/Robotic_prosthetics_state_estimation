@@ -17,7 +17,7 @@ def phase_error(phase_est, phase_truth):
         return abs(phase_est - phase_truth)
     else:
         return 1 - abs(phase_est - phase_truth)
-
+    
 class myStruct:
     pass
 
@@ -97,7 +97,7 @@ if __name__ == '__main__':
     sys.A = A
     
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-7, 1e-7, 1e-5]) # process model noise covariance
+    sys.Q = np.diag([0, 1e-7, 1e-7, 5e-5]) # process model noise covariance
     
     with open('Measurement_error_cov.pickle', 'rb') as file:
         R = pickle.load(file)
@@ -107,7 +107,7 @@ if __name__ == '__main__':
     # initialize the state
     init = myStruct()
     init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
-    init.Sigma = np.diag([0, 1e-14, 1e-14, 1e-14])
+    init.Sigma = np.diag([0, 5e-4, 1e-3, 1e-1])
 
     ekf = extended_kalman_filter(sys, init)
 
@@ -128,11 +128,12 @@ if __name__ == '__main__':
     step_length_kidnap = np.random.uniform(0, 2)
     ramp_kidnap = np.random.uniform(-45, 45)
     state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
+    print(state_kidnap)
     
     for i in range(np.shape(z)[1]):
         # kidnap
-        if i == kidnap_index:
-            ekf.x = state_kidnap
+        #if i == kidnap_index:
+            #ekf.x = state_kidnap
 
         ekf.prediction(dt)
         ekf.correction(z[:, i], Psi)
@@ -146,8 +147,16 @@ if __name__ == '__main__':
     # compare x and ground truth:
     track = True
     track_tol = 0.075
-    for i in range(int(heel_strike_index[3]), int(heel_strike_index[np.size(heel_strike_index)-1])):
-        track = track and (phase_error(x[i, 0], phases[i]) < track_tol)
+    start_check = 4
+    se = 0
+    for i in range(int(heel_strike_index[0]), int(heel_strike_index[np.size(heel_strike_index)-1])):
+        error_phase = phase_error(x[i, 0], phases[i])
+        se += error_phase ** 2
+        if i >= int(heel_strike_index[start_check]):
+            track = track and (error_phase < track_tol)
+        
+    RMSE_phase = np.sqrt(se / np.size(phases))
+    print("RMSE phase = ", RMSE_phase)
 
     print("track? ",track)
 
@@ -158,7 +167,7 @@ if __name__ == '__main__':
     plt.subplot(411)
     plt.plot(phases)
     plt.plot(x[:, 0], '--')
-    plt.plot(heel_strike_index[4:], np.zeros(np.size(heel_strike_index[4:])), 'rx')
+    plt.plot(heel_strike_index[3:], np.zeros(np.size(heel_strike_index[3:])), 'rx')
     plt.ylabel('phase')
     plt.subplot(412)
     plt.plot(phase_dots)
