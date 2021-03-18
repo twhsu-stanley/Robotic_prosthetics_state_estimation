@@ -20,7 +20,7 @@ def ekf_kidnap_test(subject, trial, side, ekf, kidnap = True):
                   [force_z_ankle], \
                   [force_x_ankle],\
                   [moment_y_ankle]])
-    z = np.squeeze(z)    
+    z = np.squeeze(z)
     
     heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
     kidnap_index = np.random.randint(heel_strike_index[0], heel_strike_index[1]) # step at which kidnapping occurs
@@ -80,10 +80,10 @@ def ekf_robustness(Q, kidnap = True, RMSE_heatmap = False):
     total_trials = 0
     RMSerror_phase = np.zeros((10, 27))
     s = 0
-    t = 0
-    #for subject in Conti_subject_names():
-    for subject in ['AB05']:
+    for subject in Conti_subject_names():
+    #for subject in ['AB05']:
         print("subject: ", subject)
+        t = 0
         for trial in Conti_trial_names(subject):
             if trial == 'subjectdetails':
                 continue
@@ -102,6 +102,9 @@ def ekf_robustness(Q, kidnap = True, RMSE_heatmap = False):
                 RMSerror_phase[s, t] = RMSE_phase
             t += 1
         s += 1
+
+    with open('RMSE_phase.pickle', 'wb') as file:
+        pickle.dump(RMSerror_phase, file)
 
     if RMSE_heatmap:
         plt.imshow(RMSerror_phase)

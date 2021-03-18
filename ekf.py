@@ -23,7 +23,7 @@ class myStruct:
 
 class extended_kalman_filter:
     def __init__(self, system, init):
-        # EKF Construct an instance of this class
+        # Constructor
         # Inputs:
         #   system: system and noise models
         #   init:   initial state mean and covariance
