@@ -1,6 +1,5 @@
 import numpy as np
 from model_framework import *
-from data_generators import *
 from continuous_data import *
 from model_fit import *
 import matplotlib.pyplot as plt
@@ -55,7 +54,8 @@ class extended_kalman_filter:
         z_hat = self.h.evaluate_h_func(Psi, self.x_pred[0,0], self.x_pred[1,0], self.x_pred[2,0], self.x_pred[3,0])
         
         # innovation
-        z = np.array([[z[0]], [z[1]], [z[2]], [z[3]]])
+        #z = np.array([[z[0]], [z[1]], [z[2]], [z[3]]])
+        z = np.array([z]).T
         self.v = z - z_hat
         #print("innov: \n", self.v)
 
@@ -80,11 +80,7 @@ def process_model(x, dt):
     #dt = 0.01 # data sampling rate: 100 Hz
     return A(dt) @ x
     
-if __name__ == '__main__':
-    subject = 'AB01'
-    trial= 's1x2d2x5'
-    side = 'left'
-
+def ekf_test(subject, trial, side):
     dt = 1/100
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
     global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle = load_Conti_measurement_data(subject, trial, side)
@@ -118,7 +114,7 @@ if __name__ == '__main__':
     z = np.squeeze(z)
 
     x = []  # state estimate
-    #x.append(init.x)
+    x.append(init.x)
 
     heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
     kidnap_index = np.random.randint(heel_strike_index[0], heel_strike_index[1]) # step at which kidnapping occurs
@@ -131,14 +127,16 @@ if __name__ == '__main__':
     print(state_kidnap)
     
     for i in range(np.shape(z)[1]):
+    #for i in range(200):
         # kidnap
-        #if i == kidnap_index:
-            #ekf.x = state_kidnap
+        if i == kidnap_index:
+            ekf.x = state_kidnap
 
         ekf.prediction(dt)
         ekf.correction(z[:, i], Psi)
-
+        
         x.append(ekf.x)
+        
         #Sigma.append(np.diag(ekf.Sigma))
         
     x = np.array(x).squeeze()
@@ -157,9 +155,7 @@ if __name__ == '__main__':
         
     RMSE_phase = np.sqrt(se / np.size(phases))
     print("RMSE phase = ", RMSE_phase)
-
     print("track? ",track)
-
     print("Sigma at final step: \n", ekf.Sigma)
 
     # plot results
@@ -185,17 +181,11 @@ if __name__ == '__main__':
     plt.ylabel('ramp')
     #plt.ylim(ramps.min()-1, ramps.max()+1)
 
-    """
-    plt.figure()
-    plt.subplot(411)
-    plt.plot(Sigma[:,0])
-    plt.subplot(412)
-    plt.plot(Sigma[:,1])
-    plt.subplot(413)
-    plt.plot(Sigma[:,2])
-    plt.subplot(414)
-    plt.plot(Sigma[:,3])
-    """
-    #plot_Conti_data(subject, trial, side)
-
     plt.show()
+
+if __name__ == '__main__':
+    subject = 'AB01'
+    trial= 's1x2d2x5'
+    side = 'left'
+    ekf_test(subject, trial, side)
+

@@ -125,7 +125,7 @@ if __name__ == '__main__':
             for Q_ramp in [5e-5]:
                 Q = np.diag([0, Q_phase_dot, Q_step_length, Q_ramp]) # process model noise covariance
                 print("Q =\n", Q)
-                rob = ekf_robustness(Q, kidnap = True, RMSE_heatmap = True)
+                rob = ekf_robustness(Q, kidnap = False, RMSE_heatmap = True)
                 if rob > robustness:
                     robustness = rob
                     Q_best = Q
