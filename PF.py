@@ -49,20 +49,11 @@ class particle_filter:
         self.p.w = np.array(self.p.w).reshape(-1, 1)
 
     def particles_propagation(self, dt):
-        M = round(self.n * self.pp)
-        for i in range(M):
+        for i in range(self.n):
             # process noise
             pn = np.dot(self.LQ, randn(4, 1))
             # propagate the particles
             self.p.x[i, :] = self.f(np.array([self.p.x[i, :]]).T, dt, pn).reshape(-1)
-            #self.p.x[i,0] = warpToOne(self.p.x[i,0])
-        
-        for i in range(M, self.n):
-            phase_kidnap = np.random.uniform(-0.5, 0.5)
-            phase_dot_kidnap = np.random.uniform(0, 5)
-            step_length_kidnap = np.random.uniform(0, 2)
-            ramp_kidnap = np.random.uniform(-45, 45)
-            self.p.x[i, :] = [self.p.x[i,0] + phase_kidnap, phase_dot_kidnap, step_length_kidnap, ramp_kidnap]
             #self.p.x[i,0] = warpToOne(self.p.x[i,0])
         
     def importance_measurement(self, z, Psi):
@@ -77,26 +68,45 @@ class particle_filter:
 
         # update and normalize weights
         self.p.w = np.multiply(self.p.w, w)
-        self.p.w = self.p.w / np.sum(self.p.w)
 
-        # compute mean and covariance of estimate
-        self.mean_cov()
-
-        # compute effective number of particles
-        self.Neff = 1 / np.sum(np.power(self.p.w, 2))  # effective number of particles
-        if self.Neff < self.n * 0.2 * self.pp:
+        if np.sum(self.p.w) < 1e-80: # might be kidnapped
+            self.Neff = 0
             self.resampling()
+            # compute mean and covariance of estimate
+            self.mean_cov()
+        else:
+            self.p.w = self.p.w / np.sum(self.p.w)
+            # compute effective number of particles
+            self.Neff = 1 / np.sum(np.power(self.p.w, 2))  # effective number of particles
+            if self.Neff < self.n * 0.2:
+                self.resampling()
+            # compute mean and covariance of estimate
+            self.mean_cov()
 
     def resampling(self):
         # low variance resampling
+        if np.sum(self.p.w) < 1e-80:
+            M = 0
+            print("resamping: generate uniformly distributed state")
+        else:
+            M = round(self.n * 1)
+
         W = np.cumsum(self.p.w)
         r = rand(1) / self.n
         j = 1
-        for m in range(self.n):
+        for m in range(M):
             u = r + (m - 1) / self.n
             while u > W[j]:
                 j = j + 1
             self.p.x[m, :] = self.p.x[j, :]
+            self.p.w[m] = 1 / self.n
+        
+        for m in range(M, self.n):
+            phase_kidnap = np.random.uniform(-0.5, 0.5)
+            phase_dot_kidnap = np.random.uniform(0, 5)
+            step_length_kidnap = np.random.uniform(0, 2)
+            ramp_kidnap = np.random.uniform(-45, 45)
+            self.p.x[m, :] = [self.p.x[m,0] + phase_kidnap, phase_dot_kidnap, step_length_kidnap, ramp_kidnap]
             self.p.w[m] = 1 / self.n
 
     def mean_cov(self):

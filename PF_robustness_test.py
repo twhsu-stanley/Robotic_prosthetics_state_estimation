@@ -33,7 +33,7 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
 
     # initialization
     init = myStruct()
-    init.n = 100
+    init.n = 200
     init.mu = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
     #init.Sigma = np.diag([1e-14, 5e-4, 1e-3, 1e-1])
     init.Sigma = np.diag([1e-14, 1e-14, 1e-14, 1e-14])
@@ -159,11 +159,11 @@ def pf_robustness(kidnap = True, RMSE_heatmap = False):
     return robustness
 
 if __name__ == '__main__':
-    subject = 'AB01'
+    subject = 'AB10'
     trial= 's1x2d2x5'
     side = 'left'
 
-    pf_test(subject, trial, side, kidnap = False, plot = True)
+    pf_test(subject, trial, side, kidnap = True, plot = True)
 
     #Q = np.diag([1e-14, 1e-7, 1e-7, 5e-5]) # process model noise covariance
     #print("Q =\n", Q)
