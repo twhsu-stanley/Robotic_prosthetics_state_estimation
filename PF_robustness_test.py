@@ -13,13 +13,10 @@ measurement_model = model_loader('Measurement_model.pickle')
 class myStruct:
     pass
 
-def A(dt):
-    return np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
-
 def process_model(x, dt, pn):
     # dt = 0.01 # data sampling rate: 100 Hz
     # pn: additive noise
-    return A(dt) @ x + pn
+    return np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]) @ x + pn
 
 def pf_test(subject, trial, side, kidnap = True, plot = True):
     dt = 1/100
@@ -31,14 +28,15 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
     sys = myStruct()
     sys.f = process_model
     sys.h = measurement_model
-    sys.Q = np.diag([1e-14, 5e-3, 5e-3, 5e-1]) # process model noise covariance
+    sys.Q = np.diag([1e-14, 1e-6, 1e-7, 5e-5]) # process model noise covariance
     sys.R = R[subject] # measurement noise covariance
 
     # initialization
     init = myStruct()
-    init.n = 200
+    init.n = 100
     init.mu = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
-    init.Sigma = np.diag([1e-14, 5e-4, 1e-3, 1e-1])
+    #init.Sigma = np.diag([1e-14, 5e-4, 1e-3, 1e-1])
+    init.Sigma = np.diag([1e-14, 1e-14, 1e-14, 1e-14])
 
     pf = particle_filter(sys, init)
 
@@ -47,48 +45,47 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
                   [force_x_ankle],\
                   [moment_y_ankle]])
     z = np.squeeze(z)
-    
+
     heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
     kidnap_index = np.random.randint(heel_strike_index[0], heel_strike_index[1]) # step at which kidnapping occurs
-    
-    phase_kidnap = np.random.uniform(0, 1)
-    phase_dot_kidnap = np.random.uniform(0, 5)
-    step_length_kidnap = np.random.uniform(0, 2)
-    ramp_kidnap = np.random.uniform(-45, 45)
-    state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
 
+    total_step = 300 # = np.shape(z)[1]
+    phases = phases[0 : total_step]
+    phase_dots = phase_dots[0 : total_step]
+    step_lengths = step_lengths[0 : total_step]
+    ramps = ramps[0 : total_step]
     
-    phases = phases[0:1000]
-    phase_dots = phase_dots[0:1000]
-    step_lengths = step_lengths[0:1000]
-    ramps = ramps[0:1000]
-    #x = np.zeros((np.shape(z)[1], 4))  # state estimate
-    x = np.zeros((1000, 4))  # state estimate
-    #for i in range(np.shape(z)[1]):
-    for i in range(1000):
+    x = np.zeros((total_step, 4))  # state estimate
+    #Sigma_norm = np.zeros(total_step)
+    Neff = np.zeros(total_step)
+    for i in range(total_step):
         # kidnap
         if kidnap == True and i == kidnap_index:
-            pf.kidnap(state_kidnap)
+            pf.kidnap()
             print("kidnap index = ", kidnap_index)
-
-        pf.sample_motion(dt)
+        
+        pf.particles_propagation(dt)
         pf.importance_measurement(z[:, i], Psi)
         x[i,:] = pf.mu.T
+        #Sigma_norm[i] = np.linalg.norm(pf.Sigma, 2)
+        #Sigma_norm[i] = pf.Sigma[0,0]
+        Neff[i] = pf.Neff
 
     # evaluate robustness
     # compare x and ground truth:
-    track = True
-    track_tol = 0.08
-    start_check = 4
+    #track = True
+    track_tol = 0.07
+    #start_check = 2
     se = 0
     #for i in range(int(heel_strike_index[0]), int(heel_strike_index[np.size(heel_strike_index)-1])):
-    for i in range(1000):
+    for i in range(kidnap_index[0], total_step):
         error_phase = phase_error(x[i, 0], phases[i])
         se += error_phase ** 2
-        if i >= int(heel_strike_index[start_check]):
-            track = track and (error_phase < track_tol)
-        
+        #if i >= int(heel_strike_index[start_check]):
+            #track = track and (error_phase < track_tol)
+    
     RMSE_phase = np.sqrt(se / np.size(phases))
+    track = (RMSE_phase < track_tol)
     print("RMSE phase = ", RMSE_phase)
 
     if kidnap == True:
@@ -98,7 +95,11 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
 
     # plot results
     if plot == True:
-        plt.figure()
+        plt.figure(0)
+        plt.plot(Neff)
+        plt.ylabel('Neff')
+
+        plt.figure(1)
         plt.subplot(411)
         plt.plot(phases)
         plt.plot(x[:, 0], '--')
@@ -158,11 +159,11 @@ def pf_robustness(kidnap = True, RMSE_heatmap = False):
     return robustness
 
 if __name__ == '__main__':
-    subject = 'AB05'
+    subject = 'AB01'
     trial= 's1x2d2x5'
     side = 'left'
 
-    pf_test(subject, trial, side, kidnap = True, plot = True)
+    pf_test(subject, trial, side, kidnap = False, plot = True)
 
     #Q = np.diag([1e-14, 1e-7, 1e-7, 5e-5]) # process model noise covariance
     #print("Q =\n", Q)

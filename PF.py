@@ -34,6 +34,7 @@ class particle_filter:
         self.h = system.h  # measurement model
         self.R = system.R  # measurement noise covariance
         self.n = init.n  # number of particles
+        self.pp = 0.8
 
         self.p = myStruct()  # particles
         self.mu = init.mu # particles mean
@@ -42,66 +43,81 @@ class particle_filter:
         wu = 1 / self.n  # uniform weights
         L_init = np.linalg.cholesky(init.Sigma)
         for i in range(self.n):
-            self.p.x.append(np.dot(L_init, randn(len(init.mu), 1)) + init.mu)
+            self.p.x.append(np.dot(L_init, randn(4, 1)) + init.mu)
             self.p.w.append(wu)
-        self.p.x = np.array(self.p.x).reshape(-1, len(init.mu))
+        self.p.x = np.array(self.p.x).reshape(-1, 4)
         self.p.w = np.array(self.p.w).reshape(-1, 1)
 
-    def sample_motion(self, dt):
-        for i in range(self.n):
+    def particles_propagation(self, dt):
+        M = round(self.n * self.pp)
+        for i in range(M):
             # process noise
             pn = np.dot(self.LQ, randn(4, 1))
             # propagate the particles
             self.p.x[i, :] = self.f(np.array([self.p.x[i, :]]).T, dt, pn).reshape(-1)
-
+            #self.p.x[i,0] = warpToOne(self.p.x[i,0])
+        
+        for i in range(M, self.n):
+            phase_kidnap = np.random.uniform(-0.5, 0.5)
+            phase_dot_kidnap = np.random.uniform(0, 5)
+            step_length_kidnap = np.random.uniform(0, 2)
+            ramp_kidnap = np.random.uniform(-45, 45)
+            self.p.x[i, :] = [self.p.x[i,0] + phase_kidnap, phase_dot_kidnap, step_length_kidnap, ramp_kidnap]
+            #self.p.x[i,0] = warpToOne(self.p.x[i,0])
+        
     def importance_measurement(self, z, Psi):
         # Inputs:
         #   z: measurement
         z = np.array([z]).T
-        w = np.zeros([self.n, 1])  # importance weights
+        w = np.zeros((self.n, 1))  # importance weights
         for i in range(self.n):
             z_hat = self.h.evaluate_h_func(Psi, warpToOne(self.p.x[i,0]), self.p.x[i,1], self.p.x[i,2], self.p.x[i,3])
-            v = z - z_hat
-            w[i] = multivariate_normal.pdf(v.reshape(-1), np.array([0, 0, 0, 0]), self.R)
+            v = (z - z_hat).reshape(-1)
+            w[i] = multivariate_normal.pdf(v, np.array([0, 0, 0, 0]), self.R)
 
         # update and normalize weights
-        self.p.w = np.multiply(self.p.w, w)  # since we used motion model to sample
+        self.p.w = np.multiply(self.p.w, w)
         self.p.w = self.p.w / np.sum(self.p.w)
-        # compute effective number of particles
-        self.Neff = 1 / np.sum(np.power(self.p.w, 2))  # effective number of particles
-        if self.Neff < self.n / 5:
-            self.resampling()
-        
+
         # compute mean and covariance of estimate
         self.mean_cov()
 
+        # compute effective number of particles
+        self.Neff = 1 / np.sum(np.power(self.p.w, 2))  # effective number of particles
+        if self.Neff < self.n * 0.2 * self.pp:
+            self.resampling()
+
     def resampling(self):
-        #print("resampling!")
         # low variance resampling
         W = np.cumsum(self.p.w)
         r = rand(1) / self.n
-        # r = 0.5 / self.n
         j = 1
-        for i in range(self.n):
-            u = r + (i - 1) / self.n
+        for m in range(self.n):
+            u = r + (m - 1) / self.n
             while u > W[j]:
                 j = j + 1
-            self.p.x[i, :] = self.p.x[j, :]
-            self.p.w[i] = 1 / self.n
+            self.p.x[m, :] = self.p.x[j, :]
+            self.p.w[m] = 1 / self.n
 
     def mean_cov(self):
-        wtot = np.sum(self.p.w)
+        M = round(self.n * 1) #self.pp
+        wtot = np.sum(self.p.w[0:M])
         if wtot > 0:
-            self.mu[0] = np.sum(self.p.x[:, 0] * self.p.w.reshape(-1)) / wtot
-            self.mu[1] = np.sum(self.p.x[:, 1] * self.p.w.reshape(-1)) / wtot
-            self.mu[2] = np.sum(self.p.x[:, 2] * self.p.w.reshape(-1)) / wtot
-            self.mu[3] = np.sum(self.p.x[:, 3] * self.p.w.reshape(-1)) / wtot
+            #self.mu[0] = np.sum(self.p.x[:, 0] * self.p.w.reshape(-1)) / wtot
+            #self.mu[1] = np.sum(self.p.x[:, 1] * self.p.w.reshape(-1)) / wtot
+            #self.mu[2] = np.sum(self.p.x[:, 2] * self.p.w.reshape(-1)) / wtot
+            #self.mu[3] = np.sum(self.p.x[:, 3] * self.p.w.reshape(-1)) / wtot
             
-            sum = 0
-            for i in range(self.n):
-                dev = self.p.x[i, :].T - self.mu
-                sum += dev * dev.T * self.p.w[i]
-            self.Sigma = sum / wtot
+            self.mu[0] = np.sum(self.p.x[0:M, 0] * self.p.w[0:M].reshape(-1)) / wtot
+            self.mu[1] = np.sum(self.p.x[0:M, 1] * self.p.w[0:M].reshape(-1)) / wtot
+            self.mu[2] = np.sum(self.p.x[0:M, 2] * self.p.w[0:M].reshape(-1)) / wtot
+            self.mu[3] = np.sum(self.p.x[0:M, 3] * self.p.w[0:M].reshape(-1)) / wtot
+
+            #sum = 0
+            #for i in range(self.n):
+            #    dev = self.p.x[i, :].T - self.mu
+            #   sum += dev * dev.T * self.p.w[i]
+            #self.Sigma = sum / wtot
 
             self.mu[0] = warpToOne(self.mu[0])
 
@@ -112,10 +128,17 @@ class particle_filter:
             self.mu[2] = np.nan
             self.mu[3] = np.nan
 
-    def kidnap(self, state_kidnap):
+    def kidnap(self):
+        # since kidnapping always happens in the 1st stride, wrapToOne is not needed
+        phase_kidnap = np.random.uniform(-0.5, 0.5)
+        phase_dot_kidnap = np.random.uniform(0, 5)
+        step_length_kidnap = np.random.uniform(0, 2)
+        ramp_kidnap = np.random.uniform(-45, 45)
+        state_kidnap = np.array([[self.mu[0, 0] + phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
+        
         delta = state_kidnap - self.mu
         self.p.x = self.p.x + matlib.repmat(delta.T, self.n, 1)
-        print("kidnap delta = ", delta)
+        print("kidnap delta = \n", delta)
 
 
 
