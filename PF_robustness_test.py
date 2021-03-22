@@ -31,14 +31,13 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
     sys = myStruct()
     sys.f = process_model
     sys.h = measurement_model
-    sys.Q = np.diag([1e-14, 1e-7, 1e-7, 5e-5]) # process model noise covariance
+    sys.Q = np.diag([1e-50, 5e-5, 1e-4, 5e-2]) # process model noise covariance
     sys.R = R[subject] # measurement noise covariance
 
     # initialization
     init = myStruct()
     init.n = 100
     init.mu = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
-    #init.Sigma = np.diag([1e-14, 5e-4, 1e-3, 1e-1])
     init.Sigma = np.diag([1e-14, 1e-14, 1e-14, 1e-14])
 
     pf = particle_filter(sys, init)
@@ -59,7 +58,7 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
     ramp_kidnap = np.random.uniform(-45, 45)
     state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
 
-    total_step = 800 # = np.shape(z)[1]
+    total_step = 350 # = np.shape(z)[1]
     phases = phases[0 : total_step]
     phase_dots = phase_dots[0 : total_step]
     step_lengths = step_lengths[0 : total_step]
@@ -84,7 +83,7 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
     # evaluate robustness
     track = True
     track_tol = 0.08
-    start_check = 4
+    start_check = 3
     se = 0
     #for i in range(int(heel_strike_index[0]), int(heel_strike_index[np.size(heel_strike_index)-1])):
     for i in range(total_step):
@@ -103,6 +102,7 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
         phase_dot_b4kn = x[kidnap_index - 1, 1][0]
         print("phase_dot right after kidnap = ", phase_dot_akn)
         print("phase_dot right before kidnap = ", phase_dot_b4kn)
+
     elif kidnap == False:
         print("track without kidnapping? ", track)
 
@@ -159,6 +159,7 @@ def pf_robustness(kidnap = True, RMSE_heatmap = False):
                     track_count = track_count + 1
     
     robustness = track_count / total_trials * 100
+    print("robustness (%) = ", robustness)
 
     RMSerror_phase = np.array(RMSerror_phase).reshape(-1, 3)
     with open('RMSE_phase_PF.pickle', 'wb') as file:
@@ -179,8 +180,8 @@ if __name__ == '__main__':
     trial= 's1x2d2x5'
     side = 'left'
 
-    #pf_test(subject, trial, side, kidnap = True, plot = True)
-    pf_robustness(kidnap = True, RMSE_heatmap = True)
+    pf_test(subject, trial, side, kidnap = True, plot = True)
+    #pf_robustness(kidnap = True, RMSE_heatmap = True)
 
     #Q = np.diag([1e-14, 1e-7, 1e-7, 5e-5]) # process model noise covariance
     #print("Q =\n", Q)

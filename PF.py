@@ -36,7 +36,6 @@ class particle_filter:
         self.R = system.R  # measurement noise covariance
         self.n = init.n  # dynamic number of particles
         self.pn = init.n # number of particles
-        self.delta = 0
 
         self.p = myStruct()  # particles
         self.mu = init.mu # particles mean
@@ -64,29 +63,31 @@ class particle_filter:
         for i in range(self.n):
             z_hat = self.h.evaluate_h_func(Psi, warpToOne(self.p.x[i,0]), self.p.x[i,1], self.p.x[i,2], self.p.x[i,3])
             w[i] = multivariate_normal.pdf((z - z_hat).reshape(-1), np.array([0, 0, 0, 0]), self.R)
-            if w[i] > 1e-85:
+            if w[i] > 1e-15:
                 count += 1
 
-        if count < self.n / 10: # might be kidnapped
+        # update and normalize weights
+        self.p.w = np.multiply(self.p.w, w)
+
+        # compute mean and covariance of estimate
+        self.mean_cov()
+
+        if count < self.pn / 30: # might be kidnapped
             self.Neff = 0
-            self.n = self.pn * 10 # increase number of particles by 10 times
+            self.n = self.pn * 100 # increase number of particles by 10 times
             self.resampling(mode = "uniform")
         else:
-            # update and normalize weights
-            self.p.w = np.multiply(self.p.w, w)
+            
             self.p.w = self.p.w / np.sum(self.p.w)
             self.Neff = 1 / np.sum(np.power(self.p.w, 2))  # effective number of particles
             if self.Neff < self.n / 5:
                 self.n = self.pn # set number of pparticles to the origin value
                 self.resampling(mode = "low_variance")
         
-        # compute mean and covariance of estimate
-        self.mean_cov()
-
     def resampling(self, mode):
         if mode == "uniform":
             # generate uniformly distributed state
-            #print("resamping: uniform")
+            print("resamping: uniform")
             mu_temp = np.mean(self.p.x[:, 0])
             self.p.x = []
             self.p.w = []
@@ -138,12 +139,13 @@ class particle_filter:
 
         else:
             print('\033[91mWarning: Total weight is zero or nan!\033[0m')
-            self.mu[0] = np.nan
-            self.mu[1] = np.nan
-            self.mu[2] = np.nan
-            self.mu[3] = np.nan
+            self.mu[0] = np.mean(self.p.x[:, 0]) #np.nan
+            self.mu[0] = warpToOne(self.mu[0])
+            self.mu[1] = np.mean(self.p.x[:, 1]) #np.nan
+            self.mu[2] = np.mean(self.p.x[:, 2]) #np.nan
+            self.mu[3] = np.mean(self.p.x[:, 3]) #np.nan
 
     def kidnap(self, state_kidnap):
-        self.delta = state_kidnap - self.mu
-        self.p.x = self.p.x + matlib.repmat(self.delta.T, self.n, 1)
-        print("kidnap delta = \n", self.delta)
+        delta = state_kidnap - self.mu
+        self.p.x = self.p.x + matlib.repmat(delta.T, self.n, 1)
+        print("kidnap delta = \n", delta)
