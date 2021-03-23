@@ -2,6 +2,7 @@ import numpy as np
 import math
 import pandas as pd
 import seaborn as sns
+import time
 import matplotlib.pyplot as plt
 from PF import *
 from model_framework import *
@@ -58,7 +59,7 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
     ramp_kidnap = np.random.uniform(-45, 45)
     state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
 
-    total_step = 350 # = np.shape(z)[1]
+    total_step = 600 # = np.shape(z)[1]
     phases = phases[0 : total_step]
     phase_dots = phase_dots[0 : total_step]
     step_lengths = step_lengths[0 : total_step]
@@ -67,7 +68,12 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
     x = np.zeros((total_step, 4))  # state estimate
     #Sigma_norm = np.zeros(total_step)
     Neff = np.zeros(total_step)
+
+    t_step_max = 0
+    
     for i in range(total_step):
+        t = time.time()
+
         # kidnap
         if kidnap == True and i == kidnap_index:
             pf.kidnap(state_kidnap)
@@ -80,6 +86,10 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
         #Sigma_norm[i] = pf.Sigma[0,0]
         Neff[i] = pf.Neff
 
+        if (time.time() - t) > t_step_max:
+            t_step_max = time.time() - t
+
+    print("longest time step: ", t_step_max)
     # evaluate robustness
     track = True
     track_tol = 0.08
@@ -142,7 +152,7 @@ def pf_robustness(kidnap = True, RMSE_heatmap = False):
     RMSerror_phase = []
 
     #for subject in Conti_subject_names():
-    for subject in ['AB01', 'AB10']:
+    for subject in ['AB01']:
         print("subject: ", subject)
 
         for trial in Conti_trial_names(subject):
@@ -180,8 +190,8 @@ if __name__ == '__main__':
     trial= 's1x2d2x5'
     side = 'left'
 
-    pf_test(subject, trial, side, kidnap = True, plot = True)
-    #pf_robustness(kidnap = True, RMSE_heatmap = True)
+    #pf_test(subject, trial, side, kidnap = True, plot = True)
+    pf_robustness(kidnap = True, RMSE_heatmap = True)
 
     #Q = np.diag([1e-14, 1e-7, 1e-7, 5e-5]) # process model noise covariance
     #print("Q =\n", Q)

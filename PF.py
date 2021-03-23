@@ -87,7 +87,7 @@ class particle_filter:
     def resampling(self, mode):
         if mode == "uniform":
             # generate uniformly distributed state
-            print("resamping: uniform")
+            #print("resamping: uniform")
             mu_temp = np.mean(self.p.x[:, 0])
             self.p.x = []
             self.p.w = []
@@ -115,7 +115,7 @@ class particle_filter:
                 u = r + m / self.n
                 while u > W[j]:
                     j = j + 1
-                
+            
                 self.p.x.append(x_temp[j, :]) #self.p.x[m, :] = self.p.x[j, :]
                 self.p.w.append(1 / self.n) #self.p.w[m] = 1 / self.n
             self.p.x = np.array(self.p.x).reshape(-1, 4)
@@ -138,7 +138,7 @@ class particle_filter:
             self.mu[0] = warpToOne(self.mu[0])
 
         else:
-            print('\033[91mWarning: Total weight is zero or nan!\033[0m')
+            #print('\033[91mWarning: Total weight is zero or nan!\033[0m')
             self.mu[0] = np.mean(self.p.x[:, 0]) #np.nan
             self.mu[0] = warpToOne(self.mu[0])
             self.mu[1] = np.mean(self.p.x[:, 1]) #np.nan
@@ -148,4 +148,4 @@ class particle_filter:
     def kidnap(self, state_kidnap):
         delta = state_kidnap - self.mu
         self.p.x = self.p.x + matlib.repmat(delta.T, self.n, 1)
-        print("kidnap delta = \n", delta)
+        #print("kidnap delta = \n", delta)
