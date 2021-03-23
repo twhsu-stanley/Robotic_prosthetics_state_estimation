@@ -70,7 +70,7 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
     Neff = np.zeros(total_step)
 
     t_step_max = 0
-    
+    t_step_tot = 0
     for i in range(total_step):
         t = time.time()
 
@@ -86,24 +86,27 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
         #Sigma_norm[i] = pf.Sigma[0,0]
         Neff[i] = pf.Neff
 
-        if (time.time() - t) > t_step_max:
+        t_step = time.time() - t
+        t_step_tot += t_step
+        if t_step > t_step_max:
             t_step_max = time.time() - t
 
-    print("longest time step: ", t_step_max)
+    print("longest time step = ", t_step_max)
+    print("mean time step = ", t_step_tot / total_step)
     # evaluate robustness
-    track = True
-    track_tol = 0.08
-    start_check = 3
+    #track = True
+    track_tol = 0.05
+    #start_check = 3
     se = 0
     #for i in range(int(heel_strike_index[0]), int(heel_strike_index[np.size(heel_strike_index)-1])):
     for i in range(total_step):
         error_phase = phase_error(x[i, 0], phases[i])
         se += error_phase ** 2
-        if i >= int(heel_strike_index[start_check]):
-            track = track and (error_phase < track_tol)
+        #if i >= int(heel_strike_index[start_check]):
+            #track = track and (error_phase < track_tol)
     
     RMSE_phase = np.sqrt(se / total_step)
-    #track = (RMSE_phase < track_tol)
+    track = (RMSE_phase < track_tol)
     print("RMSE phase = ", RMSE_phase)
 
     if kidnap == True:
@@ -190,8 +193,8 @@ if __name__ == '__main__':
     trial= 's1x2d2x5'
     side = 'left'
 
-    #pf_test(subject, trial, side, kidnap = True, plot = True)
-    pf_robustness(kidnap = True, RMSE_heatmap = True)
+    pf_test(subject, trial, side, kidnap = True, plot = True)
+    #pf_robustness(kidnap = True, RMSE_heatmap = True)
 
     #Q = np.diag([1e-14, 1e-7, 1e-7, 5e-5]) # process model noise covariance
     #print("Q =\n", Q)
