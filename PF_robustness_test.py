@@ -32,7 +32,7 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
     sys = myStruct()
     sys.f = process_model
     sys.h = measurement_model
-    sys.Q = np.diag([1e-50, 5e-5, 1e-4, 5e-2]) # process model noise covariance
+    sys.Q = np.diag([1e-50, 5e-5, 1e-4, 5e-2]) # process model noise covariance [1e-50, 5e-5, 1e-4, 5e-2]
     sys.R = R[subject] # measurement noise covariance
 
     # initialization
@@ -50,7 +50,7 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
     z = np.squeeze(z)
 
     heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
-    kidnap_index = np.random.randint(heel_strike_index[0], heel_strike_index[1]) # step at which kidnapping occurs
+    kidnap_index = np.random.randint(heel_strike_index[0, 0], heel_strike_index[1, 0]) # step at which kidnapping occurs
 
     # kidnapping state
     phase_kidnap = np.random.uniform(0, 1)
@@ -59,7 +59,7 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
     ramp_kidnap = np.random.uniform(-45, 45)
     state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
 
-    total_step = 600 # = np.shape(z)[1]
+    total_step =  800 #np.shape(z)[1]
     phases = phases[0 : total_step]
     phase_dots = phase_dots[0 : total_step]
     step_lengths = step_lengths[0 : total_step]
@@ -73,12 +73,9 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
     t_step_tot = 0
     for i in range(total_step):
         t = time.time()
-
         # kidnap
         if kidnap == True and i == kidnap_index:
             pf.kidnap(state_kidnap)
-            print("kidnap index = ", kidnap_index)
-        
         pf.particles_propagation(dt)
         pf.importance_measurement(z[:, i], Psi)
         x[i,:] = pf.mu.T
@@ -89,35 +86,38 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
         t_step = time.time() - t
         t_step_tot += t_step
         if t_step > t_step_max:
-            t_step_max = time.time() - t
+            t_step_max = t_step
 
     print("longest time step = ", t_step_max)
     print("mean time step = ", t_step_tot / total_step)
+    
     # evaluate robustness
     #track = True
     track_tol = 0.05
     #start_check = 3
     se = 0
-    #for i in range(int(heel_strike_index[0]), int(heel_strike_index[np.size(heel_strike_index)-1])):
-    for i in range(total_step):
+    for i in range(kidnap_index + 100, total_step):
         error_phase = phase_error(x[i, 0], phases[i])
         se += error_phase ** 2
         #if i >= int(heel_strike_index[start_check]):
             #track = track and (error_phase < track_tol)
-    
-    RMSE_phase = np.sqrt(se / total_step)
+    RMSE_phase = np.sqrt(se / (total_step - kidnap_index - 100))
     track = (RMSE_phase < track_tol)
     print("RMSE phase = ", RMSE_phase)
 
     if kidnap == True:
-        print("recover from kidnap? ", track)
-        phase_dot_akn = x[kidnap_index, 1][0]
-        phase_dot_b4kn = x[kidnap_index - 1, 1][0]
+        phase_dot_akn = x[kidnap_index, 1]
+        phase_dot_b4kn = x[kidnap_index - 1, 1]
+        kidnap_step = kidnap_index / (heel_strike_index[1, 0] - heel_strike_index[0, 0]) * 100 # kidmap step % of stride
+        print("kidnapping step (%_stride) = ", kidnap_step)
         print("phase_dot right after kidnap = ", phase_dot_akn)
         print("phase_dot right before kidnap = ", phase_dot_b4kn)
-
+        print("recover from kidnap? ", track)
+        print("---------------------------------------------------------------")
+        result = (track, RMSE_phase, phase_dot_b4kn, phase_dot_akn, kidnap_step)
     elif kidnap == False:
         print("track without kidnapping? ", track)
+        result = (track, RMSE_phase)
 
     # plot results
     if plot == True:
@@ -147,17 +147,16 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
         plt.ylabel('ramp')
         plt.show()
     
-    return track, RMSE_phase, phase_dot_b4kn, phase_dot_akn
+    return result
 
-def pf_robustness(kidnap = True, RMSE_heatmap = False):    
+def pf_robustness(kidnap = True):    
     track_count = 0
     total_trials = 0
     RMSerror_phase = []
 
     #for subject in Conti_subject_names():
-    for subject in ['AB01']:
+    for subject in ['AB01', 'AB02', 'AB09']:
         print("subject: ", subject)
-
         for trial in Conti_trial_names(subject):
         #for trial in ['s1x2d2x5']:
             if trial == 'subjectdetails':
@@ -166,37 +165,40 @@ def pf_robustness(kidnap = True, RMSE_heatmap = False):
             for side in ['left']:
                 #print("side: ", side)
                 total_trials = total_trials + 1
-                track, RMSE_phase, phase_dot_b4kn, phase_dot_akn = pf_test(subject, trial, side, kidnap = True, plot = False)
-                RMSerror_phase.append([RMSE_phase, phase_dot_b4kn, phase_dot_akn])
+
+                if kidnap == True:
+                    track, RMSE_phase, phase_dot_b4kn, phase_dot_akn, kidnap_step = pf_test(subject, trial, side, kidnap, plot = False)
+                    RMSerror_phase.append([RMSE_phase, phase_dot_akn / phase_dot_b4kn, kidnap_step])
+                else:
+                    track, RMSE_phase = pf_test(subject, trial, side, kidnap, plot = False)
+                    #RMSerror_phase.append([RMSE_phase])
+
                 if  track == True:
                     track_count = track_count + 1
     
     robustness = track_count / total_trials * 100
     print("robustness (%) = ", robustness)
-
-    RMSerror_phase = np.array(RMSerror_phase).reshape(-1, 3)
-    with open('RMSE_phase_PF.pickle', 'wb') as file:
-            pickle.dump(RMSerror_phase, file)
     
-    if RMSE_heatmap == True:
-        RMSerror_phase_df = pd.DataFrame(RMSerror_phase, columns=['RMSE', 'x', 'y'])
+    if kidnap == True:
+        RMSerror_phase = np.array(RMSerror_phase).reshape(-1, 3)
+        RMSerror_phase_df = pd.DataFrame(RMSerror_phase, columns = ['RMSE', 'x', 'y'])
         sns.heatmap(RMSerror_phase_df.pivot('y', 'x', 'RMSE'))
         plt.title("RMSE of phase")
-        plt.xlabel("phase_dot before kidnapping")
-        plt.ylabel("phase_dot after kidnapping")
+        plt.xlabel("phase_dot after kidnapping / phase_dot")
+        plt.ylabel("kidnapping step (%_stride)")
         plt.show()
+    else:
+        pass
+        # heatmap for normal test
 
     return robustness
 
 if __name__ == '__main__':
-    subject = 'AB10'
+    subject = 'AB05'
     trial= 's1x2d2x5'
     side = 'left'
 
-    pf_test(subject, trial, side, kidnap = True, plot = True)
-    #pf_robustness(kidnap = True, RMSE_heatmap = True)
+    result = pf_test(subject, trial, side, kidnap = False, plot = True)
+    #robustness = pf_robustness(kidnap = True)
 
-    #Q = np.diag([1e-14, 1e-7, 1e-7, 5e-5]) # process model noise covariance
-    #print("Q =\n", Q)
-    #robustness = ekf_robustness(Q, kidnap = False, RMSE_heatmap = True)
     #print("robustness (%): ", robustness)
