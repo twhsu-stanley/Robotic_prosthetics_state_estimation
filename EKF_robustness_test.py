@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import matplotlib.pyplot as plt
 import time
 from EKF import *
 from model_framework import *
@@ -22,8 +23,16 @@ def process_model(x, dt):
 
 def ekf_test(subject, trial, side, kidnap = True, plot = False):
     dt = 1/100
+    # load ground truth
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
+    # load measurements
     global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle = load_Conti_measurement_data(subject, trial, side)
+    z = np.array([[global_thigh_angle_Y],\
+                  [force_z_ankle], \
+                  [force_x_ankle],\
+                  [moment_y_ankle]])
+    z = np.squeeze(z)
+
     Psi = load_Psi(subject)
 
     # build the system
@@ -31,24 +40,17 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-7, 1e-7, 5e-5]) # process model noise covariance
+    sys.Q = np.diag([0, 1e-4, 1e-6, 5e-4]) # process model noise covariance
     sys.R = R[subject] # measurement noise covariance
 
     # initialize the state
     init = myStruct()
-    init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
+    init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]+0.5], [ramps[0]+10]])
     init.Sigma = np.diag([0, 5e-4, 1e-3, 1e-1])
 
     ekf = extended_kalman_filter(sys, init)
-
-    z = np.array([[global_thigh_angle_Y],\
-                  [force_z_ankle], \
-                  [force_x_ankle],\
-                  [moment_y_ankle]])
-    z = np.squeeze(z)
     
     heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
-    
     kidnap_index = np.random.randint(heel_strike_index[0, 0], heel_strike_index[1, 0]) # step at which kidnapping occurs
     
     phase_kidnap = np.random.uniform(0, 1)
@@ -57,7 +59,7 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
     ramp_kidnap = np.random.uniform(-45, 45)
     state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
 
-    total_step =  2500 #np.shape(z)[1]
+    total_step =  1000 #np.shape(z)[1]
     phases = phases[0 : total_step]
     phase_dots = phase_dots[0 : total_step]
     step_lengths = step_lengths[0 : total_step]
@@ -156,20 +158,21 @@ def ekf_bank_test(subject, trial, side, plot = True):
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-5, 1e-7, 5e-5]) # process model noise covariance
+    sys.Q = np.diag([0, 1e-4, 1e-6, 5e-4]) #([0, 1e-5, 1e-7, 5e-5]) # process model noise covariance
     sys.R = R[subject] # measurement noise covariance
     init = myStruct()
 
-    total_step =  900 #np.shape(z)[1]
+    total_step =  500 #np.shape(z)[1]
     # ground truth states
     phases = phases[0 : total_step]
     phase_dots = phase_dots[0 : total_step]
     step_lengths = step_lengths[0 : total_step]
     ramps = ramps[0 : total_step]
     
-    N = 50 # number of EKFs in the EKF bank
-    kidnap_index = 100 # step at which kidnapping occurs
+    N = 200 # number of EKFs in the EKF bank
+    kidnap_index = 50 # step at which kidnapping occurs
     x = np.zeros((N, total_step, 4))  # state estimate
+    phase_dot_ROC = np.zeros((N, 2))
     for n in range(N):
         # initialize the state
         init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
@@ -190,6 +193,10 @@ def ekf_bank_test(subject, trial, side, plot = True):
             ekf.prediction(dt)
             ekf.correction(z[:, i], Psi)
             x[n, i,:] = ekf.x.T
+            
+        phase_dot_ROC[n, 0] = x[n, kidnap_index, 1] - phase_dots[kidnap_index-1]
+        #phase_dot_ROC[n, 0] = phase_dot_kidnap
+        phase_dot_ROC[n, 1] = x[n, -1, 1]
     
     if plot == True:
         # plot results
@@ -212,6 +219,17 @@ def ekf_bank_test(subject, trial, side, plot = True):
         plt.plot(ramps)
         plt.plot(range(total_step), x[:, :, 3].T, '--')
         plt.ylabel('ramp')
+
+        plt.figure("phase_dot cluster")
+        plt.hist(phase_dot_ROC[:, 1])
+        plt.xlabel('phase_dot in the end')
+        plt.ylabel('counts')
+
+        plt.figure("Region of Convergence")
+        plt.scatter(phase_dot_ROC[:, 0], phase_dot_ROC[:, 1])
+        plt.xlabel('phase_dot right after kidnapping')
+        plt.ylabel('phase_dot in the end')
+
         plt.show()
 
 
@@ -220,8 +238,8 @@ def ekf_robustness(kidnap = True, RMSE_heatmap = False):
     total_trials = 0
     RMSerror_phase = []
 
-    for subject in Conti_subject_names():
-    #for subject in ['AB01', 'AB02', 'AB09']:
+    #for subject in Conti_subject_names():
+    for subject in ['AB01', 'AB02', 'AB09']:
         print("subject: ", subject)
         for trial in Conti_trial_names(subject):
         #for trial in ['s1x2d2x5']:
@@ -260,10 +278,10 @@ def ekf_robustness(kidnap = True, RMSE_heatmap = False):
     return robustness
 
 if __name__ == '__main__':
-    subject = 'AB10'
+    subject = 'AB01'
     trial= 's1x2d2x5'
     side = 'left'
 
-    #ekf_test(subject, trial, side, kidnap = True, plot = True)
+    #ekf_test(subject, trial, side, kidnap = False, plot = True)
     ekf_bank_test(subject, trial, side, plot = True)
     #ekf_robustness(kidnap = True, RMSE_heatmap = True)

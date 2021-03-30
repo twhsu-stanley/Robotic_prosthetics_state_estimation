@@ -2,7 +2,7 @@ import numpy as np
 from model_framework import *
 from continuous_data import *
 from model_fit import *
-import matplotlib.pyplot as plt
+
 
 def warpToOne(phase):
     phase_wrap = np.remainder(phase, 1)
