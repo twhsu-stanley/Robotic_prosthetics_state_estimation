@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from mpl_toolkits import mplot3d
 import time
 from EKF import *
 from model_framework import *
@@ -162,17 +163,21 @@ def ekf_bank_test(subject, trial, side, plot = True):
     sys.R = R[subject] # measurement noise covariance
     init = myStruct()
 
-    total_step =  500 #np.shape(z)[1]
+    total_step =  1000 #np.shape(z)[1]
     # ground truth states
     phases = phases[0 : total_step]
     phase_dots = phase_dots[0 : total_step]
     step_lengths = step_lengths[0 : total_step]
     ramps = ramps[0 : total_step]
     
-    N = 200 # number of EKFs in the EKF bank
-    kidnap_index = 50 # step at which kidnapping occurs
+    N = 100 # number of EKFs in the EKF bank
+    kidnap_index = 30 # step at which kidnapping occurs
     x = np.zeros((N, total_step, 4))  # state estimate
-    phase_dot_ROC = np.zeros((N, 2))
+    phase_dot_ROC = np.zeros(N)
+    phase_rakn = np.zeros(N)
+    phase_dot_rakn = np.zeros(N)
+    step_length_rakn = np.zeros(N)
+    ramp_rakn = np.zeros(N)
     for n in range(N):
         # initialize the state
         init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
@@ -193,45 +198,91 @@ def ekf_bank_test(subject, trial, side, plot = True):
             ekf.prediction(dt)
             ekf.correction(z[:, i], Psi)
             x[n, i,:] = ekf.x.T
-            
-        phase_dot_ROC[n, 0] = x[n, kidnap_index, 1] - phase_dots[kidnap_index-1]
-        #phase_dot_ROC[n, 0] = phase_dot_kidnap
-        phase_dot_ROC[n, 1] = x[n, -1, 1]
+        
+        phase_rakn[n] = x[n, kidnap_index, 0] #- phases[kidnap_index]
+        phase_dot_rakn[n] = x[n, kidnap_index, 1] #- phase_dots[kidnap_index]
+        step_length_rakn[n] = x[n, kidnap_index, 2] #- step_lengths[kidnap_index]
+        ramp_rakn[n] = x[n, kidnap_index, 3] #- ramps[kidnap_index]
+        phase_dot_ROC[n] = x[n, -1, 1]
     
     if plot == True:
         # plot results
-        plt.figure("phase")
-        #plt.subplot(411)
+        plt.figure("states")
+        plt.subplot(411)
         plt.plot(phases)
         plt.plot(range(total_step), x[:, :, 0].T, '--')
         plt.ylabel('phase')
-
-        plt.figure("other states")
-        plt.subplot(311)
+        plt.subplot(412)
         plt.plot(phase_dots)
         plt.plot(range(total_step), x[:, :, 1].T, '--')
         plt.ylabel('phase dot')
-        plt.subplot(312)
+        plt.subplot(413)
         plt.plot(step_lengths)
         plt.plot(range(total_step), x[:, :, 2].T, '--')
         plt.ylabel('step length')
-        plt.subplot(313)
+        plt.subplot(414)
         plt.plot(ramps)
         plt.plot(range(total_step), x[:, :, 3].T, '--')
         plt.ylabel('ramp')
 
         plt.figure("phase_dot cluster")
-        plt.hist(phase_dot_ROC[:, 1])
+        plt.hist(phase_dot_ROC)
         plt.xlabel('phase_dot in the end')
         plt.ylabel('counts')
 
-        plt.figure("Region of Convergence")
-        plt.scatter(phase_dot_ROC[:, 0], phase_dot_ROC[:, 1])
-        plt.xlabel('phase_dot right after kidnapping')
-        plt.ylabel('phase_dot in the end')
+        plt.figure("Region of attraction_1")
+        ax = plt.axes(projection='3d')
+        for n in range(N):
+            if phase_dot_ROC[n] < phase_dots[-1] + 0.2 and phase_dot_ROC[n] > phase_dots[-1] - 0.2:
+                ax.scatter3D(phase_rakn[n], phase_dot_rakn[n], step_length_rakn[n], c = 'r')
+            elif phase_dot_ROC[n] < 0.2 and phase_dot_ROC[n] > - 0.3:
+                ax.scatter3D(phase_rakn[n], phase_dot_rakn[n], step_length_rakn[n], c = 'b')
+            else:
+                ax.scatter3D(phase_rakn[n], phase_dot_rakn[n], step_length_rakn[n], c = 'k')
+        ax.set_xlabel('phase right after kidnapping')
+        ax.set_ylabel('phase_dot right after kidnapping')
+        ax.set_zlabel('step_length right after kidnapping')
+
+        plt.figure("Region of attraction_2")
+        ax = plt.axes(projection='3d')
+        for n in range(N):
+            if phase_dot_ROC[n] < phase_dots[-1] + 0.2 and phase_dot_ROC[n] > phase_dots[-1] - 0.2:
+                ax.scatter3D(phase_rakn[n], phase_dot_rakn[n], ramp_rakn[n], c = 'r')
+            elif phase_dot_ROC[n] < 0.2 and phase_dot_ROC[n] > - 0.3:
+                ax.scatter3D(phase_rakn[n], phase_dot_rakn[n], ramp_rakn[n], c = 'b')
+            else:
+                ax.scatter3D(phase_rakn[n], phase_dot_rakn[n], ramp_rakn[n], c = 'k')
+        ax.set_xlabel('phase right after kidnapping')
+        ax.set_ylabel('phase_dot right after kidnapping')
+        ax.set_zlabel('ramp right after kidnapping')
+
+        plt.figure("Region of attraction_3")
+        ax = plt.axes(projection='3d')
+        for n in range(N):
+            if phase_dot_ROC[n] < phase_dots[-1] + 0.2 and phase_dot_ROC[n] > phase_dots[-1] - 0.2:
+                ax.scatter3D(phase_rakn[n], ramp_rakn[n], step_length_rakn[n], c = 'r')
+            elif phase_dot_ROC[n] < 0.2 and phase_dot_ROC[n] > - 0.3:
+                ax.scatter3D(phase_rakn[n], ramp_rakn[n], step_length_rakn[n], c = 'b')
+            else:
+                ax.scatter3D(phase_rakn[n], ramp_rakn[n], step_length_rakn[n], c = 'k')
+        ax.set_xlabel('phase right after kidnapping')
+        ax.set_ylabel('ramp right after kidnapping')
+        ax.set_zlabel('step_length right after kidnapping')
+
+        plt.figure("Region of attraction_4")
+        ax = plt.axes(projection='3d')
+        for n in range(N):
+            if phase_dot_ROC[n] < phase_dots[-1] + 0.2 and phase_dot_ROC[n] > phase_dots[-1] - 0.2:
+                ax.scatter3D(ramp_rakn[n], phase_dot_rakn[n], step_length_rakn[n], c = 'r')
+            elif phase_dot_ROC[n] < 0.2 and phase_dot_ROC[n] > - 0.3:
+                ax.scatter3D(ramp_rakn[n], phase_dot_rakn[n], step_length_rakn[n], c = 'b')
+            else:
+                ax.scatter3D(ramp_rakn[n], phase_dot_rakn[n], step_length_rakn[n], c = 'k')
+        ax.set_xlabel('ramp right after kidnapping')
+        ax.set_ylabel('phase_dot right after kidnapping')
+        ax.set_zlabel('step_length right after kidnapping')
 
         plt.show()
-
 
 def ekf_robustness(kidnap = True, RMSE_heatmap = False):
     track_count = 0
@@ -278,8 +329,8 @@ def ekf_robustness(kidnap = True, RMSE_heatmap = False):
     return robustness
 
 if __name__ == '__main__':
-    subject = 'AB01'
-    trial= 's1x2d2x5'
+    subject = 'AB02'
+    trial= 's1x2i10'
     side = 'left'
 
     #ekf_test(subject, trial, side, kidnap = False, plot = True)
