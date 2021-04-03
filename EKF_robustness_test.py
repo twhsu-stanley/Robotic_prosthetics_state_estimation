@@ -170,7 +170,7 @@ def ekf_bank_test(subject, trial, side, plot = True):
     step_lengths = step_lengths[0 : total_step]
     ramps = ramps[0 : total_step]
     
-    N = 100 # number of EKFs in the EKF bank
+    N = 100 # number of EKFs in the EKF-bank
     kidnap_index = 30 # step at which kidnapping occurs
     x = np.zeros((N, total_step, 4))  # state estimate
     phase_dot_ROC = np.zeros(N)
@@ -283,6 +283,7 @@ def ekf_bank_test(subject, trial, side, plot = True):
         ax.set_zlabel('step_length right after kidnapping')
 
         plt.show()
+
 
 def ekf_robustness(kidnap = True, RMSE_heatmap = False):
     track_count = 0

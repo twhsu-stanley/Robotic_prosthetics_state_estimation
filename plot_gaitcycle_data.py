@@ -12,6 +12,10 @@ with open('Global_thigh_angle.npz', 'rb') as file:
     g_t = np.load(file)
     global_thigh_angle_Y = g_t[subject][0]
 
+with open('Global_thigh_angVel_Y.npz', 'rb') as file:
+    g_tv = np.load(file)
+    global_thigh_angVel_Y = g_tv[subject]
+
 with open('Reaction_wrench.npz', 'rb') as file:
     r_w = np.load(file)
     force_x_ankle = r_w[subject][0]

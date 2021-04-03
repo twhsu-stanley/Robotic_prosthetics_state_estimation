@@ -49,6 +49,7 @@ def get_ramp(subject):
 def get_time_step(subject):
     return np.concatenate(list(time_step_generator(subject)), axis = 0)
 
+
 #====================================== Generator functions ===============================================#
 def joint_angle_generator(subject, joint, direction = 'x', left=True, right=True):
     #Note: coords of the dataset are different from coords of the world frame
@@ -237,7 +238,22 @@ if __name__ == '__main__':
         dict_gt[subject] = get_global_thigh_angle(subject)
     with open('Global_thigh_angle.npz', 'wb') as file:
         np.savez(file, **dict_gt)
-    
+    """
+
+    dict_gtv_Y = dict()
+    with open('Global_thigh_angle.npz', 'rb') as file:
+        gt_Y = np.load(file)
+        for subject in subject_names:
+            dt = get_time_step(subject)
+            gtv_Y = np.zeros(np.shape(gt_Y[subject][0]))
+            for i in range(np.shape(gt_Y[subject][0])[0]):
+                v = np.diff(gt_Y[subject][0][i, :]) / dt[i, 0]
+                gtv_Y[i, :] = np.insert(v, 0, 0)
+            dict_gtv_Y[subject] = gtv_Y
+    with open('Global_thigh_angVel_Y.npz', 'wb') as file:
+        np.savez(file, **dict_gtv_Y)
+
+    """
     dict_rw = dict()
     for subject in subject_names:
         dict_rw[subject] = get_reaction_wrench(subject)
@@ -259,12 +275,3 @@ if __name__ == '__main__':
     print(np.shape(RW))
     """
 
-    with open('Reaction_wrench.npz', 'rb') as file:
-        RW = np.load(file)
-        for subject in subject_names:
-            print(np.shape(RW[subject][0]))
-
-    with open('Global_thigh_angle.npz', 'rb') as file:
-        GT = np.load(file)
-        for subject in subject_names:
-            print(np.shape(GT[subject][0]))
