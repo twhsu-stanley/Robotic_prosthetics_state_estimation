@@ -5,8 +5,8 @@ from model_framework import *
 from model_fit import *
 
 subject = 'AB01'
-stride_id = 11
-n = 10
+stride_id = 70
+n = 60
 
 with open('Global_thigh_angle.npz', 'rb') as file:
     g_t = np.load(file)
@@ -30,7 +30,7 @@ phase_dots = get_phase_dot(subject)
 step_lengths = get_step_length(subject)
 ramps = get_ramp(subject)
 
-m_model = model_loader('Measurement_model.pickle')
+m_model = model_loader('Measurement_model2.pickle')
 
 Psi = load_Psi(subject)
 
@@ -53,6 +53,12 @@ moment_y_ankle_pred = model_prediction(m_model.models[3], Psi[3], phases[stride_
                                                 phase_dots[stride_id-n:stride_id+n,:].ravel(),\
                                                 step_lengths[stride_id-n:stride_id+n,:].ravel(),\
                                                 ramps[stride_id-n:stride_id+n,:].ravel())
+
+global_thigh_angVel_Y_pred = model_prediction(m_model.models[4], Psi[4], phases[stride_id-n:stride_id+n,:].ravel(),\
+                                                phase_dots[stride_id-n:stride_id+n,:].ravel(),\
+                                                step_lengths[stride_id-n:stride_id+n,:].ravel(),\
+                                                ramps[stride_id-n:stride_id+n,:].ravel())
+
 # compute covariance from samples
 err_gthY = global_thigh_angle_Y[stride_id-n:stride_id+n,:].ravel() - global_thigh_angle_Y_pred
 print("mean gtY ", np.mean(err_gthY))
@@ -66,7 +72,10 @@ print("std fx ", np.std(err_fx))
 err_my = moment_y_ankle[stride_id-n:stride_id+n,:].ravel() - moment_y_ankle_pred
 print("mean my ", np.mean(err_my))
 print("std my ", np.std(err_my))
-err = np.stack((err_gthY, err_fz, err_fx, err_my))
+err_gtvY = global_thigh_angVel_Y[stride_id-n:stride_id+n,:].ravel() - global_thigh_angVel_Y_pred
+print("mean gtvY ", np.mean(err_gtvY))
+print("std gtvY ", np.std(err_gtvY))
+err = np.stack((err_gthY, err_fz, err_fx, err_my, err_gtvY))
 R = np.cov(err)
 print("R = ", R)
 
@@ -94,5 +103,11 @@ plt.plot(moment_y_ankle[stride_id-n:stride_id+n,:].ravel(), 'b-')
 plt.plot(moment_y_ankle_pred, 'k--')
 plt.legend(['actual','predicted'])
 plt.ylabel('moment_y_ankle')
+
+plt.figure("global thigh angVel")
+plt.plot(global_thigh_angVel_Y[stride_id-n:stride_id+n,:].ravel(), 'b-')
+plt.plot(global_thigh_angVel_Y_pred,'k--')
+plt.legend(['actual','predicted'])
+plt.ylabel('global_thigh_angVel_Y')
 
 plt.show()

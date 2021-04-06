@@ -1,10 +1,27 @@
 import numpy as np
 import scipy as sp
 import scipy.io as sio
+from scipy.signal import butter, lfilter, filtfilt
 import h5py as hp
 import math
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+
+# low-pass filter
+def butter_lowpass_filter(data, cutoff, fs, order = 1):
+  # cutoff: desired cutoff frequency of the filter (Hz)
+  # fs: sampling rate (Hz)
+  nyq = 0.5 * fs
+  normal_cutoff = cutoff / nyq
+  b, a = butter(order, normal_cutoff, btype='low', analog=False)
+  #data_filtered = lfilter(b, a, data)
+  data_filtered = filtfilt(b, a, data)
+  return data_filtered
+
+#def time_derivative(input, omega, dt):
+  #tf = ([1, 0], [1/omega, 1], dt)
+  #_, d_input = dlsim(tf, input, t = np.arange(np.shape(input)[0])*dt)
+  #return d_input
 
 def plot3d(ax, data, *args, **kwargs):
   if len(data.shape)==1:

@@ -240,18 +240,31 @@ if __name__ == '__main__':
         np.savez(file, **dict_gt)
     """
 
-    dict_gtv_Y = dict()
+    dict_gtv_Y1 = dict()
+    dict_gtv_Y2 = dict()
+    dict_gtv_Y3 = dict()
     with open('Global_thigh_angle.npz', 'rb') as file:
         gt_Y = np.load(file)
         for subject in subject_names:
             dt = get_time_step(subject)
-            gtv_Y = np.zeros(np.shape(gt_Y[subject][0]))
+            gtv_Y1 = np.zeros(np.shape(gt_Y[subject][0]))
+            gtv_Y2 = np.zeros(np.shape(gt_Y[subject][0]))
+            gtv_Y3 = np.zeros(np.shape(gt_Y[subject][0]))
             for i in range(np.shape(gt_Y[subject][0])[0]):
                 v = np.diff(gt_Y[subject][0][i, :]) / dt[i, 0]
-                gtv_Y[i, :] = np.insert(v, 0, 0)
-            dict_gtv_Y[subject] = gtv_Y
-    with open('Global_thigh_angVel_Y.npz', 'wb') as file:
-        np.savez(file, **dict_gtv_Y)
+                gtv_Y1[i, :] = butter_lowpass_filter(np.insert(v, 0, 0), 5, 1/dt[i, 0], order = 1)
+                gtv_Y2[i, :] = butter_lowpass_filter(np.insert(v, 0, 0), 2, 1/dt[i, 0], order = 1)
+                gtv_Y3[i, :] = butter_lowpass_filter(np.insert(v, 0, 0), 1.5, 1/dt[i, 0], order = 1)
+            dict_gtv_Y1[subject] = gtv_Y1
+            dict_gtv_Y2[subject] = gtv_Y2
+            dict_gtv_Y3[subject] = gtv_Y3
+
+    with open('Global_thigh_angVel_Y1.npz', 'wb') as file:
+        np.savez(file, **dict_gtv_Y1)
+    with open('Global_thigh_angVel_Y2.npz', 'wb') as file:
+        np.savez(file, **dict_gtv_Y2)
+    with open('Global_thigh_angVel_Y3.npz', 'wb') as file:
+        np.savez(file, **dict_gtv_Y3)
 
     """
     dict_rw = dict()
@@ -274,4 +287,4 @@ if __name__ == '__main__':
         np.savez(file, RW)
     print(np.shape(RW))
     """
-
+    

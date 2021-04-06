@@ -165,7 +165,7 @@ class Measurement_Model():
 		self.models = models
 
 	def evaluate_h_func(self, Psi, *states):
-		h = np.zeros((4,1))
+		h = np.zeros((np.shape(Psi)[0], 1))
 		k = 0
 		for model in self.models:
 			h[k] = model.evaluate(*states) @ Psi[k,:].T
@@ -173,7 +173,7 @@ class Measurement_Model():
 		return h
 
 	def evaluate_dh_func(self, Psi, *states):
-		H = np.zeros((4, 4))
+		H = np.zeros((np.shape(Psi)[0], 4))
 		k = 0
 		for model in self.models:
 			j = 0
