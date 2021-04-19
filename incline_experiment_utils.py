@@ -18,10 +18,14 @@ def butter_lowpass_filter(data, cutoff, fs, order = 1):
   data_filtered = filtfilt(b, a, data)
   return data_filtered
 
-#def time_derivative(input, omega, dt):
-  #tf = ([1, 0], [1/omega, 1], dt)
-  #_, d_input = dlsim(tf, input, t = np.arange(np.shape(input)[0])*dt)
-  #return d_input
+# band-pass filter
+def butter_bandpass_filter(data, lowcut, highcut, fs, order = 1):
+  nyq = 0.5 * fs
+  normal_lowcut = lowcut / nyq
+  normal_highcut = highcut / nyq
+  b, a = butter(order, [normal_lowcut, normal_highcut], btype='band', analog=False)
+  data_filtered = filtfilt(b, a, data)
+  return data_filtered
 
 def plot3d(ax, data, *args, **kwargs):
   if len(data.shape)==1:

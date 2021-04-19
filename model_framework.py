@@ -5,6 +5,7 @@
 import numpy as np
 import math
 import pickle
+import scipy
 
 class Basis:
 	def __init__(self, n, var_name):
@@ -200,7 +201,7 @@ def least_squares(model, output, *data):
 	if isinstance(output,(np.ndarray)):
 		output = np.array(output)
 
-	# least square solution
+	# linear least square solution
 	psi = np.linalg.solve(R.T @ R, R.T @ output)
 
 	return psi

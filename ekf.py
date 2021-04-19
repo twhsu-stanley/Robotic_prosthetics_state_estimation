@@ -49,15 +49,19 @@ class extended_kalman_filter:
 
         # evaluate measurement Jacobian at current operating point
         H = self.h.evaluate_dh_func(Psi, self.x_pred[0,0], self.x_pred[1,0], self.x_pred[2,0], self.x_pred[3,0])
+        H[6, 0] += 2*np.pi
 
         # predicted measurements
         z_hat = self.h.evaluate_h_func(Psi, self.x_pred[0,0], self.x_pred[1,0], self.x_pred[2,0], self.x_pred[3,0])
-        
+        z_hat[6] += self.x_pred[0,0] *2*np.pi
+
         # innovation
-        #z = np.array([[z[0]], [z[1]], [z[2]], [z[3]]])
         z = np.array([z]).T
-        self.v = z - z_hat
-        #print("innov: \n", self.v)
+        self.v = z - z_hat        
+        if self.v[6] > np.pi:
+            self.v[6] -= 2*np.pi
+        elif self.v[6] < -np.pi:
+            self.v[6] += 2*np.pi
 
         # innovation covariance
         S = H @ self.Sigma_pred @ H.T + self.R  
