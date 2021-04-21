@@ -53,22 +53,22 @@ class extended_kalman_filter:
 
         # predicted measurements
         z_hat = self.h.evaluate_h_func(Psi, self.x_pred[0,0], self.x_pred[1,0], self.x_pred[2,0], self.x_pred[3,0])
-        z_hat[6] += self.x_pred[0,0] *2*np.pi
+        z_hat[6] += self.x_pred[0,0] * 2*np.pi
 
         # innovation
         z = np.array([z]).T
-        self.v = z - z_hat        
+        self.v = z - z_hat
+        # WRAP ANGLE ISSUE!!
         if self.v[6] > np.pi:
             self.v[6] -= 2*np.pi
         elif self.v[6] < -np.pi:
             self.v[6] += 2*np.pi
 
         # innovation covariance
-        S = H @ self.Sigma_pred @ H.T + self.R  
+        S = H @ self.Sigma_pred @ H.T + self.R
 
         # filter gain
         K = self.Sigma_pred @ H.T @ np.linalg.inv(S)
-        #print("K: \n", K)
 
         # correct the predicted state statistics
         self.x = self.x_pred + K @ self.v

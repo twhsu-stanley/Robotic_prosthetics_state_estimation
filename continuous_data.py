@@ -110,16 +110,17 @@ def load_Conti_measurement_data(subject, trial, side):
     force_x_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_x'][0, start_index:end_index]
     moment_y_ankle = Continuous_measurement_data[subject][trial][side]['moment_ankle_y'][0, start_index:end_index]
     global_thigh_angVel_5hz = Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_5hz'][start_index:end_index]
+    global_thigh_angVel_2x5hz = Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_2x5hz'][start_index:end_index]
     global_thigh_angVel_2hz = Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_2hz'][start_index:end_index]
     atan2 = Continuous_measurement_data[subject][trial][side]['atan2'][start_index:end_index]
 
     return global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle,\
-           global_thigh_angVel_5hz, global_thigh_angVel_2hz, atan2
+           global_thigh_angVel_5hz, global_thigh_angVel_2x5hz, global_thigh_angVel_2hz, atan2
 
 def plot_Conti_data(subject, trial, side):
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
     global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle,\
-                                         global_thigh_angVel_5hz, global_thigh_angVel_2hz, atan2\
+                                         global_thigh_angVel_5hz, global_thigh_angVel_2x5hz, global_thigh_angVel_2hz, atan2\
                                          = load_Conti_measurement_data(subject, trial, side)
     m_model = model_loader('Measurement_model_new.pickle')
     Psi = load_Psi(subject)
@@ -129,8 +130,9 @@ def plot_Conti_data(subject, trial, side):
     force_x_ankle_pred = model_prediction(m_model.models[2], Psi[2], phases, phase_dots, step_lengths, ramps)
     moment_y_ankle_pred = model_prediction(m_model.models[3],Psi[3], phases, phase_dots, step_lengths, ramps)
     global_thigh_angVel_5hz_pred = model_prediction(m_model.models[4], Psi[4], phases, phase_dots, step_lengths, ramps)
-    global_thigh_angVel_2hz_pred = model_prediction(m_model.models[5], Psi[5], phases, phase_dots, step_lengths, ramps)
-    atan2_pred = model_prediction(m_model.models[6], Psi[6], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
+    global_thigh_angVel_2x5hz_pred = model_prediction(m_model.models[5], Psi[5], phases, phase_dots, step_lengths, ramps)
+    global_thigh_angVel_2hz_pred = model_prediction(m_model.models[6], Psi[6], phases, phase_dots, step_lengths, ramps)
+    atan2_pred = model_prediction(m_model.models[7], Psi[7], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
     
     # compute rmse
     print("subject: ",  subject)
@@ -160,6 +162,11 @@ def plot_Conti_data(subject, trial, side):
     print("mean gtv_5hz ", np.mean(err_gtv_5hz))
     print("std gtv_5hz ", np.std(err_gtv_5hz))
     print("RMSE gtv_5hz ", np.sqrt(np.square(err_gtv_5hz).mean()))
+    print('________________________________')
+    err_gtv_2x5hz = global_thigh_angVel_2x5hz - global_thigh_angVel_2x5hz_pred
+    print("mean gtv_2x5hz ", np.mean(err_gtv_2x5hz))
+    print("std gtv_2x5hz ", np.std(err_gtv_2x5hz))
+    print("RMSE gtv_2x5hz ", np.sqrt(np.square(err_gtv_2x5hz).mean()))
     print('________________________________')
     err_gtv_2hz = global_thigh_angVel_2hz - global_thigh_angVel_2hz_pred
     print("mean gtv_2hz ", np.mean(err_gtv_2hz))
@@ -229,22 +236,27 @@ def plot_Conti_data(subject, trial, side):
     plt.ylabel('ramp')
     
     plt.figure()
-    plt.subplot(411)
+    plt.subplot(511)
     plt.plot(global_thigh_angle_Y[800:2000], 'b-')
     plt.plot(global_thigh_angle_Y_pred[800:2000],'b--')
     plt.legend(['actual','predicted'])
     plt.ylabel('thigh_angle_Y')
-    plt.subplot(412)
+    plt.subplot(512)
     plt.plot(global_thigh_angVel_5hz[800:2000],'k-')
     plt.plot(global_thigh_angVel_5hz_pred[800:2000], 'k--')
     plt.ylabel('thigh_angVel_5hz')
     plt.legend(['actual','predicted'])
-    plt.subplot(413)
+    plt.subplot(513)
+    plt.plot(global_thigh_angVel_2x5hz[800:2000],'k-')
+    plt.plot(global_thigh_angVel_2x5hz_pred[800:2000], 'k--')
+    plt.ylabel('thigh_angVel_2x5hz')
+    plt.legend(['actual','predicted'])
+    plt.subplot(514)
     plt.plot(global_thigh_angVel_2hz[800:2000],'r-')
     plt.plot(global_thigh_angVel_2hz_pred[800:2000], 'r--')
     plt.ylabel('thigh_angVel_2hz')
     plt.legend(['actual','predicted'])
-    plt.subplot(414)
+    plt.subplot(515)
     plt.plot(atan2[800:2000],'b-')
     plt.plot(atan2_pred[800:2000], 'b--')
     plt.ylabel('atan2')
@@ -294,17 +306,23 @@ if __name__ == '__main__':
             for side in ['left', 'right']:
                 # APPEND NEW DATA: Global_thigh_angVel_Y
                 gt_Y = Continuous_measurement_data[subject][trial][side]['global_thigh_angle_Y'][0, :]
-                gt_Y_bp = butter_bandpass_filter(gt_Y, 0.5, 2, 1/dt, order = 1)
-                v = np.diff(gt_Y_bp) / dt
+                v = np.diff(gt_Y) / dt
                 global_thigh_angVel_5hz = butter_lowpass_filter(np.insert(v, 0, 0), 5, 1/dt, order = 1)
+                global_thigh_angVel_2x5hz = butter_lowpass_filter(np.insert(v, 0, 0), 2.5, 1/dt, order = 1)
                 global_thigh_angVel_2hz = butter_lowpass_filter(np.insert(v, 0, 0), 2, 1/dt, order = 1)
-                atan2 = np.arctan2(-global_thigh_angVel_2hz, gt_Y_bp)
+
+                # compute atan2 w/ band-passed signals
+                gt_bp = butter_bandpass_filter(gt_Y, 0.5, 2, 1/dt, order = 1)
+                v_bp = np.diff(gt_bp) / dt
+                gtv_bp = butter_lowpass_filter(np.insert(v_bp, 0, 0), 2, 1/dt, order = 1)
+                atan2 = np.arctan2(-gtv_bp, gt_bp)
                 for i in range(np.shape(atan2)[0]):
                     if atan2[i] < 0:
                         atan2[i] = atan2[i] + 2 * np.pi
                 
-                Continuous_measurement_data[subject][trial][side]['global_thigh_angle_bp'] = gt_Y_bp
+                #Continuous_measurement_data[subject][trial][side]['global_thigh_angle_bp'] = gt_Y_bp
                 Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_5hz'] = global_thigh_angVel_5hz
+                Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_2x5hz'] = global_thigh_angVel_2x5hz
                 Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_2hz'] = global_thigh_angVel_2hz
                 Continuous_measurement_data[subject][trial][side]['atan2'] = atan2
     
@@ -312,8 +330,10 @@ if __name__ == '__main__':
     	pickle.dump(Continuous_measurement_data, file)
 
     """
-    subject = 'AB09'
+    subject = 'AB02'
     trial = 's0x8d10'
     side = 'left'
     plot_Conti_data(subject, trial, side)
+
+
     

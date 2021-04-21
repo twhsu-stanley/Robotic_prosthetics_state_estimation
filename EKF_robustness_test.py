@@ -18,7 +18,6 @@ with open('R.pickle', 'rb') as file:
 
 m_model = model_loader('Measurement_model_new.pickle')
 
-
 def A(dt):
     return np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
 
@@ -39,7 +38,9 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
                   [force_z_ankle],\
                   [force_x_ankle],\
                   [moment_y_ankle],\
-                  [global_thigh_angVel_5hz], [global_thigh_angVel_2hz], [atan2]])   
+                  [global_thigh_angVel_5hz],\
+                  [global_thigh_angVel_2hz],\
+                  [atan2]])   
     z = np.squeeze(z)
 
     Psi = load_Psi(subject)
@@ -49,14 +50,15 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-6, 1e-6, 1e-2]) # process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
+    sys.Q = np.diag([0, 1e-5, 1e-7, 1e-9]) # process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
     # measurement noise covariance
     sys.R = R[subject]
+    # sys.R = load_R(R[subject], [0, 1, 2, 3, 4, 5, 6, 7])
 
     # initialize the state
     init = myStruct()
     init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
-    init.Sigma = np.diag([0, 5e-4, 1e-3, 1e-1])
+    init.Sigma = np.diag([0, 5e-10, 1e-10, 1e-10])
 
     ekf = extended_kalman_filter(sys, init)
     
@@ -69,7 +71,7 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
     ramp_kidnap = np.random.uniform(-45, 45)
     state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
 
-    total_step =  1000 #np.shape(z)[1]
+    total_step =  1200 #np.shape(z)[1]
     phases = phases[0 : total_step]
     phase_dots = phase_dots[0 : total_step]
     step_lengths = step_lengths[0 : total_step]
@@ -343,10 +345,10 @@ def ekf_robustness(kidnap = True, RMSE_heatmap = False):
 
 if __name__ == '__main__':
     subject = 'AB01'
-    trial = 's1x2i10'
+    trial = 's1x2d10'
     side = 'left'
 
-    ekf_test(subject, trial, side, kidnap = True, plot = True)
+    ekf_test(subject, trial, side, kidnap = False, plot = True)
     #ekf_bank_test(subject, trial, side, plot = True)
     #ekf_robustness(kidnap = True, RMSE_heatmap = True)
     #print(np.diag(R[subject]))

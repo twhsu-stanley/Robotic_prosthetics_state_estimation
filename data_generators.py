@@ -240,35 +240,47 @@ if __name__ == '__main__':
         np.savez(file, **dict_gt)
     """
 
-    dict_gt_bp = dict()
+    #dict_gt_bp = dict()
     dict_gtv_5hz = dict()
+    dict_gtv_2x5hz = dict()
     dict_gtv_2hz = dict()
     dict_atan2 = dict()
-    with open('Gait_cycle_data/Global_thigh_angle.npz', 'rb') as file: # load band-pass filtered thigh angles
+    with open('Gait_cycle_data/Global_thigh_angle.npz', 'rb') as file:
         gt_Y = np.load(file)
         for subject in subject_names:
             dt = get_time_step(subject)
             gt_bp = np.zeros(np.shape(gt_Y[subject][0]))
             gtv_5hz = np.zeros(np.shape(gt_Y[subject][0]))
+            gtv_2x5hz = np.zeros(np.shape(gt_Y[subject][0]))
             gtv_2hz = np.zeros(np.shape(gt_Y[subject][0]))
             atan2 = np.zeros(np.shape(gt_Y[subject][0]))
             for i in range(np.shape(gt_Y[subject][0])[0]):
-                gt_bp[i, :] = butter_bandpass_filter(gt_Y[subject][0][i, :], 0.5, 2, 1/dt[i, 0], order = 1)
-                v = np.diff(gt_bp[i, :]) / dt[i, 0]
+                # compute angular velocities w/ LP filters w/ different cutoff frequencies
+                v = np.diff(gt_Y[subject][0][i, :]) / dt[i, 0]
                 gtv_5hz[i, :] = butter_lowpass_filter(np.insert(v, 0, 0), 5, 1/dt[i, 0], order = 1)
+                gtv_2x5hz[i, :] = butter_lowpass_filter(np.insert(v, 0, 0), 2.5, 1/dt[i, 0], order = 1)
                 gtv_2hz[i, :] = butter_lowpass_filter(np.insert(v, 0, 0), 2, 1/dt[i, 0], order = 1)
-                atan2[i, :] = np.arctan2(-gtv_2hz[i, :], gt_bp[i, :])
+
+                # compute atan2 w/ band-pass filter
+                gt_bp = butter_bandpass_filter(gt_Y[subject][0][i, :], 0.5, 2, 1/dt[i, 0], order = 1)
+                v_bp = np.diff(gt_bp) / dt[i, 0]
+                gtv_bp = butter_lowpass_filter(np.insert(v_bp, 0, 0), 2, 1/dt[i, 0], order = 1)
+                atan2[i, :] = np.arctan2(-gtv_bp, gt_bp)
                 for j in range(np.shape(atan2[i, :])[0]):
                     if atan2[i, j] < 0:
                         atan2[i, j] = atan2[i, j] + 2 * np.pi
-            dict_gt_bp[subject] = gt_bp
+            #dict_gt_bp[subject] = gt_bp
             dict_gtv_5hz[subject] = gtv_5hz
+            dict_gtv_2x5hz[subject] = gtv_2x5hz
             dict_gtv_2hz[subject] = gtv_2hz
             dict_atan2[subject] = atan2
-    with open('Gait_cycle_data/Global_thigh_angle_bp.npz', 'wb') as file:
-        np.savez(file, **dict_gt_bp)
+
+    #with open('Gait_cycle_data/Global_thigh_angle_bp.npz', 'wb') as file:
+    #    np.savez(file, **dict_gt_bp)
     with open('Gait_cycle_data/Global_thigh_angVel_5hz.npz', 'wb') as file:
         np.savez(file, **dict_gtv_5hz)
+    with open('Gait_cycle_data/Global_thigh_angVel_2x5hz.npz', 'wb') as file:
+        np.savez(file, **dict_gtv_2x5hz)
     with open('Gait_cycle_data/Global_thigh_angVel_2hz.npz', 'wb') as file:
         np.savez(file, **dict_gtv_2hz)
     with open('Gait_cycle_data/atan2.npz', 'wb') as file:
