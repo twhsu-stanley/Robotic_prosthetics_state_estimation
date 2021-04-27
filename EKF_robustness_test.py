@@ -10,13 +10,23 @@ from data_generators import *
 from continuous_data import *
 from model_fit import *
 
-# Model_1: sys.Q = np.diag([0, 1e-4, 1e-6, 5e-4])
-# Model_2: sys.Q = np.diag([0, 5e-5, 1e-6, 1e-3])
+# [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1]
+# [01234567] w/ Q=[0, 3e-5, 1e-5, 1e-1]
+
+# determine which sensors to use
+# 0: global_thigh_angle_Y;
+# 1: force_z_ankle, 2: force_x_ankle; 3: moment_y_ankle;
+# 4: global_thigh_angVel_5hz; 5: global_thigh_angVel_2x5hz; 6: global_thigh_angVel_2hz;
+# 7: atan2
+sensors = [0, 1, 2, 3, 4, 5, 6, 7] # [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1] looks good
+arctan2 = False
+if sensors[-1] == 7:
+    arctan2 = True
 
 with open('R.pickle', 'rb') as file:
     R = pickle.load(file)
 
-m_model = model_loader('Measurement_model_new.pickle')
+m_model = model_loader('Measurement_model_' + str(len(sensors)) +'.pickle')
 
 def A(dt):
     return np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
@@ -31,29 +41,30 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
     # load measurements
     global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle,\
-                                global_thigh_angVel_5hz, global_thigh_angVel_2hz, atan2\
-                                = load_Conti_measurement_data(subject, trial, side) 
+                global_thigh_angVel_5hz, global_thigh_angVel_2x5hz, global_thigh_angVel_2hz, atan2\
+                                        = load_Conti_measurement_data(subject, trial, side)
 
     z = np.array([[global_thigh_angle_Y],\
                   [force_z_ankle],\
                   [force_x_ankle],\
                   [moment_y_ankle],\
                   [global_thigh_angVel_5hz],\
+                  [global_thigh_angVel_2x5hz],\
                   [global_thigh_angVel_2hz],\
                   [atan2]])   
     z = np.squeeze(z)
+    z = z[sensors, :]
 
-    Psi = load_Psi(subject)
+    Psi = load_Psi(subject)[sensors, :]
 
     # build the system
     sys = myStruct()
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-5, 1e-7, 1e-9]) # process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
+    sys.Q = np.diag([0, 3e-5, 1e-5, 1e-1]) # [0, 6e-5, 1e-6, 1e-1] # process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
     # measurement noise covariance
-    sys.R = R[subject]
-    # sys.R = load_R(R[subject], [0, 1, 2, 3, 4, 5, 6, 7])
+    sys.R = R[subject][np.ix_(sensors, sensors)]
 
     # initialize the state
     init = myStruct()
@@ -71,7 +82,7 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
     ramp_kidnap = np.random.uniform(-45, 45)
     state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
 
-    total_step =  1200 #np.shape(z)[1]
+    total_step =  1000 #np.shape(z)[1]
     phases = phases[0 : total_step]
     phase_dots = phase_dots[0 : total_step]
     step_lengths = step_lengths[0 : total_step]
@@ -87,7 +98,7 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
             ekf.x = state_kidnap
 
         ekf.prediction(dt)
-        ekf.correction(z[:, i], Psi)
+        ekf.correction(z[:, i], Psi, arctan2)
         x[i,:] = ekf.x.T
         
         t_step = time.time() - t
@@ -102,7 +113,7 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
     # compare x and ground truth:
     track = True
     track_tol = 0.1
-    start_check = 4
+    start_check = 5
     se = 0
     for i in range(total_step):
         error_phase = phase_error(x[i, 0], phases[i])
@@ -111,7 +122,7 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
             track = track and (error_phase < track_tol)
     
     RMSE_phase = np.sqrt(se / total_step)
-    track = track or (RMSE_phase < 0.08)
+    track = track or (RMSE_phase < 0.1)
     print("RMSE phase = ", RMSE_phase)
 
     if kidnap == True:
@@ -156,25 +167,30 @@ def ekf_bank_test(subject, trial, side, plot = True):
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
     # load measurements
     global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle,\
-                                         global_thigh_angVel_Y1, global_thigh_angVel_Y2, global_thigh_angVel_Y3\
-                                         = load_Conti_measurement_data(subject, trial, side)  
+                global_thigh_angVel_5hz, global_thigh_angVel_2x5hz, global_thigh_angVel_2hz, atan2\
+                                        = load_Conti_measurement_data(subject, trial, side)
 
     z = np.array([[global_thigh_angle_Y],\
-                  [force_z_ankle], \
+                  [force_z_ankle],\
                   [force_x_ankle],\
                   [moment_y_ankle],\
-                  [global_thigh_angVel_Y1], [global_thigh_angVel_Y2], [global_thigh_angVel_Y3]])   
+                  [global_thigh_angVel_5hz],\
+                  [global_thigh_angVel_2x5hz],\
+                  [global_thigh_angVel_2hz],\
+                  [atan2]])   
     z = np.squeeze(z)
-    
-    Psi = load_Psi(subject)
+    z = z[sensors, :]
+
+    Psi = load_Psi(subject)[sensors, :]
 
     # build the system
     sys = myStruct()
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 3e-5, 1e-5, 1e-1]) #([0, 1e-5, 1e-7, 5e-5]) # process model noise covariance
-    sys.R = R[subject] # measurement noise covariance
+    sys.Q = np.diag([0, 1e-4, 5e-5, 1]) # process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
+    # measurement noise covariance
+    sys.R = R[subject][np.ix_(sensors, sensors)]
     init = myStruct()
 
     total_step =  800 #np.shape(z)[1]
@@ -210,7 +226,7 @@ def ekf_bank_test(subject, trial, side, plot = True):
             if i == kidnap_index:
                 ekf.x = state_kidnap
             ekf.prediction(dt)
-            ekf.correction(z[:, i], Psi)
+            ekf.correction(z[:, i], Psi, arctan2)
             x[n, i,:] = ekf.x.T
         
         phase_rakn[n] = x[n, kidnap_index, 0] #- phases[kidnap_index]
@@ -305,7 +321,7 @@ def ekf_robustness(kidnap = True, RMSE_heatmap = False):
     RMSerror_phase = []
 
     #for subject in Conti_subject_names():
-    for subject in ['AB01', 'AB05', 'AB10']:
+    for subject in ['AB01','AB02','AB03','AB09','AB10']:
         print("subject: ", subject)
         for trial in Conti_trial_names(subject):
         #for trial in ['s1x2d2x5']:
@@ -345,10 +361,10 @@ def ekf_robustness(kidnap = True, RMSE_heatmap = False):
 
 if __name__ == '__main__':
     subject = 'AB01'
-    trial = 's1x2d10'
+    trial = 's0x8d10'
     side = 'left'
 
-    ekf_test(subject, trial, side, kidnap = False, plot = True)
+    #ekf_test(subject, trial, side, kidnap = True, plot = True)
     #ekf_bank_test(subject, trial, side, plot = True)
-    #ekf_robustness(kidnap = True, RMSE_heatmap = True)
+    ekf_robustness(kidnap = True, RMSE_heatmap = True)
     #print(np.diag(R[subject]))

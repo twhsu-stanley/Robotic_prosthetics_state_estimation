@@ -14,8 +14,9 @@ def butter_lowpass_filter(data, cutoff, fs, order = 1):
   nyq = 0.5 * fs
   normal_cutoff = cutoff / nyq
   b, a = butter(order, normal_cutoff, btype='low', analog=False)
-  #data_filtered = lfilter(b, a, data)
-  data_filtered = filtfilt(b, a, data)
+  data_filtered = lfilter(b, a, data)
+  #data_filtered = filtfilt(b, a, data)
+  
   return data_filtered
 
 # band-pass filter
@@ -24,7 +25,9 @@ def butter_bandpass_filter(data, lowcut, highcut, fs, order = 1):
   normal_lowcut = lowcut / nyq
   normal_highcut = highcut / nyq
   b, a = butter(order, [normal_lowcut, normal_highcut], btype='band', analog=False)
-  data_filtered = filtfilt(b, a, data)
+  data_filtered = lfilter(b, a, data)
+  #data_filtered = filtfilt(b, a, data)
+  
   return data_filtered
 
 def plot3d(ax, data, *args, **kwargs):

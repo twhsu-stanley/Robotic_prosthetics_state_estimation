@@ -42,30 +42,43 @@ class extended_kalman_filter:
         self.x_pred[0, 0] = warpToOne(self.x_pred[0, 0]) # wrap to be between 0 and 1
         self.Sigma_pred = self.A(dt) @ self.Sigma @ self.A(dt).T + self.Q  # predicted state covariance
 
-    def correction(self, z, Psi):
+    def correction(self, z, Psi, arctan2 = False):
         # EKF correction step
         # Inputs:
         #   z:  measurement
 
         # evaluate measurement Jacobian at current operating point
         H = self.h.evaluate_dh_func(Psi, self.x_pred[0,0], self.x_pred[1,0], self.x_pred[2,0], self.x_pred[3,0])
-        H[6, 0] += 2*np.pi
 
         # predicted measurements
         z_hat = self.h.evaluate_h_func(Psi, self.x_pred[0,0], self.x_pred[1,0], self.x_pred[2,0], self.x_pred[3,0])
-        z_hat[6] += self.x_pred[0,0] * 2*np.pi
 
+        if arctan2:
+            H[-1, 0] += 2*np.pi
+            z_hat[-1] += self.x_pred[0,0] * 2 * np.pi
+            # wrap to 2pi
+            if z_hat[-1] > 2*np.pi:
+                z_hat[-1] -= 2*np.pi
+                    
         # innovation
         z = np.array([z]).T
         self.v = z - z_hat
-        # WRAP ANGLE ISSUE!!
-        if self.v[6] > np.pi:
-            self.v[6] -= 2*np.pi
-        elif self.v[6] < -np.pi:
-            self.v[6] += 2*np.pi
+        
+        if arctan2:
+            # wrap to pi
+            self.v[-1] = np.arctan2(np.sin(self.v[-1]), np.cos(self.v[-1])) 
+
+        # Adjust R dynamically according to errors
+        R = self.R
+        #MD = np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) # Mahalanobis distance
+        #if MD > np.sqrt(26.13): # 8-DOF Chi-square test
+            #R[4:7, 4:7] /= 4
+            #print(np.linalg.eigvals(R))
+            #print(" ")
+
 
         # innovation covariance
-        S = H @ self.Sigma_pred @ H.T + self.R
+        S = H @ self.Sigma_pred @ H.T + R
 
         # filter gain
         K = self.Sigma_pred @ H.T @ np.linalg.inv(S)
