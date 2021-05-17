@@ -57,27 +57,27 @@ class particle_filter:
         #   z: measurement
         z = np.array([z]).T
         w = np.zeros(self.n)  # importance weights
-        count = 0
+        #count = 0
         for i in range(self.n):
             z_hat = self.h.evaluate_h_func(Psi, warpToOne(self.p.x[i,0]), self.p.x[i,1], self.p.x[i,2], self.p.x[i,3])
             w[i] = multivariate_normal.pdf((z - z_hat).T, np.array([0, 0, 0, 0]), self.R)
-            if w[i] > 1e-15:
-                count += 1
+            #if w[i] > 1e-15:
+                #count += 1
 
         self.p.w = np.multiply(self.p.w, w) # update weights
 
         self.mean_cov() # compute mean and covariance of estimate
 
-        if count < self.pn / 30: # might be kidnapped
-            self.Neff = 0
-            self.n = self.pn * 50 # increase number of particles by "100" times
-            self.resampling(mode = "uniform")
-        else:
-            self.p.w = self.p.w / np.sum(self.p.w) # normalize weights
-            self.Neff = 1 / np.sum(np.power(self.p.w, 2))  # effective number of particles
-            if self.Neff < self.n / 5:
-                self.n = self.pn # set number of pparticles to the origin value
-                self.resampling(mode = "low_variance")
+        #if count < self.pn / 30: # might be kidnapped
+        #    self.Neff = 0
+        #    self.n = self.pn * 5 # increase number of particles by "100" times
+        #    self.resampling(mode = "uniform")
+        #else:
+        self.p.w = self.p.w / np.sum(self.p.w) # normalize weights
+        self.Neff = 1 / np.sum(np.power(self.p.w, 2))  # effective number of particles
+        if self.Neff < self.n / 5:
+            self.n = self.pn # set number of pparticles to the origin value
+            self.resampling(mode = "low_variance")
         
     def resampling(self, mode):
         if mode == "uniform":

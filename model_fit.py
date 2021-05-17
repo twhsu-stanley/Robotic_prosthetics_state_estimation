@@ -274,61 +274,68 @@ def load_R(R, measurements):
 if __name__ == '__main__':
     
     # dictionary storing all measurement model coefficients
-    Measurement_model_coeff = dict()
+    #Measurement_model_coeff = dict()
     #Measurement_model_RMSE = dict()
 
     # Orders of the measurement model
     F = 11
+    P = 1
     N = 3
 
     phase_model = Fourier_Basis(F, 'phase')
-    phase_dot_model = Polynomial_Basis(1, 'phase_dot')
+    phase_dot_model = Polynomial_Basis(P, 'phase_dot')
     step_length_model = Berstein_Basis(N,'step_length')
     ramp_model = Berstein_Basis(N, 'ramp')
     
     # Measrurement model for global_thigh_angle_Y
-    #model_thigh_Y = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    model_thigh_Y = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_thigh_Y = model_fit(model_thigh_Y, 'global_thigh_angle_Y')
-    #with open('Psi/Psi_thigh_Y.npz', 'wb') as file:
+    #with open('Psi/Psi_thigh_Y_2.npz', 'wb') as file:
     #    np.savez(file, psi_thigh_Y, allow_pickle = True) 
     
     # Measrurement model for reaction_force_z_ankle
-    #model_force_z = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
-    #psi_force_z, RMSE_force_z = model_fit(model_force_z, 'reaction_force_z_ankle')
+    model_force_z = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    #psi_force_Z = model_fit(model_force_z, 'reaction_force_z_ankle')
+    #with open('Psi/Psi_force_Z_2.npz', 'wb') as file:
+    #    np.savez(file, psi_force_Z, allow_pickle = True)
     #Measurement_model_coeff['reaction_force_z_ankle'] = psi_force_z
     #Measurement_model_RMSE['reaction_force_z_ankle'] = RMSE_force_z
 
     # Measrurement model for reaction_force_x_ankle
-    #model_force_x = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
-    #psi_force_x, RMSE_force_x = model_fit(model_force_x, 'reaction_force_x_ankle')
+    model_force_x = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    #psi_force_X = model_fit(model_force_x, 'reaction_force_x_ankle')
+    #with open('Psi/Psi_force_X_2.npz', 'wb') as file:
+    #    np.savez(file, psi_force_X, allow_pickle = True)
     #Measurement_model_coeff['reaction_force_x_ankle'] = psi_force_x
     #Measurement_model_RMSE['reaction_force_x_ankle'] = RMSE_force_x
 
     # Measrurement model for reaction_moment_y_ankle
-    #model_moment_y = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
-    #psi_moment_y, RMSE_moment_y = model_fit(model_moment_y, 'reaction_moment_y_ankle')
+    model_moment_y = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    #psi_moment_Y = model_fit(model_moment_y, 'reaction_moment_y_ankle')
+    #with open('Psi/Psi_moment_Y_2.npz', 'wb') as file:
+    #    np.savez(file, psi_moment_Y, allow_pickle = True) 
     #Measurement_model_coeff['reaction_moment_y_ankle'] = psi_moment_y
     #Measurement_model_RMSE['reaction_moment_y_ankle'] = RMSE_moment_y
     
     # NEW ADDED: Measrurement model for global_thigh_angVel_Y
-    #model_thighVel_5hz = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    model_thighVel_5hz = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_thighVel_5hz = model_fit(model_thighVel_5hz, 'global_thigh_angVel_5hz')
-    #with open('Psi/Psi_thighVel_5hz.npz', 'wb') as file:
+    #with open('Psi/Psi_thighVel_5hz_2.npz', 'wb') as file:
     #    np.savez(file, psi_thighVel_5hz, allow_pickle = True) 
 
-    #model_thighVel_2x5hz = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    model_thighVel_2x5hz = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_thighVel_2x5hz = model_fit(model_thighVel_2x5hz, 'global_thigh_angVel_2x5hz')
-    #with open('Psi/Psi_thighVel_2x5hz.npz', 'wb') as file:
+    #with open('Psi/Psi_thighVel_2x5hz_2.npz', 'wb') as file:
     #    np.savez(file, psi_thighVel_2x5hz, allow_pickle = True)
 
-    #model_thighVel_2hz = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    model_thighVel_2hz = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_thighVel_2hz = model_fit(model_thighVel_2hz, 'global_thigh_angVel_2hz')
-    #with open('Psi/Psi_thighVel_2hz.npz', 'wb') as file:
+    #with open('Psi/Psi_thighVel_2hz_2.npz', 'wb') as file:
     #    np.savez(file, psi_thighVel_2hz, allow_pickle = True) 
 
-    #model_atan2 = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    model_atan2 = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_atan2 = model_fit(model_atan2, 'atan2')
-    #with open('Psi/Psi_atan2.npz', 'wb') as file:
+    #with open('Psi/Psi_atan2_2.npz', 'wb') as file:
     #    np.savez(file, psi_atan2, allow_pickle = True)
 
     """
@@ -360,16 +367,16 @@ if __name__ == '__main__':
     #    np.savez(file, **Measurement_model_RMSE, allow_pickle = True)
 
     # save measurement model
-    #m_model = Measurement_Model(model_thigh_Y, model_force_z, model_force_x, model_moment_y,\
-    #                            model_thighVel_5hz, model_thighVel_2x5hz, model_thighVel_2hz, model_atan2)
+    m_model = Measurement_Model(model_thigh_Y, model_force_z, model_force_x, model_moment_y,\
+                                model_thighVel_5hz, model_thighVel_2x5hz, model_thighVel_2hz, model_atan2)
     #m_model = Measurement_Model(model_thigh_Y,\
     #                            model_thighVel_5hz, model_thighVel_2x5hz, model_thighVel_2hz)
-    #model_saver(m_model, 'Measurement_model_4.pickle')
+    model_saver(m_model, 'Measurement_model_8.pickle')
     
 
-    R = dict()
-    for subject in subject_names:
-        R[subject] = measurement_error_cov(subject)
-    with open('R.pickle', 'wb') as file:
-    	pickle.dump(R, file)
+    #R = dict()
+    #for subject in subject_names:
+    #    R[subject] = measurement_error_cov(subject)
+    #with open('R.pickle', 'wb') as file:
+    #	pickle.dump(R, file)
 

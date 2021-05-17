@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from matplotlib.ticker import StrMethodFormatter
 from mpl_toolkits import mplot3d
 import time
 from EKF import *
@@ -10,8 +11,9 @@ from data_generators import *
 from continuous_data import *
 from model_fit import *
 
+# [0123] tuning for normal case: Q=[0, 1e-7, 1e-7, 5e-3]
 # [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1]
-# [01234567] w/ Q=[0, 3e-5, 1e-5, 1e-1]
+# [01234567] w/ Q=[0, 3e-5, 1e-5, 1e-1][0, 4e-5, 1e-5, 1e-1]
 
 # determine which sensors to use
 # 0: global_thigh_angle_Y;
@@ -51,7 +53,7 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
                   [global_thigh_angVel_5hz],\
                   [global_thigh_angVel_2x5hz],\
                   [global_thigh_angVel_2hz],\
-                  [atan2]])   
+                  [atan2]])
     z = np.squeeze(z)
     z = z[sensors, :]
 
@@ -62,9 +64,18 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 3e-5, 1e-5, 1e-1]) # [0, 6e-5, 1e-6, 1e-1] # process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
+    sys.Q = np.diag([0, 1e-5, 1e-5, 1e-1]) #[0, 6e-5, 1e-6, 1e-1] #process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
     # measurement noise covariance
-    sys.R = R[subject][np.ix_(sensors, sensors)]
+    sys.R = R[subject][np.ix_(sensors, sensors)] * 4
+    sys.R[6,:] /= 2
+    sys.R[:,6] /= 2
+    sys.R[5,:] /= 2
+    sys.R[:,5] /= 2
+    sys.R[4,:] /= 2
+    sys.R[:,4] /= 2
+    if arctan2:
+        sys.R[-1,:] /= 1
+        sys.R[:,-1] /= 1
 
     # initialize the state
     init = myStruct()
@@ -77,18 +88,19 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
     kidnap_index = np.random.randint(heel_strike_index[0, 0], heel_strike_index[1, 0]) # step at which kidnapping occurs
     
     phase_kidnap = np.random.uniform(0, 1)
-    phase_dot_kidnap = np.random.uniform(0, 5)
-    step_length_kidnap = np.random.uniform(0, 2)
-    ramp_kidnap = np.random.uniform(-45, 45)
+    phase_dot_kidnap = np.random.uniform(0.5, 1)#(0, 5)#
+    step_length_kidnap = np.random.uniform(0.9, 1.5)#(0, 2)#
+    ramp_kidnap = np.random.uniform(-10, 10)#(-45, 45)#
     state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
 
-    total_step =  1000 #np.shape(z)[1]
+    total_step =  int(heel_strike_index[25, 0]) + 1 #np.shape(z)[1]
     phases = phases[0 : total_step]
     phase_dots = phase_dots[0 : total_step]
     step_lengths = step_lengths[0 : total_step]
     ramps = ramps[0 : total_step]
 
     x = np.zeros((total_step, 4))  # state estimate
+    z_pred = np.zeros((total_step, len(sensors)))
     t_step_max = 0
     t_step_tot = 0
     for i in range(total_step):
@@ -100,26 +112,29 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
         ekf.prediction(dt)
         ekf.correction(z[:, i], Psi, arctan2)
         x[i,:] = ekf.x.T
+        z_pred[i,:] = ekf.z_hat.T
         
         t_step = time.time() - t
         t_step_tot += t_step
         if t_step > t_step_max:
             t_step_max = t_step
 
-    print("longest time step = ", t_step_max)
-    print("mean time step = ", t_step_tot / total_step)
+    #print("longest time step = ", t_step_max)
+    #print("mean time step = ", t_step_tot / total_step)
 
     # evaluate robustness
     # compare x and ground truth:
     track = True
-    track_tol = 0.1
-    start_check = 5
+    track_tol = 0.15
+    start_check = 15
     se = 0
     for i in range(total_step):
         error_phase = phase_error(x[i, 0], phases[i])
         se += error_phase ** 2
         if i >= int(heel_strike_index[start_check]):
             track = track and (error_phase < track_tol)
+            #if error_phase > track_tol:
+            #    print(str(i/100)+": " + str(error_phase))
     
     RMSE_phase = np.sqrt(se / total_step)
     track = track or (RMSE_phase < 0.1)
@@ -133,30 +148,99 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
         #print("phase_dot right after kidnap = ", phase_dot_akn)
         #print("phase_dot right before kidnap = ", phase_dot_b4kn)
         print("recover from kidnap? ", track)
-        result = (track, RMSE_phase, ramp_kidnap, ramps[0])
+        result = (track, RMSE_phase, step_lengths[0], ramps[0])
     elif kidnap == False:
         print("track without kidnapping? ", track)
         result = (track, RMSE_phase)
     
     if plot == True:
         # plot results
-        plt.figure()
+        tt = dt * np.arange(len(phases))
+        plt.figure("State Estimate")
         plt.subplot(411)
-        plt.plot(phases)
-        plt.plot(x[:, 0], '--')
-        plt.ylabel('phase')
+        plt.title('EKF Robustness Test')
+        plt.plot(tt, phases, 'k-')
+        plt.plot(tt, x[:, 0], 'r--')
+        plt.legend(('ground truth', 'estimate'))
+        #plt.legend(('ground truth', 'estimate'), bbox_to_anchor=(1, 1.05))
+        plt.ylabel('$\phi$')
+        plt.ylim([0, 2])
+        plt.xlim([0, tt[-1]+0.1])
         plt.subplot(412)
-        plt.plot(phase_dots)
-        plt.plot(x[:, 1], '--')
-        plt.ylabel('phase dot')
+        plt.plot(tt, phase_dots, 'k-')
+        plt.plot(tt, x[:, 1], 'r--')
+        plt.ylabel('$\dot{\phi}~(s^{-1})$')
+        plt.xlim([0, tt[-1]+0.1])
         plt.subplot(413)
-        plt.plot(step_lengths)
-        plt.plot(x[:, 2], '--')
-        plt.ylabel('step length')
+        plt.plot(tt, step_lengths, 'k-')
+        plt.plot(tt, x[:, 2], 'r--')
+        plt.ylabel('$l~(m)$')
+        plt.xlim([0, tt[-1]+0.1])
         plt.subplot(414)
-        plt.plot(ramps)
-        plt.plot(x[:, 3], '--')
-        plt.ylabel('ramp')
+        plt.plot(tt, ramps, 'k-')
+        plt.plot(tt, x[:, 3], 'r--')
+        plt.ylabel('$\\alpha~(deg)$')
+        plt.xlabel('time (s)')
+        plt.xlim([0, tt[-1]+0.1])
+
+        plt.figure("Original Measurements")
+        plt.subplot(411)
+        plt.title("Original Measurements")
+        plt.plot(tt, z[0, 0:total_step], 'k-')
+        plt.plot(tt, z_pred[:, 0], 'r--')
+        plt.legend(('actual', 'predicted'))
+        plt.ylabel('$\\theta_Y$')
+        plt.ylim([-10, 50])
+        plt.xlim([0, tt[-1]+0.1])
+        plt.subplot(412)
+        plt.plot(tt, z[1, 0:total_step], 'k-')
+        plt.plot(tt, z_pred[:, 1], 'r--')
+        plt.ylabel('$f_Z$')
+        plt.ylim([0, 1500])
+        plt.xlim([0, tt[-1]+0.1])
+        plt.subplot(413)
+        plt.plot(tt, z[2, 0:total_step], 'k-')
+        plt.plot(tt, z_pred[:, 2], 'r--')
+        plt.ylabel('$f_X$')
+        plt.ylim([-500, 200])
+        plt.xlim([0, tt[-1]+0.1])
+        plt.subplot(414)
+        plt.plot(tt, z[3, 0:total_step], 'k-')
+        plt.plot(tt, z_pred[:, 3], 'r--')
+        plt.ylabel('$m_Y$')
+        plt.ylim([0, 2000])
+        plt.xlim([0, tt[-1]+0.1])
+        plt.xlabel("time (s)")
+
+        plt.figure("Auxiliary Measurements")
+        plt.subplot(411)
+        plt.title("Original Measurements")
+        plt.plot(tt, z[4, 0:total_step], 'k-')
+        plt.plot(tt, z_pred[:, 4], 'r--')
+        plt.legend(('actual', 'predicted'))
+        plt.ylabel('$\dot{\\theta}_{Y_{5Hz}} ~(deg/s)$')
+        plt.ylim([-150, 150])
+        plt.xlim([0, tt[-1]+0.1])
+        plt.subplot(412)
+        plt.plot(tt, z[5, 0:total_step], 'k-')
+        plt.plot(tt, z_pred[:, 5], 'r--')
+        plt.ylabel('$\dot{\\theta}_{Y_{2.5Hz}} ~(deg/s)$')
+        plt.ylim([-150, 150])
+        plt.xlim([0, tt[-1]+0.1])
+        plt.subplot(413)
+        plt.plot(tt, z[6, 0:total_step], 'k-')
+        plt.plot(tt, z_pred[:, 6], 'r--')
+        plt.ylabel('$\dot{\\theta}_{Y_{2Hz}} ~(deg/s)$')
+        plt.ylim([-150, 150])
+        plt.xlim([0, tt[-1]+0.1])
+        #plt.subplot(414)
+        #plt.plot(tt, z[7, 0:total_step], 'k-')
+        #plt.plot(tt, z_pred[:, 7], 'r--')
+        #plt.ylabel('$atan2$')
+        #plt.ylim([0, 10])
+        #plt.xlim([0, tt[-1]+0.1])
+        #plt.xlabel("time (s)")
+
         plt.show()
 
     return result
@@ -177,7 +261,7 @@ def ekf_bank_test(subject, trial, side, plot = True):
                   [global_thigh_angVel_5hz],\
                   [global_thigh_angVel_2x5hz],\
                   [global_thigh_angVel_2hz],\
-                  [atan2]])   
+                  [atan2]])
     z = np.squeeze(z)
     z = z[sensors, :]
 
@@ -188,19 +272,30 @@ def ekf_bank_test(subject, trial, side, plot = True):
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-4, 5e-5, 1]) # process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
+    sys.Q = np.diag([0, 1e-5, 1e-5, 1e-1]) #[0, 6e-5, 1e-6, 1e-1] #process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
     # measurement noise covariance
-    sys.R = R[subject][np.ix_(sensors, sensors)]
+    sys.R = R[subject][np.ix_(sensors, sensors)] * 4
+    sys.R[6,:] /= 2
+    sys.R[:,6] /= 2
+    sys.R[5,:] /= 2
+    sys.R[:,5] /= 2
+    sys.R[4,:] /= 2
+    sys.R[:,4] /= 2
+    #if arctan2:
+        #sys.R[-1,:] /= 1
+        #sys.R[:,-1] /= 1
+    
     init = myStruct()
 
-    total_step =  800 #np.shape(z)[1]
+    heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
+    total_step =  int(heel_strike_index[25, 0])+1 #np.shape(z)[1]
     # ground truth states
     phases = phases[0 : total_step]
     phase_dots = phase_dots[0 : total_step]
     step_lengths = step_lengths[0 : total_step]
     ramps = ramps[0 : total_step]
     
-    N = 100 # number of EKFs in the EKF-bank
+    N = 30 # number of EKFs in the EKF-bank
     kidnap_index = 30 # step at which kidnapping occurs
     x = np.zeros((N, total_step, 4))  # state estimate
     phase_dot_ROC = np.zeros(N)
@@ -237,23 +332,43 @@ def ekf_bank_test(subject, trial, side, plot = True):
     
     if plot == True:
         # plot results
+        tt = dt * np.arange(len(phases))
+        plt.figure("phase")
+        plt.plot(tt, phases, 'k-', linewidth=3)
+        plt.plot(tt,  x[:, :, 0].T, 'b--', linewidth=1, alpha = 0.4)
+        plt.ylabel('$\phi$')
+        plt.legend(('ground truth', 'estimate'))
+        #plt.legend(('ground truth', 'estimate'), bbox_to_anchor=(1, 1.05))
+        plt.ylim([0, 1.4])
+        plt.xlim([0, tt[-1]+0.1])
+        plt.xlabel('time (s)')
+
         plt.figure("states")
         plt.subplot(411)
-        plt.plot(phases)
-        plt.plot(range(total_step), x[:, :, 0].T, '--')
-        plt.ylabel('phase')
+        plt.title('EKFs-Bank Test')
+        plt.plot(tt, phases, 'k--', linewidth=2)
+        plt.plot(tt,  x[:, :, 0].T, '--',  alpha = 0.35)
+        plt.ylabel('$\phi$')
+        plt.legend(('ground truth', 'estimate'))
+        #plt.legend(('ground truth', 'estimate'), bbox_to_anchor=(1, 1.05))
+        plt.ylim([0, 2])
+        plt.xlim([0, tt[-1]+0.1])
         plt.subplot(412)
-        plt.plot(phase_dots)
-        plt.plot(range(total_step), x[:, :, 1].T, '--')
-        plt.ylabel('phase dot')
+        plt.plot(tt, phase_dots, 'k-', linewidth=2)
+        plt.plot(tt, x[:, :, 1].T, '--')
+        plt.ylabel('$\dot{\phi}~(s^{-1})$')
+        plt.xlim([0, tt[-1]+0.1])
         plt.subplot(413)
-        plt.plot(step_lengths)
-        plt.plot(range(total_step), x[:, :, 2].T, '--')
-        plt.ylabel('step length')
+        plt.plot(tt, step_lengths, 'k-', linewidth=2)
+        plt.plot(tt, x[:, :, 2].T, '--')
+        plt.ylabel('$l~(m)$')
+        plt.xlim([0, tt[-1]+0.1])
         plt.subplot(414)
-        plt.plot(ramps)
-        plt.plot(range(total_step), x[:, :, 3].T, '--')
-        plt.ylabel('ramp')
+        plt.plot(tt, ramps, 'k-', linewidth=2)
+        plt.plot(tt, x[:, :, 3].T, '--')
+        plt.ylabel('$\\alpha~(deg)$')
+        plt.xlim([0, tt[-1]+0.1])
+        plt.xlabel('time (s)')
 
         plt.figure("phase_dot cluster")
         plt.hist(phase_dot_ROC)
@@ -314,17 +429,16 @@ def ekf_bank_test(subject, trial, side, plot = True):
 
         plt.show()
 
-
 def ekf_robustness(kidnap = True, RMSE_heatmap = False):
     track_count = 0
     total_trials = 0
     RMSerror_phase = []
 
     #for subject in Conti_subject_names():
-    for subject in ['AB01','AB02','AB03','AB09','AB10']:
+    for subject in ['AB01', 'AB02', 'AB09', 'AB10']: # , 'AB08', 'AB09'
         print("subject: ", subject)
         for trial in Conti_trial_names(subject):
-        #for trial in ['s1x2d2x5']:
+        #for trial in ['s1x2d2x5', 's1x2d7x5', 's0x8i10', 's0x8i5']:
             if trial == 'subjectdetails':
                 continue
             print("trial: ", trial)
@@ -333,8 +447,9 @@ def ekf_robustness(kidnap = True, RMSE_heatmap = False):
                 total_trials = total_trials + 1
                 
                 if kidnap == True:
-                    track, RMSE_phase, ramp_kidnap, ramp = ekf_test(subject, trial, side, kidnap, plot = False)
-                    RMSerror_phase.append([RMSE_phase, ramp_kidnap, ramp])
+                    track, RMSE_phase, step_length, ramp = ekf_test(subject, trial, side, kidnap, plot = False)
+                    #step_length = round(step_length, 2)
+                    RMSerror_phase.append([RMSE_phase, step_length, ramp])
                 else:
                     track, RMSE_phase = ekf_test(subject, trial, side, kidnap, plot = False)
                     RMSerror_phase.append([RMSE_phase])
@@ -350,8 +465,10 @@ def ekf_robustness(kidnap = True, RMSE_heatmap = False):
         RMSerror_phase_df = pd.DataFrame(RMSerror_phase, columns = ['RMSE', 'x', 'y'])
         sns.heatmap(RMSerror_phase_df.pivot('y', 'x', 'RMSE'))
         plt.title("RMSE of phase")
-        plt.xlabel("ramp_kidnap")
+        plt.xlabel("step_length")
         plt.ylabel("ramp")
+        plt.ylim((-10, 10))
+        plt.gca().xaxis.set_major_formatter(StrMethodFormatter('{x:,.2f}'))
         plt.show()
     else:
         pass
@@ -365,6 +482,6 @@ if __name__ == '__main__':
     side = 'left'
 
     #ekf_test(subject, trial, side, kidnap = True, plot = True)
-    #ekf_bank_test(subject, trial, side, plot = True)
-    ekf_robustness(kidnap = True, RMSE_heatmap = True)
+    ekf_bank_test(subject, trial, side, plot = True)
+    #ekf_robustness(kidnap = True, RMSE_heatmap = False)
     #print(np.diag(R[subject]))

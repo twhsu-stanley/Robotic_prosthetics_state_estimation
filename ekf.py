@@ -10,6 +10,14 @@ def warpToOne(phase):
         phase_wrap = phase_wrap - np.sign(phase_wrap)
     return phase_wrap
 
+def wrapTo2pi(ang):
+    while ang > 2*np.pi:
+        ang -= 2*np.pi
+    #while ang < 0:
+    #    ang += 2*np.pi
+    return ang
+
+
 def phase_error(phase_est, phase_truth):
     # measure error between estimated and ground-truth phase
     if abs(phase_est - phase_truth) < 0.5:
@@ -51,18 +59,17 @@ class extended_kalman_filter:
         H = self.h.evaluate_dh_func(Psi, self.x_pred[0,0], self.x_pred[1,0], self.x_pred[2,0], self.x_pred[3,0])
 
         # predicted measurements
-        z_hat = self.h.evaluate_h_func(Psi, self.x_pred[0,0], self.x_pred[1,0], self.x_pred[2,0], self.x_pred[3,0])
+        self.z_hat = self.h.evaluate_h_func(Psi, self.x_pred[0,0], self.x_pred[1,0], self.x_pred[2,0], self.x_pred[3,0])
 
         if arctan2:
             H[-1, 0] += 2*np.pi
-            z_hat[-1] += self.x_pred[0,0] * 2 * np.pi
+            self.z_hat[-1] += self.x_pred[0,0] * 2 * np.pi
             # wrap to 2pi
-            if z_hat[-1] > 2*np.pi:
-                z_hat[-1] -= 2*np.pi
+            self.z_hat[-1] = wrapTo2pi(self.z_hat[-1])
                     
         # innovation
         z = np.array([z]).T
-        self.v = z - z_hat
+        self.v = z - self.z_hat
         
         if arctan2:
             # wrap to pi
@@ -72,10 +79,9 @@ class extended_kalman_filter:
         R = self.R
         #MD = np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) # Mahalanobis distance
         #if MD > np.sqrt(26.13): # 8-DOF Chi-square test
-            #R[4:7, 4:7] /= 4
-            #print(np.linalg.eigvals(R))
-            #print(" ")
-
+            # scale R of thigh angle vel
+            #U = np.diag([1, 1, 1, 1, 1/2, 1/2, 1/2, 1])
+            #R = U @ R @ U.T
 
         # innovation covariance
         S = H @ self.Sigma_pred @ H.T + R

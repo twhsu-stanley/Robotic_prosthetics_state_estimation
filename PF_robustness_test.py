@@ -9,10 +9,20 @@ from model_framework import *
 from continuous_data import *
 from model_fit import *
 
-with open('Measurement_error_cov.pickle', 'rb') as file:
+# determine which sensors to use
+# 0: global_thigh_angle_Y;
+# 1: force_z_ankle, 2: force_x_ankle; 3: moment_y_ankle;
+# 4: global_thigh_angVel_5hz; 5: global_thigh_angVel_2x5hz; 6: global_thigh_angVel_2hz;
+# 7: atan2
+sensors = [0, 1, 2, 3] # [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1] looks good
+arctan2 = False
+if sensors[-1] == 7:
+    arctan2 = True
+
+with open('R.pickle', 'rb') as file:
     R = pickle.load(file)
 
-measurement_model = model_loader('Measurement_model.pickle')
+m_model = model_loader('Measurement_model_' + str(len(sensors)) +'.pickle')
 
 class myStruct:
     pass
@@ -24,16 +34,32 @@ def process_model(x, dt, pn):
 
 def pf_test(subject, trial, side, kidnap = True, plot = True):
     dt = 1/100
+    # load ground truth
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
-    global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle = load_Conti_measurement_data(subject, trial, side)
-    Psi = load_Psi(subject)
+    # load measurements
+    global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle,\
+                global_thigh_angVel_5hz, global_thigh_angVel_2x5hz, global_thigh_angVel_2hz, atan2\
+                                        = load_Conti_measurement_data(subject, trial, side)
+
+    z = np.array([[global_thigh_angle_Y],\
+                  [force_z_ankle],\
+                  [force_x_ankle],\
+                  [moment_y_ankle],\
+                  [global_thigh_angVel_5hz],\
+                  [global_thigh_angVel_2x5hz],\
+                  [global_thigh_angVel_2hz],\
+                  [atan2]])
+    z = np.squeeze(z)
+    z = z[sensors, :]
+
+    Psi = load_Psi(subject)[sensors, :]
 
     # build the system
     sys = myStruct()
     sys.f = process_model
-    sys.h = measurement_model
+    sys.h = m_model
     sys.Q = np.diag([1e-50, 5e-5, 1e-4, 5e-2]) # process model noise covariance [1e-50, 5e-5, 1e-4, 5e-2]
-    sys.R = R[subject] # measurement noise covariance
+    sys.R = R[subject][np.ix_(sensors, sensors)]
 
     # initialization
     init = myStruct()
@@ -43,23 +69,17 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
 
     pf = particle_filter(sys, init)
 
-    z = np.array([[global_thigh_angle_Y],\
-                  [force_z_ankle], \
-                  [force_x_ankle],\
-                  [moment_y_ankle]])
-    z = np.squeeze(z)
-
     heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
     kidnap_index = np.random.randint(heel_strike_index[0, 0], heel_strike_index[1, 0]) # step at which kidnapping occurs
 
     # kidnapping state
     phase_kidnap = np.random.uniform(0, 1)
-    phase_dot_kidnap = np.random.uniform(0, 5)
-    step_length_kidnap = np.random.uniform(0, 2)
-    ramp_kidnap = np.random.uniform(-45, 45)
+    phase_dot_kidnap = np.random.uniform(0.5, 1)#(0, 2)#
+    step_length_kidnap = np.random.uniform(0.9, 1.5)#(0, 1.5)#
+    ramp_kidnap = np.random.uniform(-10, 10)#(-45, 45)
     state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
 
-    total_step =  800 #np.shape(z)[1]
+    total_step =  int(heel_strike_index[9, 0]) + 1 #np.shape(z)[1] #np.shape(z)[1]
     phases = phases[0 : total_step]
     phase_dots = phase_dots[0 : total_step]
     step_lengths = step_lengths[0 : total_step]
@@ -92,28 +112,28 @@ def pf_test(subject, trial, side, kidnap = True, plot = True):
     print("mean time step = ", t_step_tot / total_step)
     
     # evaluate robustness
-    #track = True
-    track_tol = 0.05
-    #start_check = 3
+    track = True
+    track_tol = 0.1
+    start_check = 5
     se = 0
     for i in range(kidnap_index + 100, total_step):
         error_phase = phase_error(x[i, 0], phases[i])
         se += error_phase ** 2
-        #if i >= int(heel_strike_index[start_check]):
-            #track = track and (error_phase < track_tol)
+        if i >= int(heel_strike_index[start_check]):
+            track = track and (error_phase < track_tol)
     RMSE_phase = np.sqrt(se / (total_step - kidnap_index - 100))
-    track = (RMSE_phase < track_tol)
+    track = track or (RMSE_phase < track_tol)
     print("RMSE phase = ", RMSE_phase)
 
     if kidnap == True:
         phase_dot_akn = x[kidnap_index, 1]
         phase_dot_b4kn = x[kidnap_index - 1, 1]
         kidnap_step = kidnap_index / (heel_strike_index[1, 0] - heel_strike_index[0, 0]) * 100 # kidmap step % of stride
-        print("kidnapping step (%_stride) = ", kidnap_step)
-        print("phase_dot right after kidnap = ", phase_dot_akn)
-        print("phase_dot right before kidnap = ", phase_dot_b4kn)
+        #print("kidnapping step (%_stride) = ", kidnap_step)
+        #print("phase_dot right after kidnap = ", phase_dot_akn)
+        #print("phase_dot right before kidnap = ", phase_dot_b4kn)
         print("recover from kidnap? ", track)
-        print("---------------------------------------------------------------")
+        #print("---------------------------------------------------------------")
         result = (track, RMSE_phase, phase_dot_b4kn, phase_dot_akn, kidnap_step)
     elif kidnap == False:
         print("track without kidnapping? ", track)
@@ -155,7 +175,7 @@ def pf_robustness(kidnap = True):
     RMSerror_phase = []
 
     #for subject in Conti_subject_names():
-    for subject in ['AB01', 'AB02', 'AB09']:
+    for subject in ['AB01', 'AB10']:
         print("subject: ", subject)
         for trial in Conti_trial_names(subject):
         #for trial in ['s1x2d2x5']:
@@ -198,7 +218,7 @@ if __name__ == '__main__':
     trial= 's1x2d2x5'
     side = 'left'
 
-    result = pf_test(subject, trial, side, kidnap = False, plot = True)
-    #robustness = pf_robustness(kidnap = True)
+    #result = pf_test(subject, trial, side, kidnap = False, plot = True)
+    robustness = pf_robustness(kidnap = True)
 
     #print("robustness (%): ", robustness)

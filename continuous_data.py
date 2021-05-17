@@ -100,7 +100,7 @@ def Conti_state_vars(subject, trial, side):
     return phase, phase_dot, step_length, ramp
 
 def load_Conti_measurement_data(subject, trial, side):
-    with open('Continuous_measurement_data_new.pickle', 'rb') as file:
+    with open('Continuous_measurement_data_new_s.pickle', 'rb') as file:
         Continuous_measurement_data = pickle.load(file)
 
     start_index, end_index = Conti_start_end(subject, trial, side)
@@ -112,7 +112,7 @@ def load_Conti_measurement_data(subject, trial, side):
     global_thigh_angVel_5hz = Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_5hz'][start_index:end_index]
     global_thigh_angVel_2x5hz = Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_2x5hz'][start_index:end_index]
     global_thigh_angVel_2hz = Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_2hz'][start_index:end_index]
-    atan2 = Continuous_measurement_data[subject][trial][side]['atan2'][start_index:end_index]
+    atan2 = Continuous_measurement_data[subject][trial][side]['atan2_s'][start_index:end_index]
 
     return global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle,\
            global_thigh_angVel_5hz, global_thigh_angVel_2x5hz, global_thigh_angVel_2hz, atan2
@@ -189,8 +189,8 @@ def plot_Conti_data(subject, trial, side):
         if at2[i] > 2*np.pi:
            at2[i] -= 2*np.pi
     plt.plot(at2[0:1600], '--')
-    plt.plot(phases[0:1600]*2*np.pi, 'r')
-    plt.legend(['atan2', 'atan2_predicted', 'phase*2pi'])
+    #plt.plot(phases[0:1600]*2*np.pi, 'r')
+    plt.legend(['atan2', 'atan2_predicted'])#, 'phase*2pi'
     
     plt.subplot(212)
     a = atan2[0:1600] - 2*np.pi*phases[0:1600]
@@ -201,46 +201,37 @@ def plot_Conti_data(subject, trial, side):
     plt.legend(['atan2-phase*2pi', 'least-squares fitting'])
     
 
-    
-    plt.figure('measurement')
-    plt.subplot(711)
-    plt.plot(global_thigh_angle_Y, 'b-')
-    plt.plot(global_thigh_angle_Y_pred,'k--')
-    plt.legend(['actual','predicted'])
-    plt.ylabel('global_thigh_angle_Y')
-    plt.subplot(712)
-    plt.plot(force_z_ankle, 'b-')
-    plt.plot(force_z_ankle_pred, 'k--')
-    plt.legend(['actual','predicted'])
-    plt.ylabel('force_z_ankle')
-    plt.subplot(713)
-    plt.plot(force_x_ankle, 'b-')
-    plt.plot(force_x_ankle_pred, 'k--')
-    plt.legend(['actual','predicted'])
-    plt.ylabel('force_x_ankle')
-    plt.subplot(714)
-    plt.plot(moment_y_ankle, 'b-')
-    plt.plot(moment_y_ankle_pred, 'k--')
-    plt.legend(['actual','predicted'])
-    plt.ylabel('moment_y_ankle')
-    plt.subplot(715)
-    plt.plot(global_thigh_angVel_5hz, 'b-')
-    plt.plot(global_thigh_angVel_5hz_pred,'k--')
-    plt.legend(['actual','predicted'])
-    plt.ylabel('global_thigh_angVel_5hz')
-    plt.subplot(716)
-    plt.plot(global_thigh_angVel_2hz, 'b-')
-    plt.plot(global_thigh_angVel_2hz_pred,'k--')
-    plt.legend(['actual','predicted'])
-    plt.ylabel('global_thigh_angVel_2hz')
-    plt.subplot(717)
-    plt.plot(atan2, 'b-')
-    plt.plot(atan2_pred,'k--')
-    plt.legend(['actual','predicted'])
-    plt.ylabel('atan2')
+    heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
+    total_step =  int(heel_strike_index[10, 0])+1 #np.shape(z)[1]
+    tt = 0.01 * np.arange(total_step)
+    plt.figure('Original Measurements')
+    plt.subplot(411)
+    plt.plot(tt, global_thigh_angle_Y[0:total_step], 'k-')
+    plt.plot(tt, global_thigh_angle_Y_pred[0:total_step],'b--')
+    plt.ylim([-25, 105])
+    plt.xlim([0, 13.6])
+    plt.legend(('actual', 'least squares'))
+    #plt.legend(('actual', 'least squares'), bbox_to_anchor=(1, 1.05))
+    plt.ylabel('$\\theta_Y~(deg)$')
+    plt.subplot(412)
+    plt.plot(tt, force_z_ankle[0:total_step], 'k-')
+    plt.plot(tt, force_z_ankle_pred[0:total_step], 'b--')
+    plt.ylabel('$f_Z~(N)$')
+    plt.xlim([0, 13.6])
+    plt.subplot(413)
+    plt.plot(tt, force_x_ankle[0:total_step], 'k-')
+    plt.plot(tt, force_x_ankle_pred[0:total_step], 'b--')
+    plt.ylabel('$f_X~(N)$')
+    plt.xlim([0, 13.6])
+    plt.subplot(414)
+    plt.plot(tt, moment_y_ankle[0:total_step], 'k-')
+    plt.plot(tt, moment_y_ankle_pred[0:total_step], 'b--')
+    plt.ylabel('$m_Y~(N \cdot m)$')
+    plt.xlim([0, 13.6])
+    plt.xlabel('time (s)')
 
 
-    plt.figure('state')
+    plt.figure('State')
     plt.subplot(411)
     plt.plot(phases)
     plt.ylabel('phase')
@@ -255,32 +246,35 @@ def plot_Conti_data(subject, trial, side):
     plt.ylabel('ramp')
     
     
-    plt.figure()
-    plt.subplot(511)
-    plt.plot(global_thigh_angle_Y[800:2000], 'b-')
-    plt.plot(global_thigh_angle_Y_pred[800:2000],'b--')
-    plt.legend(['actual','predicted'])
-    plt.ylabel('thigh_angle_Y')
-    plt.subplot(512)
-    plt.plot(global_thigh_angVel_5hz[800:2000],'k-')
-    plt.plot(global_thigh_angVel_5hz_pred[800:2000], 'k--')
-    plt.ylabel('thigh_angVel_5hz')
-    plt.legend(['actual','predicted'])
-    plt.subplot(513)
-    plt.plot(global_thigh_angVel_2x5hz[800:2000],'k-')
-    plt.plot(global_thigh_angVel_2x5hz_pred[800:2000], 'k--')
-    plt.ylabel('thigh_angVel_2x5hz')
-    plt.legend(['actual','predicted'])
-    plt.subplot(514)
-    plt.plot(global_thigh_angVel_2hz[800:2000],'r-')
-    plt.plot(global_thigh_angVel_2hz_pred[800:2000], 'r--')
-    plt.ylabel('thigh_angVel_2hz')
-    plt.legend(['actual','predicted'])
-    plt.subplot(515)
-    plt.plot(atan2[800:2000],'b-')
-    plt.plot(at2[800:2000], 'b--')
-    plt.ylabel('atan2')
-    plt.legend(['actual','predicted'])
+    plt.figure('Fictitious Sensors: thigh angle vel')
+    plt.subplot(311)
+    plt.plot(tt, global_thigh_angVel_5hz[0:total_step],'k-')
+    plt.plot(tt, global_thigh_angVel_5hz_pred[0:total_step], 'b--')
+    plt.ylabel('$\dot{\\theta}_{Y_{5Hz}} ~(deg/s)$')
+    plt.ylim([-200, 400])
+    plt.xlim([0, 13.6])
+    plt.legend(('actual', 'least squares'))
+    #plt.legend(('actual', 'least squares'), bbox_to_anchor=(1, 1.05))
+    plt.subplot(312)
+    plt.plot(tt, global_thigh_angVel_2x5hz[0:total_step],'k-')
+    plt.plot(tt, global_thigh_angVel_2x5hz_pred[0:total_step], 'b--')
+    plt.ylabel('$\dot{\\theta}_{Y_{2.5Hz}} ~(deg/s)$')
+    plt.xlim([0, 13.6])
+    plt.subplot(313)
+    plt.plot(tt, global_thigh_angVel_2hz[0:total_step],'k-')
+    plt.plot(tt, global_thigh_angVel_2hz_pred[0:total_step], 'b--')
+    plt.ylabel('$\dot{\\theta}_{Y_{2Hz}} ~(deg/s)$')
+    plt.xlim([0, 13.6])
+    plt.xlabel('time (s)')
+    
+    plt.figure('Fictitious Sensors: atan2')
+    plt.plot(tt, atan2[0:total_step],'k-')
+    plt.plot(tt, at2[0:total_step], 'b--')
+    plt.ylabel('$atan2~(rad)$')
+    plt.xlabel('time (s)')
+    plt.ylim([0, 7.5])
+    plt.xlim([0, 13.6])
+    plt.legend(('actual', 'least squares'))
     
     plt.show()
 
@@ -315,7 +309,7 @@ if __name__ == '__main__':
     
     # APPEND NEW DATA
     """
-    with open('Continuous_measurement_data_new_ff.pickle', 'rb') as file:
+    with open('Continuous_measurement_data_new.pickle', 'rb') as file:
     	Continuous_measurement_data = pickle.load(file)
 
     dt = 1/100
@@ -326,35 +320,35 @@ if __name__ == '__main__':
             for side in ['left', 'right']:
                 # APPEND NEW DATA: Global_thigh_angVel_Y
                 gt_Y = Continuous_measurement_data[subject][trial][side]['global_thigh_angle_Y'][0, :]
-                v = np.diff(gt_Y) / dt
-                global_thigh_angVel_5hz = butter_lowpass_filter(np.insert(v, 0, 0), 5, 1/dt, order = 1)
-                global_thigh_angVel_2x5hz = butter_lowpass_filter(np.insert(v, 0, 0), 2.5, 1/dt, order = 1)
-                global_thigh_angVel_2hz = butter_lowpass_filter(np.insert(v, 0, 0), 2, 1/dt, order = 1)
+                #v = np.diff(gt_Y) / dt
+                #global_thigh_angVel_5hz = butter_lowpass_filter(np.insert(v, 0, 0), 5, 1/dt, order = 1)
+                #global_thigh_angVel_2x5hz = butter_lowpass_filter(np.insert(v, 0, 0), 2.5, 1/dt, order = 1)
+                #global_thigh_angVel_2hz = butter_lowpass_filter(np.insert(v, 0, 0), 2, 1/dt, order = 1)
 
                 # compute atan2 w/ band-passed signals
-                gt_bp = butter_bandpass_filter(gt_Y, 0.5, 2, 1/dt, order = 1)
+                gt_bp = butter_bandpass_filter(gt_Y, 0.5, 2, 1/dt, order = 2)
                 v_bp = np.diff(gt_bp) / dt
                 gtv_bp = butter_lowpass_filter(np.insert(v_bp, 0, 0), 2, 1/dt, order = 1)
-                atan2 = np.arctan2(-gtv_bp, gt_bp)
+                atan2 = np.arctan2(-gtv_bp/(2*np.pi*0.8), gt_bp) # scaled
                 for i in range(np.shape(atan2)[0]):
                     if atan2[i] < 0:
                         atan2[i] = atan2[i] + 2 * np.pi
                 
                 #Continuous_measurement_data[subject][trial][side]['global_thigh_angle_bp'] = gt_Y_bp
-                Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_5hz'] = global_thigh_angVel_5hz
-                Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_2x5hz'] = global_thigh_angVel_2x5hz
-                Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_2hz'] = global_thigh_angVel_2hz
-                Continuous_measurement_data[subject][trial][side]['atan2'] = atan2
+                #Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_5hz'] = global_thigh_angVel_5hz
+                #Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_2x5hz'] = global_thigh_angVel_2x5hz
+                #Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_2hz'] = global_thigh_angVel_2hz
+                Continuous_measurement_data[subject][trial][side]['atan2_s'] = atan2
     
-    with open('Continuous_measurement_data_new.pickle', 'wb') as file:
+    with open('Continuous_measurement_data_new_s.pickle', 'wb') as file:
     	pickle.dump(Continuous_measurement_data, file)
 
     """
-    subject = 'AB02'
-    trial = 's1x2d10'
+    subject = 'AB05'
+    trial = 's1x2i10'
     side = 'left'
     plot_Conti_data(subject, trial, side)
-
+    
     #####################
     """
     dt = get_time_step(subject)
@@ -365,15 +359,18 @@ if __name__ == '__main__':
         gt_bp2 = np.zeros(np.shape(gt_Y[subject][0]))
         atan2 = np.zeros(np.shape(gt_Y[subject][0]))
         atan22 = np.zeros(np.shape(gt_Y[subject][0]))
+        atan2v = np.zeros(np.shape(gt_Y[subject][0]))
         gtv_2hz = np.zeros(np.shape(gt_Y[subject][0]))
         gtv_2hz2 = np.zeros(np.shape(gt_Y[subject][0]))
+
+        plt.figure('Phase portrait')
         for i in range(15):
             gt[i, :] = gt_Y[subject][0][i, :]
             gt_bp[i, :] = butter_bandpass_filter(gt_Y[subject][0][i, :], 0.5, 2, 1/dt[i, 0], order = 1)
             
             gt_rep = np.array([gt_Y[subject][0][i, :], gt_Y[subject][0][i, :], gt_Y[subject][0][i, :],\
                                    gt_Y[subject][0][i, :], gt_Y[subject][0][i, :]]).reshape(-1)
-            gbp = butter_bandpass_filter(gt_rep, 0.5, 2, 1/dt[i, 0], order = 1)
+            gbp = butter_bandpass_filter(gt_rep, 0.5, 2, 1/dt[i, 0], order = 2)
             gt_bp2[i, :] = gbp[2*len(gt_Y[subject][0][i, :]): 3*len(gt_Y[subject][0][i, :])]
             
             v_bp = np.diff(gt_bp2[i, :]) / dt[i, 0]
@@ -381,26 +378,30 @@ if __name__ == '__main__':
             gtv_stack = np.array([gtv_bp, gtv_bp, gtv_bp, gtv_bp, gtv_bp]).reshape(-1)
             gtv_blp = butter_lowpass_filter(gtv_stack, 2, 1/dt[i, 0], order = 1)[2*len(gt_Y[subject][0][i, :]): 3*len(gt_Y[subject][0][i, :])]
 
-            atan2[i, :] = np.arctan2(-gtv_blp, gt_bp2[i, :])
+            atan2[i, :] = np.arctan2(-gtv_blp/(2*np.pi*0.8), gt_bp2[i, :])
+            plt.plot(gt_bp2[i, :], -gtv_blp/(2*np.pi*0.8))
+
             for j in range(np.shape(atan2[i, :])[0]):
                 if atan2[i, j] < 0:
                     atan2[i, j] = atan2[i, j] + 2 * np.pi
-
+            #at2v = np.diff(atan2[i, :]) / dt[i, 0]
+            #at2v = np.insert(at2v, 0, 0)
+            #atan2v[i, :] = butter_lowpass_filter(at2v, 1, 1/dt[i, 0], order = 1)
+            
             
             v = np.diff(gt_Y[subject][0][i, :]) / dt[i, 0]
             gtv = np.insert(v, 0, 0)
             gtv_stack = np.array([gtv, gtv, gtv, gtv, gtv]).reshape(-1)
             gtv_2hz[i, :] = butter_lowpass_filter(gtv, 2, 1/dt[i, 0], order = 1)
-            gtv2 = butter_lowpass_filter(gtv_stack, 2, 1/dt[i, 0], order = 1)
+            gtv2 = butter_lowpass_filter(gtv_stack, 2, 1/dt[i, 0], order = 2)
             gtv_2hz2[i, :] = gtv2[3 * len(gt_Y[subject][0][i, :]): 4 * len(gt_Y[subject][0][i, :])]
 
 
-    
     plt.figure()
-    plt.plot(gt[0:15,:].ravel(), 'b-')
-
-    plt.plot(gt_bp[0:15,:].ravel(), 'r-')
-    plt.plot(gt_bp2[0:15,:].ravel(), 'k--')
+    plt.plot(gt[0:10,:].ravel(), 'b-')
+    plt.plot(gt_bp[0:10,:].ravel(), 'k-')
+    plt.plot(gt_bp2[0:10,:].ravel(), 'r-')
+    plt.legend(('original thigh angle', 'band-pass filtered', 'new band-pass filtered'))
     
     plt.figure()
     plt.plot(gtv_2hz[0:15,:].ravel(), 'b-')
@@ -409,7 +410,8 @@ if __name__ == '__main__':
     plt.figure()
     plt.plot(atan2[0:15,:].ravel(), 'b-')
 
+    #plt.figure()
+    #plt.plot(atan2v[0:15,:].ravel(), 'b-')
 
     plt.show()
-
     """
