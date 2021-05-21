@@ -57,7 +57,7 @@ def model_fit(model, mode):
                 g_tv = np.load(file)
                 measurement_input = g_tv[subject]
         elif mode == 'atan2':
-            with open('Gait_cycle_data/atan2.npz', 'rb') as file:
+            with open('Gait_cycle_data/atan2_s.npz', 'rb') as file: # scaled
                 atan2 = np.load(file)
                 measurement_input = atan2[subject]
         else:
@@ -130,7 +130,7 @@ def load_Psi(subject):
         p = np.load(file, allow_pickle = True)
         Psi_thighVel_2hz = p['arr_0'].item()[subject]
     
-    with open('Psi/Psi_atan2.npz', 'rb') as file:
+    with open('Psi/Psi_atan2_s.npz', 'rb') as file:
         p = np.load(file, allow_pickle = True)
         Psi_atan2 = p['arr_0'].item()[subject]
 
@@ -162,7 +162,7 @@ def measurement_error_cov(subject):
         g_tv = np.load(file)
         global_thigh_angVel_2hz = g_tv[subject]
 
-    with open('Gait_cycle_data/atan2.npz', 'rb') as file:
+    with open('Gait_cycle_data/atan2_s.npz', 'rb') as file:
         at = np.load(file)
         atan2 = at[subject]
 
@@ -184,8 +184,8 @@ def measurement_error_cov(subject):
     atan2_pred = model_prediction(m_model.models[7], Psi[7], phases.ravel(), phase_dots.ravel(), step_lengths.ravel(), ramps.ravel()) + 2*np.pi*phases.ravel()
     # wrap to [0, 2pi]
     for i in range(len(atan2_pred)):
-        if atan2_pred[i] > 2*np.pi:
-            atan2_pred[i] - 2*np.pi
+        while atan2_pred[i] > 2*np.pi:
+            atan2_pred[i] -= 2*np.pi
 
     # compute covariance from samples Measurement_errors
     print("subject: ",  subject)
@@ -255,22 +255,6 @@ def measurement_error_cov(subject):
     print("R = ", R)
     return R
 
-def load_R(R, measurements):
-    # e.g. measurements = [0, 2, 4]
-    """
-    n = len(measurements)
-    R_sub = np.zeros((n, n))
-    q = 0
-    for i in range(n):
-        r = 0
-        for j in range(n):
-            R_sub[i, j] = R[measurements[q], measurements[r]]
-            r += 1
-        q += 1
-    """
-    return R[measurements, measurements]
-    #return R_sub
-
 if __name__ == '__main__':
     
     # dictionary storing all measurement model coefficients
@@ -335,7 +319,7 @@ if __name__ == '__main__':
 
     model_atan2 = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_atan2 = model_fit(model_atan2, 'atan2')
-    #with open('Psi/Psi_atan2_2.npz', 'wb') as file:
+    #with open('Psi/Psi_atan2_s.npz', 'wb') as file:
     #    np.savez(file, psi_atan2, allow_pickle = True)
 
     """
@@ -367,16 +351,17 @@ if __name__ == '__main__':
     #    np.savez(file, **Measurement_model_RMSE, allow_pickle = True)
 
     # save measurement model
-    m_model = Measurement_Model(model_thigh_Y, model_force_z, model_force_x, model_moment_y,\
-                                model_thighVel_5hz, model_thighVel_2x5hz, model_thighVel_2hz, model_atan2)
+    #m_model = Measurement_Model(model_thigh_Y, model_force_z, model_force_x, model_moment_y,\
+    #                            model_thighVel_5hz, model_thighVel_2x5hz, model_thighVel_2hz, model_atan2)
     #m_model = Measurement_Model(model_thigh_Y,\
     #                            model_thighVel_5hz, model_thighVel_2x5hz, model_thighVel_2hz)
-    model_saver(m_model, 'Measurement_model_8.pickle')
+    #model_saver(m_model, 'Measurement_model_8.pickle')
     
 
     #R = dict()
     #for subject in subject_names:
     #    R[subject] = measurement_error_cov(subject)
-    #with open('R.pickle', 'wb') as file:
+    #with open('R_s.pickle', 'wb') as file:
     #	pickle.dump(R, file)
+
 

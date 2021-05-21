@@ -25,7 +25,7 @@ arctan2 = False
 if sensors[-1] == 7:
     arctan2 = True
 
-with open('R.pickle', 'rb') as file:
+with open('R_s.pickle', 'rb') as file:
     R = pickle.load(file)
 
 m_model = model_loader('Measurement_model_' + str(len(sensors)) +'.pickle')
@@ -67,15 +67,11 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
     sys.Q = np.diag([0, 1e-5, 1e-5, 1e-1]) #[0, 6e-5, 1e-6, 1e-1] #process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
     # measurement noise covariance
     sys.R = R[subject][np.ix_(sensors, sensors)] * 4
-    sys.R[6,:] /= 2
-    sys.R[:,6] /= 2
-    sys.R[5,:] /= 2
-    sys.R[:,5] /= 2
-    sys.R[4,:] /= 2
-    sys.R[:,4] /= 2
-    if arctan2:
-        sys.R[-1,:] /= 1
-        sys.R[:,-1] /= 1
+    U = np.diag([1/2, 1, 1, 1, 1/2, 1/2, 1/2, 1])
+    sys.R = U @ sys.R @ U.T
+    #if arctan2:
+    #    sys.R[-1,:] /= 1
+    #    sys.R[:,-1] /= 1
 
     # initialize the state
     init = myStruct()
@@ -88,9 +84,9 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
     kidnap_index = np.random.randint(heel_strike_index[0, 0], heel_strike_index[1, 0]) # step at which kidnapping occurs
     
     phase_kidnap = np.random.uniform(0, 1)
-    phase_dot_kidnap = np.random.uniform(0.5, 1)#(0, 5)#
-    step_length_kidnap = np.random.uniform(0.9, 1.5)#(0, 2)#
-    ramp_kidnap = np.random.uniform(-10, 10)#(-45, 45)#
+    phase_dot_kidnap = np.random.uniform(0, 5)#(0.5, 1)#
+    step_length_kidnap = np.random.uniform(0, 2)#(0.9, 1.5)#
+    ramp_kidnap = np.random.uniform(-45, 45)#(-10, 10)#
     state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
 
     total_step =  int(heel_strike_index[25, 0]) + 1 #np.shape(z)[1]
@@ -101,8 +97,8 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
 
     x = np.zeros((total_step, 4))  # state estimate
     z_pred = np.zeros((total_step, len(sensors)))
-    t_step_max = 0
-    t_step_tot = 0
+    #t_step_max = 0
+    #t_step_tot = 0
     for i in range(total_step):
         t = time.time()
         # kidnap
@@ -114,10 +110,10 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
         x[i,:] = ekf.x.T
         z_pred[i,:] = ekf.z_hat.T
         
-        t_step = time.time() - t
-        t_step_tot += t_step
-        if t_step > t_step_max:
-            t_step_max = t_step
+        #t_step = time.time() - t
+        #t_step_tot += t_step
+        #if t_step > t_step_max:
+        #    t_step_max = t_step
 
     #print("longest time step = ", t_step_max)
     #print("mean time step = ", t_step_tot / total_step)
@@ -126,7 +122,7 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
     # compare x and ground truth:
     track = True
     track_tol = 0.15
-    start_check = 15
+    start_check = 20
     se = 0
     for i in range(total_step):
         error_phase = phase_error(x[i, 0], phases[i])
@@ -233,19 +229,20 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
         plt.ylabel('$\dot{\\theta}_{Y_{2Hz}} ~(deg/s)$')
         plt.ylim([-150, 150])
         plt.xlim([0, tt[-1]+0.1])
-        #plt.subplot(414)
-        #plt.plot(tt, z[7, 0:total_step], 'k-')
-        #plt.plot(tt, z_pred[:, 7], 'r--')
-        #plt.ylabel('$atan2$')
-        #plt.ylim([0, 10])
-        #plt.xlim([0, tt[-1]+0.1])
-        #plt.xlabel("time (s)")
-
+        plt.subplot(414)
+        plt.plot(tt, z[7, 0:total_step], 'k-')
+        plt.plot(tt, z_pred[:, 7], 'r--')
+        plt.ylabel('$atan2$')
+        plt.ylim([0, 10])
+        plt.xlim([0, tt[-1]+0.1])
+        plt.xlabel("time (s)")
+        
         plt.show()
 
     return result
 
-def ekf_bank_test(subject, trial, side, plot = True):
+def ekf_bank_test(subject, trial, side, N = 30, plot = True):
+    # N: number of EKFs in the EKF-bank
     dt = 1/100
     # load ground truth
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
@@ -275,12 +272,8 @@ def ekf_bank_test(subject, trial, side, plot = True):
     sys.Q = np.diag([0, 1e-5, 1e-5, 1e-1]) #[0, 6e-5, 1e-6, 1e-1] #process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
     # measurement noise covariance
     sys.R = R[subject][np.ix_(sensors, sensors)] * 4
-    sys.R[6,:] /= 2
-    sys.R[:,6] /= 2
-    sys.R[5,:] /= 2
-    sys.R[:,5] /= 2
-    sys.R[4,:] /= 2
-    sys.R[:,4] /= 2
+    U = np.diag([1/2, 1, 1, 1, 1/2, 1/2, 1/2, 1])
+    sys.R = U @ sys.R @ U.T
     #if arctan2:
         #sys.R[-1,:] /= 1
         #sys.R[:,-1] /= 1
@@ -289,27 +282,29 @@ def ekf_bank_test(subject, trial, side, plot = True):
 
     heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
     total_step =  int(heel_strike_index[25, 0])+1 #np.shape(z)[1]
+    
     # ground truth states
     phases = phases[0 : total_step]
     phase_dots = phase_dots[0 : total_step]
     step_lengths = step_lengths[0 : total_step]
     ramps = ramps[0 : total_step]
     
-    N = 30 # number of EKFs in the EKF-bank
-    kidnap_index = 30 # step at which kidnapping occurs
+    #kidnap_index = 30 # step at which kidnapping occurs
     x = np.zeros((N, total_step, 4))  # state estimate
     phase_dot_ROC = np.zeros(N)
     phase_rakn = np.zeros(N)
     phase_dot_rakn = np.zeros(N)
     step_length_rakn = np.zeros(N)
     ramp_rakn = np.zeros(N)
+    M = 0
     for n in range(N):
         # initialize the state
         init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
         init.Sigma = np.diag([0, 5e-4, 1e-3, 1e-1])
         # build EKF
         ekf = extended_kalman_filter(sys, init)
-
+        
+        kidnap_index = np.random.randint(heel_strike_index[0, 0], heel_strike_index[1, 0]) # step at which kidnapping occurs
         phase_kidnap = np.random.uniform(0, 1)
         phase_dot_kidnap = np.random.uniform(0, 5)
         step_length_kidnap = np.random.uniform(0, 2)
@@ -329,7 +324,26 @@ def ekf_bank_test(subject, trial, side, plot = True):
         step_length_rakn[n] = x[n, kidnap_index, 2] #- step_lengths[kidnap_index]
         ramp_rakn[n] = x[n, kidnap_index, 3] #- ramps[kidnap_index]
         phase_dot_ROC[n] = x[n, -1, 1]
-    
+
+        # evaluate robustness
+        track = True
+        track_tol = 0.15
+        start_check = 20
+        se = 0
+        for i in range(total_step):
+            error_phase = phase_error(x[n, i, 0], phases[i])
+            se += error_phase ** 2
+            if i >= int(heel_strike_index[start_check]):
+                track = track and (error_phase < track_tol)
+        RMSE_phase = np.sqrt(se / total_step)
+        track = track or (RMSE_phase < 0.1)
+        print(track)
+        if track:
+            M += 1
+
+    robustness = M / N * 100
+    print("Robustness (%) = ", robustness)
+
     if plot == True:
         # plot results
         tt = dt * np.arange(len(phases))
@@ -428,14 +442,18 @@ def ekf_bank_test(subject, trial, side, plot = True):
         ax.set_zlabel('step_length right after kidnapping')
 
         plt.show()
+    
+    return robustness
 
-def ekf_robustness(kidnap = True, RMSE_heatmap = False):
+def ekf_robustness(kidnap = True):
     track_count = 0
     total_trials = 0
     RMSerror_phase = []
 
+    robustness = 0
+
     #for subject in Conti_subject_names():
-    for subject in ['AB01', 'AB02', 'AB09', 'AB10']: # , 'AB08', 'AB09'
+    for subject in ['AB01']: # , 'AB02', 'AB03', 'AB08', 'AB09', 'AB10'
         print("subject: ", subject)
         for trial in Conti_trial_names(subject):
         #for trial in ['s1x2d2x5', 's1x2d7x5', 's0x8i10', 's0x8i5']:
@@ -447,19 +465,22 @@ def ekf_robustness(kidnap = True, RMSE_heatmap = False):
                 total_trials = total_trials + 1
                 
                 if kidnap == True:
-                    track, RMSE_phase, step_length, ramp = ekf_test(subject, trial, side, kidnap, plot = False)
-                    #step_length = round(step_length, 2)
-                    RMSerror_phase.append([RMSE_phase, step_length, ramp])
+                    #track, RMSE_phase, step_length, ramp = ekf_test(subject, trial, side, kidnap, plot = False)
+                    #RMSerror_phase.append([RMSE_phase, step_length, ramp])
+                    robustness += ekf_bank_test(subject, trial, side, N = 30, plot = False)
                 else:
                     track, RMSE_phase = ekf_test(subject, trial, side, kidnap, plot = False)
                     RMSerror_phase.append([RMSE_phase])
                 
-                if  track == True:
-                    track_count = track_count + 1
+                #if  track == True:
+                #    track_count = track_count + 1
 
-    robustness = track_count / total_trials * 100
-    print("robustness (%) = ", robustness)
+    #robustness = track_count / total_trials * 100
+    robustness = robustness / total_trials
+    print("==========================================")
+    print("Overall Average Robustness (%) = ", robustness)
 
+    """
     if kidnap == True:
         RMSerror_phase = np.array(RMSerror_phase).reshape(-1, 3)
         RMSerror_phase_df = pd.DataFrame(RMSerror_phase, columns = ['RMSE', 'x', 'y'])
@@ -473,15 +494,15 @@ def ekf_robustness(kidnap = True, RMSE_heatmap = False):
     else:
         pass
         # heatmap for normal test
-
+    """
     return robustness
 
 if __name__ == '__main__':
     subject = 'AB01'
-    trial = 's0x8d10'
+    trial = 's1d7x5'
     side = 'left'
 
     #ekf_test(subject, trial, side, kidnap = True, plot = True)
-    ekf_bank_test(subject, trial, side, plot = True)
-    #ekf_robustness(kidnap = True, RMSE_heatmap = False)
+    #ekf_bank_test(subject, trial, side, N= 30, plot = True)
+    ekf_robustness(kidnap = True)
     #print(np.diag(R[subject]))

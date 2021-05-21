@@ -78,9 +78,9 @@ class extended_kalman_filter:
         # Adjust R dynamically according to errors
         R = self.R
         #MD = np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) # Mahalanobis distance
-        #if MD > np.sqrt(26.13): # 8-DOF Chi-square test
+        #if MD > np.sqrt(20.090): # 8-DOF Chi-square test
             # scale R of thigh angle vel
-            #U = np.diag([1, 1, 1, 1, 1/2, 1/2, 1/2, 1])
+            #U = np.diag([1, 1, 1, 1, 1/2, 1/2, 1/2, 1/2])
             #R = U @ R @ U.T
 
         # innovation covariance

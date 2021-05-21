@@ -344,13 +344,13 @@ if __name__ == '__main__':
     	pickle.dump(Continuous_measurement_data, file)
 
     """
-    subject = 'AB05'
-    trial = 's1x2i10'
+    subject = 'AB03'
+    trial = 's1i10'
     side = 'left'
-    plot_Conti_data(subject, trial, side)
+    #plot_Conti_data(subject, trial, side)
     
     #####################
-    """
+    
     dt = get_time_step(subject)
     with open('Gait_cycle_data/Global_thigh_angle.npz', 'rb') as file:
         gt_Y = np.load(file)
@@ -379,14 +379,25 @@ if __name__ == '__main__':
             gtv_blp = butter_lowpass_filter(gtv_stack, 2, 1/dt[i, 0], order = 1)[2*len(gt_Y[subject][0][i, :]): 3*len(gt_Y[subject][0][i, :])]
 
             atan2[i, :] = np.arctan2(-gtv_blp/(2*np.pi*0.8), gt_bp2[i, :])
-            plt.plot(gt_bp2[i, :], -gtv_blp/(2*np.pi*0.8))
+            plt.plot(gt_bp2[i, :], -gtv_blp/(2*np.pi*0.8), 'r-')
 
             for j in range(np.shape(atan2[i, :])[0]):
                 if atan2[i, j] < 0:
                     atan2[i, j] = atan2[i, j] + 2 * np.pi
-            #at2v = np.diff(atan2[i, :]) / dt[i, 0]
-            #at2v = np.insert(at2v, 0, 0)
-            #atan2v[i, :] = butter_lowpass_filter(at2v, 1, 1/dt[i, 0], order = 1)
+            
+            #######
+            gbp = butter_bandpass_filter(gt_rep, 0.5, 2, 1/dt[i, 0], order = 1)
+            gt_bp2[i, :] = gbp[2*len(gt_Y[subject][0][i, :]): 3*len(gt_Y[subject][0][i, :])]
+            
+            v_bp = np.diff(gt_bp2[i, :]) / dt[i, 0]
+            gtv_bp = np.insert(v_bp, 0, 0)
+            gtv_stack = np.array([gtv_bp, gtv_bp, gtv_bp, gtv_bp, gtv_bp]).reshape(-1)
+            gtv_blp = butter_lowpass_filter(gtv_stack, 2, 1/dt[i, 0], order = 1)[2*len(gt_Y[subject][0][i, :]): 3*len(gt_Y[subject][0][i, :])]
+
+            atan22[i, :] = np.arctan2(-gtv_blp, gt_bp2[i, :])
+            for j in range(np.shape(atan22[i, :])[0]):
+                if atan22[i, j] < 0:
+                    atan22[i, j] = atan22[i, j] + 2 * np.pi
             
             
             v = np.diff(gt_Y[subject][0][i, :]) / dt[i, 0]
@@ -409,9 +420,10 @@ if __name__ == '__main__':
     
     plt.figure()
     plt.plot(atan2[0:15,:].ravel(), 'b-')
+    plt.plot(atan22[0:15,:].ravel(), 'r-')
 
     #plt.figure()
     #plt.plot(atan2v[0:15,:].ravel(), 'b-')
 
     plt.show()
-    """
+    
