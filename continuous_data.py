@@ -27,6 +27,11 @@ def Conti_start_end(subject, trial, side):
 
 def Conti_global_thigh_angle_Y(subject, trial, side):
     jointangles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'] #deg
+    plt.figure()
+    #plt.plot(jointangles[side]['pelvis'][0,:])
+    plt.plot(jointangles[side]['hip'][0, :])
+    plt.legend(('pelvis', 'hip'))
+    #plt.show()
     n_s = np.size(jointangles[side]['pelvis'][0,:]) # number of data poitns
 
     Y_th = np.zeros((1, n_s))
@@ -122,7 +127,7 @@ def plot_Conti_data(subject, trial, side):
     global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle,\
                                          global_thigh_angVel_5hz, global_thigh_angVel_2x5hz, global_thigh_angVel_2hz, atan2\
                                          = load_Conti_measurement_data(subject, trial, side)
-    m_model = model_loader('Measurement_model_8.pickle')
+    m_model = model_loader('Measurement_model_8_pv.pickle') # load new model w/ linear phase_dot
     Psi = load_Psi(subject)
 
     global_thigh_angle_Y_pred = model_prediction(m_model.models[0], Psi[0], phases, phase_dots, step_lengths, ramps)
@@ -133,7 +138,6 @@ def plot_Conti_data(subject, trial, side):
     global_thigh_angVel_2x5hz_pred = model_prediction(m_model.models[5], Psi[5], phases, phase_dots, step_lengths, ramps)
     global_thigh_angVel_2hz_pred = model_prediction(m_model.models[6], Psi[6], phases, phase_dots, step_lengths, ramps)
     atan2_pred = model_prediction(m_model.models[7], Psi[7], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
-
  
     # compute rmse
     print("subject: ",  subject)
@@ -159,6 +163,7 @@ def plot_Conti_data(subject, trial, side):
     print("std m_y ", np.std(err_my))
     print("RMSE m_y ", np.sqrt(np.square(err_my).mean()))
     print('________________________________')
+    """
     err_gtv_5hz = global_thigh_angVel_5hz - global_thigh_angVel_5hz_pred
     print("mean gtv_5hz ", np.mean(err_gtv_5hz))
     print("std gtv_5hz ", np.std(err_gtv_5hz))
@@ -169,17 +174,19 @@ def plot_Conti_data(subject, trial, side):
     print("std gtv_2x5hz ", np.std(err_gtv_2x5hz))
     print("RMSE gtv_2x5hz ", np.sqrt(np.square(err_gtv_2x5hz).mean()))
     print('________________________________')
+    """
     err_gtv_2hz = global_thigh_angVel_2hz - global_thigh_angVel_2hz_pred
     print("mean gtv_2hz ", np.mean(err_gtv_2hz))
     print("std gtv_2hz ", np.std(err_gtv_2hz))
     print("RMSE gtv_2hz ", np.sqrt(np.square(err_gtv_2hz).mean()))
     print('________________________________')
+    
     err_atan2 = atan2 - atan2_pred
     err_atan2 = np.arctan2(np.sin(err_atan2), np.cos(err_atan2)) # wrap to pi
     print("mean atan2 ", np.mean(err_atan2))
     print("std atan2 ", np.std(err_atan2))
     print("RMSE atan2 ", np.sqrt(np.square(err_atan2).mean()))
-
+    
     plt.figure('atan2')
     plt.subplot(211)
     plt.plot(atan2[0:1600])
@@ -200,16 +207,15 @@ def plot_Conti_data(subject, trial, side):
     plt.plot(atan2_pred[0:1600] - 2*np.pi*phases[0:1600], '--')
     plt.legend(['atan2-phase*2pi', 'least-squares fitting'])
     
-
     heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
-    total_step =  int(heel_strike_index[10, 0])+1 #np.shape(z)[1]
+    total_step =  np.shape(global_thigh_angle_Y)[0]#int(heel_strike_index[20, 0])+1 #
     tt = 0.01 * np.arange(total_step)
     plt.figure('Original Measurements')
     plt.subplot(411)
     plt.plot(tt, global_thigh_angle_Y[0:total_step], 'k-')
     plt.plot(tt, global_thigh_angle_Y_pred[0:total_step],'b--')
     plt.ylim([-25, 105])
-    plt.xlim([0, 13.6])
+    #plt.xlim([0, 13.6])
     plt.legend(('actual', 'least squares'))
     #plt.legend(('actual', 'least squares'), bbox_to_anchor=(1, 1.05))
     plt.ylabel('$\\theta_Y~(deg)$')
@@ -217,17 +223,17 @@ def plot_Conti_data(subject, trial, side):
     plt.plot(tt, force_z_ankle[0:total_step], 'k-')
     plt.plot(tt, force_z_ankle_pred[0:total_step], 'b--')
     plt.ylabel('$f_Z~(N)$')
-    plt.xlim([0, 13.6])
+    #plt.xlim([0, 13.6])
     plt.subplot(413)
     plt.plot(tt, force_x_ankle[0:total_step], 'k-')
     plt.plot(tt, force_x_ankle_pred[0:total_step], 'b--')
     plt.ylabel('$f_X~(N)$')
-    plt.xlim([0, 13.6])
+    #plt.xlim([0, 13.6])
     plt.subplot(414)
     plt.plot(tt, moment_y_ankle[0:total_step], 'k-')
     plt.plot(tt, moment_y_ankle_pred[0:total_step], 'b--')
     plt.ylabel('$m_Y~(N \cdot m)$')
-    plt.xlim([0, 13.6])
+    #plt.xlim([0, 13.6])
     plt.xlabel('time (s)')
 
 
@@ -245,26 +251,26 @@ def plot_Conti_data(subject, trial, side):
     plt.plot(ramps)
     plt.ylabel('ramp')
     
-    
     plt.figure('Fictitious Sensors: thigh angle vel')
     plt.subplot(311)
     plt.plot(tt, global_thigh_angVel_5hz[0:total_step],'k-')
     plt.plot(tt, global_thigh_angVel_5hz_pred[0:total_step], 'b--')
     plt.ylabel('$\dot{\\theta}_{Y_{5Hz}} ~(deg/s)$')
     plt.ylim([-200, 400])
-    plt.xlim([0, 13.6])
+    #plt.xlim([0, 13.6])
     plt.legend(('actual', 'least squares'))
     #plt.legend(('actual', 'least squares'), bbox_to_anchor=(1, 1.05))
     plt.subplot(312)
     plt.plot(tt, global_thigh_angVel_2x5hz[0:total_step],'k-')
     plt.plot(tt, global_thigh_angVel_2x5hz_pred[0:total_step], 'b--')
     plt.ylabel('$\dot{\\theta}_{Y_{2.5Hz}} ~(deg/s)$')
-    plt.xlim([0, 13.6])
+    #plt.xlim([0, 13.6])
     plt.subplot(313)
+    
     plt.plot(tt, global_thigh_angVel_2hz[0:total_step],'k-')
     plt.plot(tt, global_thigh_angVel_2hz_pred[0:total_step], 'b--')
     plt.ylabel('$\dot{\\theta}_{Y_{2Hz}} ~(deg/s)$')
-    plt.xlim([0, 13.6])
+    #plt.xlim([0, 13.6])
     plt.xlabel('time (s)')
     
     plt.figure('Fictitious Sensors: atan2')
@@ -273,10 +279,99 @@ def plot_Conti_data(subject, trial, side):
     plt.ylabel('$atan2~(rad)$')
     plt.xlabel('time (s)')
     plt.ylim([0, 7.5])
-    plt.xlim([0, 13.6])
+    #plt.xlim([0, 13.6])
     plt.legend(('actual', 'least squares'))
     
     plt.show()
+
+def Conti_maxmin(subject, plot = True):
+    #for subject in Conti_subject_names():
+    phase_dots_sup = np.zeros((9,1)) # 9 different ramp angles
+    phase_dots_inf = np.zeros((9,1))
+    phase_dots_mean = np.zeros((9,1))
+    step_lengths_sup = np.zeros((9,1))
+    step_lengths_inf = np.zeros((9,1))
+    step_lengths_mean = np.zeros((9,1))
+    ramp_code = ['d10', 'd7x5', 'd5', 'd2x5', 'i0', 'i2x5', 'i5', 'i7x5', 'i10']
+    ramp_angles = [-10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10]
+    #for subject in Conti_subject_names():
+    #for subject in ['AB03']:
+    for r in range(9): # LOOP THROUGH ALL ANGLES!!
+        #phases_max = -1000000
+        #phases_min = 1000000
+        phase_dots_max = -1000000
+        phase_dots_min = 1000000
+        step_lengths_max = -1000000
+        step_lengths_min = 1000000
+        #ramps_max = -1000000
+        #ramps_min = 1000000
+        for trial in raw_walking_data['Continuous'][subject].keys():
+            if str(trial)[-3:] == ramp_code[r] or str(trial)[-4:] == ramp_code[r] or str(trial)[-2:] == ramp_code[r]:
+            #if trial == 'subjectdetails':
+            #    continue
+                for side in ['left', 'right']:
+                    phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
+                    #if np.max(phases) > phases_max:
+                    #    phases_max = np.max(phases)
+                    #if np.min(phases) < phases_min:
+                    #    phases_min = np.min(phases)
+
+                    phase_dots_mean[r] += np.mean(phase_dots)
+
+                    if np.max(phase_dots) > phase_dots_max:
+                        phase_dots_max = np.max(phase_dots)
+                    if np.min(phase_dots) < phase_dots_min:
+                        phase_dots_min = np.min(phase_dots)
+
+                    step_lengths_mean[r] += np.mean(step_lengths)
+                        
+                    if np.max(step_lengths) > step_lengths_max:
+                        step_lengths_max = np.max(step_lengths)
+                    if np.min(step_lengths) < step_lengths_min:
+                        step_lengths_min = np.min(step_lengths)
+                        
+                    #if np.max(ramps) > ramps_max:
+                    #    ramps_max = np.max(ramps)
+                    #if np.min(ramps) < ramps_min:
+            
+                    #    ramps_min = np.min(ramps)
+        phase_dots_mean[r] = phase_dots_mean[r]/6
+        phase_dots_sup[r] = phase_dots_max
+        phase_dots_inf[r] = phase_dots_min
+        step_lengths_mean[r] = step_lengths_mean[r]/6
+        step_lengths_sup[r] = step_lengths_max
+        step_lengths_inf[r] = step_lengths_min
+    
+    saturation_range =np.array([np.max(phase_dots_sup), np.min(phase_dots_inf), np.max(step_lengths_sup), np.min(step_lengths_inf)])
+    
+    #print("phases_max =", phases_max)
+    #print("phases_min =", phases_min)
+    #print("phase_dots_max =", saturation_range[0])
+    #print("phase_dots_min =", saturation_range[1])
+    #print("step_lengths_max =", saturation_range[2])
+    #print("step_lengths_min =", saturation_range[3])
+    #print("ramps_max =", ramps_max)
+    #print("ramps_min =", ramps_min)
+
+    if plot:
+        plt.figure("Phase_dots Extrema")
+        plt.plot(ramp_angles, phase_dots_sup, 'r-')
+        plt.plot(ramp_angles, phase_dots_mean, 'g-')
+        plt.plot(ramp_angles, phase_dots_inf, 'b-')
+        plt.legend(("phase_dots_max", "phase_dots_mean",  "phase_dots_min"))
+        plt.xlabel("ramp angles")
+        plt.ylabel("Phase_dot")
+
+        plt.figure("Step_lengths Extrema")
+        plt.plot(ramp_angles, step_lengths_sup, 'r-')
+        plt.plot(ramp_angles, step_lengths_mean, 'g-')
+        plt.plot(ramp_angles, step_lengths_inf, 'b-')
+        plt.legend(("step_lengths_max", "step_lengths_mean", "step_lengths_min"))
+        plt.xlabel("ramp angles")
+        plt.ylabel("step_lengths")
+        plt.show()
+    
+    return saturation_range
 
 if __name__ == '__main__':
     """
@@ -344,13 +439,16 @@ if __name__ == '__main__':
     	pickle.dump(Continuous_measurement_data, file)
 
     """
-    subject = 'AB03'
-    trial = 's1i10'
+    subject = 'AB09'
+    trial = 's0x8i5'
     side = 'left'
+    #Conti_global_thigh_angle_Y(subject, trial, side)
+    #plt.show()
     #plot_Conti_data(subject, trial, side)
+    Conti_maxmin('AB01', plot = True)
     
     #####################
-    
+    """
     dt = get_time_step(subject)
     with open('Gait_cycle_data/Global_thigh_angle.npz', 'rb') as file:
         gt_Y = np.load(file)
@@ -426,4 +524,4 @@ if __name__ == '__main__':
     #plt.plot(atan2v[0:15,:].ravel(), 'b-')
 
     plt.show()
-    
+    """

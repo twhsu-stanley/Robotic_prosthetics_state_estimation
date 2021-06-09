@@ -126,16 +126,16 @@ def load_Psi(subject):
         p = np.load(file, allow_pickle = True)
         Psi_thighVel_2x5hz = p['arr_0'].item()[subject]
     
-    with open('Psi/Psi_thighVel_2hz.npz', 'rb') as file:
+    with open('Psi/Psi_thighVel_2hz_p.npz', 'rb') as file:
         p = np.load(file, allow_pickle = True)
         Psi_thighVel_2hz = p['arr_0'].item()[subject]
     
-    with open('Psi/Psi_atan2_s.npz', 'rb') as file:
+    with open('Psi/Psi_atan2_s_p.npz', 'rb') as file:
         p = np.load(file, allow_pickle = True)
         Psi_atan2 = p['arr_0'].item()[subject]
 
     Psi = np.array([Psi_thigh_Y, Psi_force_Z, Psi_force_X, Psi_moment_Y,\
-                    Psi_thighVel_5hz, Psi_thighVel_2x5hz, Psi_thighVel_2hz, Psi_atan2])
+                    Psi_thighVel_5hz, Psi_thighVel_2x5hz, Psi_thighVel_2hz, Psi_atan2], dtype = object)
     
     return Psi
 
@@ -216,7 +216,7 @@ def measurement_error_cov(subject):
     print("mean m_y ", np.mean(Err_my))
     print("std m_y ", np.std(Err_my))
     print('________________________________')
-
+    
     Err_thigh_angVel_5hz = global_thigh_angVel_5hz.ravel() - global_thigh_angVel_5hz_pred
     #with open('Measurement_errors/Err_thigh_angVel_5hz.npz', 'wb') as file:
         #np.savez(file, Err_thigh_angVel_5hz, allow_pickle = True)
@@ -230,7 +230,7 @@ def measurement_error_cov(subject):
     print("mean gtv_2x5hz ", np.mean(Err_thigh_angVel_2x5hz))
     print("std gtv_2x5hz ", np.std(Err_thigh_angVel_2x5hz))
     print('________________________________')
-
+    
     Err_thigh_angVel_2hz = global_thigh_angVel_2hz.ravel() - global_thigh_angVel_2hz_pred
     #with open('Measurement_errors/Err_thigh_angVel_2hz.npz', 'wb') as file:
         #np.savez(file, Err_thigh_angVel_2hz, allow_pickle = True)
@@ -263,11 +263,10 @@ if __name__ == '__main__':
 
     # Orders of the measurement model
     F = 11
-    P = 1
     N = 3
 
     phase_model = Fourier_Basis(F, 'phase')
-    phase_dot_model = Polynomial_Basis(P, 'phase_dot')
+    phase_dot_model = Polynomial_Basis(1, 'phase_dot')
     step_length_model = Berstein_Basis(N,'step_length')
     ramp_model = Berstein_Basis(N, 'ramp')
     
@@ -301,6 +300,8 @@ if __name__ == '__main__':
     #Measurement_model_coeff['reaction_moment_y_ankle'] = psi_moment_y
     #Measurement_model_RMSE['reaction_moment_y_ankle'] = RMSE_moment_y
     
+    #phase_dot_model = Polynomial_Basis(2, 'phase_dot')
+
     # NEW ADDED: Measrurement model for global_thigh_angVel_Y
     model_thighVel_5hz = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_thighVel_5hz = model_fit(model_thighVel_5hz, 'global_thigh_angVel_5hz')
@@ -314,12 +315,15 @@ if __name__ == '__main__':
 
     model_thighVel_2hz = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_thighVel_2hz = model_fit(model_thighVel_2hz, 'global_thigh_angVel_2hz')
-    #with open('Psi/Psi_thighVel_2hz_2.npz', 'wb') as file:
-    #    np.savez(file, psi_thighVel_2hz, allow_pickle = True) 
+    #with open('Psi/Psi_thighVel_2hz_p.npz', 'wb') as file:
+    #   np.savez(file, psi_thighVel_2hz, allow_pickle = True)
 
+    #phase_dot_model = Polynomial_Basis(1, 'phase_dot')
+    step_length_model = Berstein_Basis(0,'step_length')
+    ramp_model = Berstein_Basis(0, 'ramp')
     model_atan2 = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_atan2 = model_fit(model_atan2, 'atan2')
-    #with open('Psi/Psi_atan2_s.npz', 'wb') as file:
+    #with open('Psi/Psi_atan2_s_pv.npz', 'wb') as file:
     #    np.savez(file, psi_atan2, allow_pickle = True)
 
     """
@@ -351,17 +355,13 @@ if __name__ == '__main__':
     #    np.savez(file, **Measurement_model_RMSE, allow_pickle = True)
 
     # save measurement model
-    #m_model = Measurement_Model(model_thigh_Y, model_force_z, model_force_x, model_moment_y,\
-    #                            model_thighVel_5hz, model_thighVel_2x5hz, model_thighVel_2hz, model_atan2)
-    #m_model = Measurement_Model(model_thigh_Y,\
-    #                            model_thighVel_5hz, model_thighVel_2x5hz, model_thighVel_2hz)
-    #model_saver(m_model, 'Measurement_model_8.pickle')
-    
+    m_model = Measurement_Model(model_thigh_Y, model_force_z, model_force_x, model_moment_y,\
+                                model_thighVel_2hz)
+    #m_model = Measurement_Model(model_thigh_Y, model_force_z, model_force_x, model_moment_y, model_thighVel_2hz)
+    model_saver(m_model, 'Measurement_model_5_sp.pickle')
 
     #R = dict()
     #for subject in subject_names:
     #    R[subject] = measurement_error_cov(subject)
     #with open('R_s.pickle', 'wb') as file:
     #	pickle.dump(R, file)
-
-

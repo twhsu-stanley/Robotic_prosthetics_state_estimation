@@ -1,3 +1,4 @@
+from pickle import FALSE
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -20,7 +21,7 @@ from model_fit import *
 # 1: force_z_ankle, 2: force_x_ankle; 3: moment_y_ankle;
 # 4: global_thigh_angVel_5hz; 5: global_thigh_angVel_2x5hz; 6: global_thigh_angVel_2hz;
 # 7: atan2
-sensors = [0, 1, 2, 3, 4, 5, 6, 7] # [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1] looks good
+sensors = [0, 1, 2, 3, 6, 7] # [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1] looks good
 arctan2 = False
 if sensors[-1] == 7:
     arctan2 = True
@@ -28,7 +29,7 @@ if sensors[-1] == 7:
 with open('R_s.pickle', 'rb') as file:
     R = pickle.load(file)
 
-m_model = model_loader('Measurement_model_' + str(len(sensors)) +'.pickle')
+m_model = model_loader('Measurement_model_' + str(len(sensors)) +'_sp.pickle')
 
 def A(dt):
     return np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
@@ -37,7 +38,7 @@ def process_model(x, dt):
     #dt = 0.01 # data sampling rate: 100 Hz
     return A(dt) @ x
 
-def ekf_test(subject, trial, side, kidnap = True, plot = False):
+def ekf_test(subject, trial, side, kidnap = False, plot = False):
     dt = 1/100
     # load ground truth
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
@@ -57,7 +58,8 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
     z = np.squeeze(z)
     z = z[sensors, :]
 
-    Psi = load_Psi(subject)[sensors, :]
+    Psi = load_Psi(subject)[sensors]
+    saturation_range = Conti_maxmin(subject, plot = False)
 
     # build the system
     sys = myStruct()
@@ -66,30 +68,29 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
     sys.h = m_model
     sys.Q = np.diag([0, 1e-5, 1e-5, 1e-1]) #[0, 6e-5, 1e-6, 1e-1] #process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
     # measurement noise covariance
-    sys.R = R[subject][np.ix_(sensors, sensors)] * 4
-    U = np.diag([1/2, 1, 1, 1, 1/2, 1/2, 1/2, 1])
+    sys.R = R[subject][np.ix_(sensors, sensors)]
+    U = np.diag([2, 2, 2, 2, 2, 2])
     sys.R = U @ sys.R @ U.T
-    #if arctan2:
-    #    sys.R[-1,:] /= 1
-    #    sys.R[:,-1] /= 1
 
     # initialize the state
     init = myStruct()
     init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
-    init.Sigma = np.diag([0, 5e-10, 1e-10, 1e-10])
+    init.Sigma = np.diag([10, 10, 10, 100])
 
     ekf = extended_kalman_filter(sys, init)
     
     heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
-    kidnap_index = np.random.randint(heel_strike_index[0, 0], heel_strike_index[1, 0]) # step at which kidnapping occurs
+    kidnap_index = np.random.randint(heel_strike_index[3, 0], heel_strike_index[4, 0]) # step at which kidnapping occurs
+    print("kidnap_index(%) = ", (kidnap_index - heel_strike_index[3, 0])/(heel_strike_index[4, 0]- heel_strike_index[3, 0])*100)
     
-    phase_kidnap = np.random.uniform(0, 1)
-    phase_dot_kidnap = np.random.uniform(0, 5)#(0.5, 1)#
-    step_length_kidnap = np.random.uniform(0, 2)#(0.9, 1.5)#
-    ramp_kidnap = np.random.uniform(-45, 45)#(-10, 10)#
+    phase_kidnap =  np.random.uniform(0, 1)
+    phase_dot_kidnap = np.random.uniform(0, 5) #(0.5, 1)#
+    step_length_kidnap = np.random.uniform(0, 2) #(0.9, 1.5)#
+    ramp_kidnap = np.random.uniform(-45, 45) #(-10, 10)#
     state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
+    print("state_kidnap = ", state_kidnap)
 
-    total_step =  int(heel_strike_index[25, 0]) + 1 #np.shape(z)[1]
+    total_step =  int(heel_strike_index[25, 0]) + 1 #np.shape(z)[1] #
     phases = phases[0 : total_step]
     phase_dots = phase_dots[0 : total_step]
     step_lengths = step_lengths[0 : total_step]
@@ -97,19 +98,31 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
 
     x = np.zeros((total_step, 4))  # state estimate
     z_pred = np.zeros((total_step, len(sensors)))
+    Sigma_norm = np.zeros((total_step, 1))
+    Sigma_diag = np.zeros((total_step, 4))
+    Mahal_dist = np.zeros((total_step, 1))
     #t_step_max = 0
     #t_step_tot = 0
+    
     for i in range(total_step):
-        t = time.time()
+        Sigma_norm[i] = np.linalg.norm(ekf.Sigma)
+        
+        #t = time.time()
         # kidnap
-        if kidnap == True and i == kidnap_index:
-            ekf.x = state_kidnap
+        #if kidnap == True and i == kidnap_index:
+        #    ekf.x = state_kidnap
+        if kidnap != False and i == kidnap_index:
+            ekf.x[kidnap] = state_kidnap[kidnap]
 
         ekf.prediction(dt)
+        ekf.state_saturation(saturation_range)
         ekf.correction(z[:, i], Psi, arctan2)
         x[i,:] = ekf.x.T
         z_pred[i,:] = ekf.z_hat.T
-        
+        #Sigma_diag[i,:] = np.array([ekf.Sigma[k,k] for k in range(4)])
+        Sigma_diag[i,:] = np.diag(ekf.Sigma)
+        Mahal_dist[i] = ekf.MD
+
         #t_step = time.time() - t
         #t_step_tot += t_step
         #if t_step > t_step_max:
@@ -122,21 +135,22 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
     # compare x and ground truth:
     track = True
     track_tol = 0.15
-    start_check = 20
+    start_check = kidnap_index + 1/0.8/dt*0.5 #5
     se = 0
     for i in range(total_step):
         error_phase = phase_error(x[i, 0], phases[i])
         se += error_phase ** 2
-        if i >= int(heel_strike_index[start_check]):
+        if i >= start_check: #int(heel_strike_index[start_check]):
             track = track and (error_phase < track_tol)
             #if error_phase > track_tol:
             #    print(str(i/100)+": " + str(error_phase))
     
     RMSE_phase = np.sqrt(se / total_step)
-    track = track or (RMSE_phase < 0.1)
+    #track = track or (RMSE_phase < 0.1)
     print("RMSE phase = ", RMSE_phase)
+    print("Final Sigma = ", Sigma_diag[-1, :])
 
-    if kidnap == True:
+    if kidnap != False:
         #phase_dot_akn = x[kidnap_index, 1]
         #phase_dot_b4kn = x[kidnap_index - 1, 1]
         #kidnap_step = kidnap_index / (heel_strike_index[1, 0] - heel_strike_index[0, 0]) * 100 # kidmap step % of stride
@@ -150,6 +164,8 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
         result = (track, RMSE_phase)
     
     if plot == True:
+        th = heel_strike_index[0:25, 0].astype(int) # time step of heel strikes
+        #nu = np.sqrt(13.277)
         # plot results
         tt = dt * np.arange(len(phases))
         plt.figure("State Estimate")
@@ -157,6 +173,9 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
         plt.title('EKF Robustness Test')
         plt.plot(tt, phases, 'k-')
         plt.plot(tt, x[:, 0], 'r--')
+        #plt.plot(tt, phases + Sigma_diag[:, 0] * nu, 'b-')
+        #plt.plot(tt, phases - Sigma_diag[:, 0] * nu, 'g-')
+        #plt.plot(th* dt, np.zeros((len(th), 1)), "rx")
         plt.legend(('ground truth', 'estimate'))
         #plt.legend(('ground truth', 'estimate'), bbox_to_anchor=(1, 1.05))
         plt.ylabel('$\phi$')
@@ -165,19 +184,40 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
         plt.subplot(412)
         plt.plot(tt, phase_dots, 'k-')
         plt.plot(tt, x[:, 1], 'r--')
+        #plt.plot(tt, phase_dots + Sigma_diag[:, 1]*nu, 'b-')
+        #plt.plot(tt, phase_dots - Sigma_diag[:, 1]*nu, 'g-')
         plt.ylabel('$\dot{\phi}~(s^{-1})$')
         plt.xlim([0, tt[-1]+0.1])
+        #plt.ylim([0.5, 1.2])
         plt.subplot(413)
         plt.plot(tt, step_lengths, 'k-')
         plt.plot(tt, x[:, 2], 'r--')
+        #plt.plot(tt, step_lengths + Sigma_diag[:, 2]*nu, 'b-')
+        #plt.plot(tt, step_lengths - Sigma_diag[:, 2]*nu, 'g-')
         plt.ylabel('$l~(m)$')
         plt.xlim([0, tt[-1]+0.1])
+        #plt.ylim([0, 2])
         plt.subplot(414)
         plt.plot(tt, ramps, 'k-')
         plt.plot(tt, x[:, 3], 'r--')
+        #plt.plot(tt, ramps + Sigma_diag[:, 3]*nu, 'b-')
+        #plt.plot(tt, ramps - Sigma_diag[:, 3]*nu, 'g-')
         plt.ylabel('$\\alpha~(deg)$')
         plt.xlabel('time (s)')
         plt.xlim([0, tt[-1]+0.1])
+        #plt.ylim([-10, 10])
+
+        plt.figure("Sigma")
+        plt.title("Sigma Norms")
+        plt.plot(Sigma_norm[th])
+        plt.ylabel('$\Sigma$')
+        plt.xlabel('heel strikes')
+
+        plt.figure("Mahalanobis Distance")
+        plt.title("Mahalanobis Distance")
+        plt.plot(tt, Mahal_dist)
+        plt.ylabel('MD')
+        plt.xlabel('time (s)')
 
         plt.figure("Original Measurements")
         plt.subplot(411)
@@ -186,28 +226,28 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
         plt.plot(tt, z_pred[:, 0], 'r--')
         plt.legend(('actual', 'predicted'))
         plt.ylabel('$\\theta_Y$')
-        plt.ylim([-10, 50])
+        #plt.ylim([-10, 50])
         plt.xlim([0, tt[-1]+0.1])
         plt.subplot(412)
         plt.plot(tt, z[1, 0:total_step], 'k-')
         plt.plot(tt, z_pred[:, 1], 'r--')
         plt.ylabel('$f_Z$')
-        plt.ylim([0, 1500])
+        #plt.ylim([0, 1500])
         plt.xlim([0, tt[-1]+0.1])
         plt.subplot(413)
         plt.plot(tt, z[2, 0:total_step], 'k-')
         plt.plot(tt, z_pred[:, 2], 'r--')
         plt.ylabel('$f_X$')
-        plt.ylim([-500, 200])
+        #plt.ylim([-500, 200])
         plt.xlim([0, tt[-1]+0.1])
         plt.subplot(414)
         plt.plot(tt, z[3, 0:total_step], 'k-')
         plt.plot(tt, z_pred[:, 3], 'r--')
         plt.ylabel('$m_Y$')
-        plt.ylim([0, 2000])
+        #plt.ylim([0, 2000])
         plt.xlim([0, tt[-1]+0.1])
         plt.xlabel("time (s)")
-
+        
         plt.figure("Auxiliary Measurements")
         plt.subplot(411)
         plt.title("Original Measurements")
@@ -215,19 +255,20 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
         plt.plot(tt, z_pred[:, 4], 'r--')
         plt.legend(('actual', 'predicted'))
         plt.ylabel('$\dot{\\theta}_{Y_{5Hz}} ~(deg/s)$')
-        plt.ylim([-150, 150])
+        #plt.ylim([-150, 150])
         plt.xlim([0, tt[-1]+0.1])
         plt.subplot(412)
         plt.plot(tt, z[5, 0:total_step], 'k-')
         plt.plot(tt, z_pred[:, 5], 'r--')
         plt.ylabel('$\dot{\\theta}_{Y_{2.5Hz}} ~(deg/s)$')
-        plt.ylim([-150, 150])
+        #plt.ylim([-150, 150])
         plt.xlim([0, tt[-1]+0.1])
+        """
         plt.subplot(413)
         plt.plot(tt, z[6, 0:total_step], 'k-')
         plt.plot(tt, z_pred[:, 6], 'r--')
         plt.ylabel('$\dot{\\theta}_{Y_{2Hz}} ~(deg/s)$')
-        plt.ylim([-150, 150])
+        #plt.ylim([-150, 150])
         plt.xlim([0, tt[-1]+0.1])
         plt.subplot(414)
         plt.plot(tt, z[7, 0:total_step], 'k-')
@@ -236,12 +277,12 @@ def ekf_test(subject, trial, side, kidnap = True, plot = False):
         plt.ylim([0, 10])
         plt.xlim([0, tt[-1]+0.1])
         plt.xlabel("time (s)")
-        
+        """
         plt.show()
 
     return result
 
-def ekf_bank_test(subject, trial, side, N = 30, plot = True):
+def ekf_bank_test(subject, trial, side, N = 30, kidnap = [0,1,2,3], plot = True):
     # N: number of EKFs in the EKF-bank
     dt = 1/100
     # load ground truth
@@ -262,7 +303,8 @@ def ekf_bank_test(subject, trial, side, N = 30, plot = True):
     z = np.squeeze(z)
     z = z[sensors, :]
 
-    Psi = load_Psi(subject)[sensors, :]
+    Psi = load_Psi(subject)[sensors]
+    saturation_range = Conti_maxmin(subject, plot = False)
 
     # build the system
     sys = myStruct()
@@ -271,17 +313,14 @@ def ekf_bank_test(subject, trial, side, N = 30, plot = True):
     sys.h = m_model
     sys.Q = np.diag([0, 1e-5, 1e-5, 1e-1]) #[0, 6e-5, 1e-6, 1e-1] #process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
     # measurement noise covariance
-    sys.R = R[subject][np.ix_(sensors, sensors)] * 4
-    U = np.diag([1/2, 1, 1, 1, 1/2, 1/2, 1/2, 1])
+    sys.R = R[subject][np.ix_(sensors, sensors)]
+    U = np.diag([2, 2, 2, 2, 2, 2])
     sys.R = U @ sys.R @ U.T
-    #if arctan2:
-        #sys.R[-1,:] /= 1
-        #sys.R[:,-1] /= 1
     
     init = myStruct()
 
     heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
-    total_step =  int(heel_strike_index[25, 0])+1 #np.shape(z)[1]
+    total_step =  int(heel_strike_index[10, 0])+1 #np.shape(z)[1]
     
     # ground truth states
     phases = phases[0 : total_step]
@@ -296,47 +335,50 @@ def ekf_bank_test(subject, trial, side, N = 30, plot = True):
     phase_dot_rakn = np.zeros(N)
     step_length_rakn = np.zeros(N)
     ramp_rakn = np.zeros(N)
+    tf = np.zeros(N)
     M = 0
     for n in range(N):
         # initialize the state
         init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
-        init.Sigma = np.diag([0, 5e-4, 1e-3, 1e-1])
+        init.Sigma = np.diag([10, 10, 10, 100])
         # build EKF
         ekf = extended_kalman_filter(sys, init)
         
-        kidnap_index = np.random.randint(heel_strike_index[0, 0], heel_strike_index[1, 0]) # step at which kidnapping occurs
+        kidnap_index = np.random.randint(heel_strike_index[3, 0], heel_strike_index[4, 0]) # step at which kidnapping occurs
         phase_kidnap = np.random.uniform(0, 1)
         phase_dot_kidnap = np.random.uniform(0, 5)
-        step_length_kidnap = np.random.uniform(0, 2)
-        ramp_kidnap = np.random.uniform(-45, 45)
+        step_length_kidnap = np.random.uniform(0, 2)#np.random.uniform(0, 2)
+        ramp_kidnap = np.random.uniform(-45, 45)#np.random.uniform(-45, 45)
         state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
     
         for i in range(total_step):
             # kidnap
             if i == kidnap_index:
-                ekf.x = state_kidnap
+                ekf.x[kidnap] = state_kidnap[kidnap]
             ekf.prediction(dt)
+            ekf.state_saturation(saturation_range)
             ekf.correction(z[:, i], Psi, arctan2)
             x[n, i,:] = ekf.x.T
         
-        phase_rakn[n] = x[n, kidnap_index, 0] #- phases[kidnap_index]
-        phase_dot_rakn[n] = x[n, kidnap_index, 1] #- phase_dots[kidnap_index]
-        step_length_rakn[n] = x[n, kidnap_index, 2] #- step_lengths[kidnap_index]
-        ramp_rakn[n] = x[n, kidnap_index, 3] #- ramps[kidnap_index]
+        phase_rakn[n] = state_kidnap[0]#x[n, kidnap_index, 0] #- phases[kidnap_index]
+        phase_dot_rakn[n] = state_kidnap[1]#x[n, kidnap_index, 1] #- phase_dots[kidnap_index]
+        step_length_rakn[n] = state_kidnap[2]#x[n, kidnap_index, 2] #- step_lengths[kidnap_index]
+        ramp_rakn[n] = state_kidnap[3]#x[n, kidnap_index, 3] #- ramps[kidnap_index]
         phase_dot_ROC[n] = x[n, -1, 1]
 
         # evaluate robustness
         track = True
         track_tol = 0.15
-        start_check = 20
+        start_check = kidnap_index + 1/0.8/dt*0.5 #5
         se = 0
         for i in range(total_step):
             error_phase = phase_error(x[n, i, 0], phases[i])
             se += error_phase ** 2
-            if i >= int(heel_strike_index[start_check]):
+            if i >= start_check: #int(heel_strike_index[start_check]):
                 track = track and (error_phase < track_tol)
         RMSE_phase = np.sqrt(se / total_step)
-        track = track or (RMSE_phase < 0.1)
+        #track = track or (RMSE_phase < 0.1)
+        tf[n] = track
         print(track)
         if track:
             M += 1
@@ -349,7 +391,7 @@ def ekf_bank_test(subject, trial, side, N = 30, plot = True):
         tt = dt * np.arange(len(phases))
         plt.figure("phase")
         plt.plot(tt, phases, 'k-', linewidth=3)
-        plt.plot(tt,  x[:, :, 0].T, 'b--', linewidth=1, alpha = 0.4)
+        plt.plot(tt,  x[:, :, 0].T, 'b--', linewidth=1)
         plt.ylabel('$\phi$')
         plt.legend(('ground truth', 'estimate'))
         #plt.legend(('ground truth', 'estimate'), bbox_to_anchor=(1, 1.05))
@@ -392,12 +434,14 @@ def ekf_bank_test(subject, trial, side, N = 30, plot = True):
         plt.figure("Region of attraction_1")
         ax = plt.axes(projection='3d')
         for n in range(N):
-            if phase_dot_ROC[n] < phase_dots[-1] + 0.2 and phase_dot_ROC[n] > phase_dots[-1] - 0.2:
+            #if phase_dot_ROC[n] < phase_dots[-1] + 0.2 and phase_dot_ROC[n] > phase_dots[-1] - 0.2:
+            if tf[n] == True:
                 ax.scatter3D(phase_rakn[n], phase_dot_rakn[n], step_length_rakn[n], c = 'r')
-            elif phase_dot_ROC[n] < 0.2 and phase_dot_ROC[n] > - 0.3:
-                ax.scatter3D(phase_rakn[n], phase_dot_rakn[n], step_length_rakn[n], c = 'b')
+            #elif phase_dot_ROC[n] < 0.2 and phase_dot_ROC[n] > - 0.3:
             else:
-                ax.scatter3D(phase_rakn[n], phase_dot_rakn[n], step_length_rakn[n], c = 'k')
+                ax.scatter3D(phase_rakn[n], phase_dot_rakn[n], step_length_rakn[n], c = 'b')
+            #else:
+            #    ax.scatter3D(phase_rakn[n], phase_dot_rakn[n], step_length_rakn[n], c = 'k')
         ax.set_xlabel('phase right after kidnapping')
         ax.set_ylabel('phase_dot right after kidnapping')
         ax.set_zlabel('step_length right after kidnapping')
@@ -405,12 +449,14 @@ def ekf_bank_test(subject, trial, side, N = 30, plot = True):
         plt.figure("Region of attraction_2")
         ax = plt.axes(projection='3d')
         for n in range(N):
-            if phase_dot_ROC[n] < phase_dots[-1] + 0.2 and phase_dot_ROC[n] > phase_dots[-1] - 0.2:
+            #if phase_dot_ROC[n] < phase_dots[-1] + 0.2 and phase_dot_ROC[n] > phase_dots[-1] - 0.2:
+            if tf[n] == True:
                 ax.scatter3D(phase_rakn[n], phase_dot_rakn[n], ramp_rakn[n], c = 'r')
-            elif phase_dot_ROC[n] < 0.2 and phase_dot_ROC[n] > - 0.3:
-                ax.scatter3D(phase_rakn[n], phase_dot_rakn[n], ramp_rakn[n], c = 'b')
+            #elif phase_dot_ROC[n] < 0.2 and phase_dot_ROC[n] > - 0.3:
             else:
-                ax.scatter3D(phase_rakn[n], phase_dot_rakn[n], ramp_rakn[n], c = 'k')
+                ax.scatter3D(phase_rakn[n], phase_dot_rakn[n], ramp_rakn[n], c = 'b')
+            #else:
+            #    ax.scatter3D(phase_rakn[n], phase_dot_rakn[n], ramp_rakn[n], c = 'k')
         ax.set_xlabel('phase right after kidnapping')
         ax.set_ylabel('phase_dot right after kidnapping')
         ax.set_zlabel('ramp right after kidnapping')
@@ -418,12 +464,14 @@ def ekf_bank_test(subject, trial, side, N = 30, plot = True):
         plt.figure("Region of attraction_3")
         ax = plt.axes(projection='3d')
         for n in range(N):
-            if phase_dot_ROC[n] < phase_dots[-1] + 0.2 and phase_dot_ROC[n] > phase_dots[-1] - 0.2:
+            #if phase_dot_ROC[n] < phase_dots[-1] + 0.2 and phase_dot_ROC[n] > phase_dots[-1] - 0.2:
+            if tf[n] == True:
                 ax.scatter3D(phase_rakn[n], ramp_rakn[n], step_length_rakn[n], c = 'r')
-            elif phase_dot_ROC[n] < 0.2 and phase_dot_ROC[n] > - 0.3:
-                ax.scatter3D(phase_rakn[n], ramp_rakn[n], step_length_rakn[n], c = 'b')
+            #elif phase_dot_ROC[n] < 0.2 and phase_dot_ROC[n] > - 0.3:
             else:
-                ax.scatter3D(phase_rakn[n], ramp_rakn[n], step_length_rakn[n], c = 'k')
+                ax.scatter3D(phase_rakn[n], ramp_rakn[n], step_length_rakn[n], c = 'b')
+            #else:
+            #    ax.scatter3D(phase_rakn[n], ramp_rakn[n], step_length_rakn[n], c = 'k')
         ax.set_xlabel('phase right after kidnapping')
         ax.set_ylabel('ramp right after kidnapping')
         ax.set_zlabel('step_length right after kidnapping')
@@ -431,12 +479,14 @@ def ekf_bank_test(subject, trial, side, N = 30, plot = True):
         plt.figure("Region of attraction_4")
         ax = plt.axes(projection='3d')
         for n in range(N):
-            if phase_dot_ROC[n] < phase_dots[-1] + 0.2 and phase_dot_ROC[n] > phase_dots[-1] - 0.2:
+            #if phase_dot_ROC[n] < phase_dots[-1] + 0.2 and phase_dot_ROC[n] > phase_dots[-1] - 0.2:
+            if tf[n] == True:
                 ax.scatter3D(ramp_rakn[n], phase_dot_rakn[n], step_length_rakn[n], c = 'r')
-            elif phase_dot_ROC[n] < 0.2 and phase_dot_ROC[n] > - 0.3:
-                ax.scatter3D(ramp_rakn[n], phase_dot_rakn[n], step_length_rakn[n], c = 'b')
+            #elif phase_dot_ROC[n] < 0.2 and phase_dot_ROC[n] > - 0.3:
             else:
-                ax.scatter3D(ramp_rakn[n], phase_dot_rakn[n], step_length_rakn[n], c = 'k')
+                ax.scatter3D(ramp_rakn[n], phase_dot_rakn[n], step_length_rakn[n], c = 'b')
+            #else:
+            #    ax.scatter3D(ramp_rakn[n], phase_dot_rakn[n], step_length_rakn[n], c = 'k')
         ax.set_xlabel('ramp right after kidnapping')
         ax.set_ylabel('phase_dot right after kidnapping')
         ax.set_zlabel('step_length right after kidnapping')
@@ -453,13 +503,16 @@ def ekf_robustness(kidnap = True):
     robustness = 0
 
     #for subject in Conti_subject_names():
-    for subject in ['AB01']: # , 'AB02', 'AB03', 'AB08', 'AB09', 'AB10'
+    for subject in ['AB04']: # , 'AB02', 'AB03', 'AB08', 'AB09', 'AB10'
         print("subject: ", subject)
         for trial in Conti_trial_names(subject):
         #for trial in ['s1x2d2x5', 's1x2d7x5', 's0x8i10', 's0x8i5']:
             if trial == 'subjectdetails':
                 continue
             print("trial: ", trial)
+            if subject == 'AB03' and trial == 's0x8i10':
+                print("Trial skipped!")
+                continue
             for side in ['left']:
                 #print("side: ", side)
                 total_trials = total_trials + 1
@@ -498,11 +551,11 @@ def ekf_robustness(kidnap = True):
     return robustness
 
 if __name__ == '__main__':
-    subject = 'AB01'
-    trial = 's1d7x5'
+    subject = 'AB03'
+    trial = 's0x8i10'#'s1x2d2x5'#'s0x8d7x5'#
     side = 'left'
 
-    #ekf_test(subject, trial, side, kidnap = True, plot = True)
-    #ekf_bank_test(subject, trial, side, N= 30, plot = True)
-    ekf_robustness(kidnap = True)
+    ekf_test(subject, trial, side, kidnap = [0,1,2,3], plot = True)
+    #ekf_bank_test(subject, trial, side, N = 30, kidnap = [0, 1, 2, 3], plot = True)
+    #ekf_robustness(kidnap = True)
     #print(np.diag(R[subject]))

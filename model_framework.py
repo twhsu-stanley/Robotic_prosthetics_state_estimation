@@ -13,7 +13,7 @@ class Basis:
 		self.var_name = var_name
 
 	#Need to implement with other subclasses
-	def evaluate(self,x):
+	def evaluate(self, x):
 		pass
 
 	#Need to implement the derivative of this also
@@ -31,18 +31,19 @@ class Polynomial_Basis(Basis):
 		Basis.__init__(self, n, var_name)
 		self.size = n
 
-	#This function will evaluate the model at the given x value
+	# evaluate the model at the given x value
 	def evaluate(self, x):
-		result = [math.pow(x,i) for i in range(0, self.n)]
+		result = [x**i for i in range(0, self.n)]
 		return np.array(result)
 
-	#This function will evaluate the derivative of the model at the given x value
+	# evaluate the derivative of the model at the given x value
 	def evaluate_derivative(self, x):
 		if self.n == 1:
 			result = [0]
 		elif self.n > 1:
 			result = [0]
-			result += [i * math.pow(x,(i-1)) for i in range(1, self.n)]
+			result += [i * x**(i-1) for i in range(1, self.n)]
+		#print("Poly_derivative", np.array(result))
 		return np.array(result)
 
 class Fourier_Basis(Basis):
@@ -114,7 +115,7 @@ class Kronecker_Model:
 	#The function inputs are expected in the same order as they where defined
 	#Alternatively, you can also input a dictionary with the var_name as the key and the 
 	# value you want to evaluate the function as the value
-	def evaluate(self, *function_inputs, partial_derivative=None):
+	def evaluate(self, *function_inputs, partial_derivative = None):
 		
 		#Crop so that you are only using the number of states and not the gait fingerprint
 		states = function_inputs[:self.num_states]
@@ -142,7 +143,8 @@ class Kronecker_Model:
 				curr_val = states[curr_func.var_name]
 
 			#Verify if we want to take the partial derivative of this function
-			if(partial_derivative is not None and curr_func.var_name in partial_derivative):
+			#if(partial_derivative is not None and curr_func.var_name in partial_derivative):
+			if(partial_derivative is not None and curr_func.var_name == partial_derivative):
 				apply_derivative = True
 			else: 
 				apply_derivative = False
@@ -169,7 +171,8 @@ class Measurement_Model():
 		h = np.zeros((np.shape(Psi)[0], 1))
 		k = 0
 		for model in self.models:
-			h[k] = model.evaluate(*states) @ Psi[k,:].T
+			h[k] = model.evaluate(*states) @ Psi[k].T #Psi[k, :].T
+			#print("f_reg", model.evaluate(*states))
 			k = k + 1
 		return h
 
@@ -179,7 +182,10 @@ class Measurement_Model():
 		for model in self.models:
 			j = 0
 			for func in model.funcs:
-				H[k, j] = model.evaluate(*states, partial_derivative = func.var_name) @ Psi[k, :].T
+				#print(func.var_name)
+				Reg = model.evaluate(*states, partial_derivative = func.var_name)
+				H[k, j] = Reg @ Psi[k].T #Psi[k, :].T
+				#print("f_derivative_reg", Reg)
 				j = j + 1
 			k = k + 1
 		return H
@@ -229,3 +235,26 @@ def fast_kronecker(a, b, buff=None):
 	#276.738 secs with 1 param
 	else:
 		return np.kron(a, b)
+
+
+def model_test():
+	phase_model = Fourier_Basis(1, 'phase')
+	phase_dot_model = Polynomial_Basis(2, 'phase_dot')
+	step_length_model = Berstein_Basis(0,'step_length')
+	ramp_model = Berstein_Basis(0, 'ramp')
+
+	model_t = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+	m_model = Measurement_Model(model_t)
+
+	Psi = [np.ones((1, 8))]
+	z=m_model.evaluate_h_func(Psi, 2, 6, 7, 5)
+	dz=m_model.evaluate_h_func(Psi, 2, 6+1, 7, 5)-z
+	dx=np.array([[0], [1], [0], [0]])
+	H=m_model.evaluate_dh_func(Psi, 2, 6, 7, 5)
+	print("f = ", z)
+	print("H= ", H)
+	print("df", dz)
+	print("H dx", H @ dx)
+
+if __name__ == '__main__':
+    model_test()
