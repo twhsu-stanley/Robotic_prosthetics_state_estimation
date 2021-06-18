@@ -77,7 +77,6 @@ class extended_kalman_filter:
         
         # predicted measurements
         self.z_hat = self.h.evaluate_h_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
-        
 
         ### Jacobian test#########################################################
         #print("HPH=",  H @ self.Sigma @ H.T)

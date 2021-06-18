@@ -12,6 +12,7 @@ sys.path.append(r'/home/pi/OSL-master/locoAPI/') # Path to Loco module
 sys.path.append(r'/usr/share/python3-mscl/')     # Path of the MSCL - API for the IMU
 import locoOSL as loco                           # Module from Locolab
 import mscl as msl                               # Module from Microstrain
+import sender                                    # for real-time plotting
 
 sys.path.append(r'/home/pi/prosthetic_phase_estimation/')
 from EKF import *
@@ -132,8 +133,9 @@ try:
     else:
         sys.exit("User stopped the execution")
 
-    loops = 0
+    ptr = 0
     t_0 = time.time()
+    start_time = time.time()
     while True:
         # Read OSL
         kneSta  = fxs.read_device(kneID)
@@ -143,31 +145,31 @@ try:
 
         ### measurement data
         ## global thigh angle
-        GlobThigh = dataOSL['ThighSagi'][0] * 180 / np.pi
+        global_thigh_angle = -dataOSL['ThighSagi'][0] * 180 / np.pi
         
-        # time ?????
+        # time
         t = time.time()
         dt = t - t_0 
         t_0 = t
 
         ## Compute global thigh angle velocity
-        if loops == 0:
-            GlobThighVel = 0 
+        if ptr == 0:
+            global_thigh_angle_vel = 0 
         else:
-            GlobThighVel = (GlobThigh - GlobThigh_0) / dt
+            global_thigh_angle_vel = (global_thigh_angle - global_thigh_angle_0) / dt
             # low-pass filtering
-            GlobThighVel_lp, z_lp = lfilter(b_lp, a_lp, GlobThighVel, zi = z_lp) # low-pass filtering
-        loops += 1
-        GlobThigh_0 = GlobThigh
+            global_thigh_angle_vel_lp, z_lp = lfilter(b_lp, a_lp, global_thigh_angle_vel, zi = z_lp) # low-pass filtering
+
+        global_thigh_angle_0 = global_thigh_angle
 
         ## Compute atan2
         # band-pass filtering
-        GlobThigh_bp, z_bp = lfilter(b_bp, a_bp, GlobThigh, zi = z_bp) 
-        Atan2 = np.arctan2(-GlobThighVel_lp / (2*np.pi*0.8), GlobThigh_bp)
+        global_thigh_angle_bp, z_bp = lfilter(b_bp, a_bp, global_thigh_angle, zi = z_bp) 
+        Atan2 = np.arctan2(-global_thigh_angle_vel_lp / (2*np.pi*0.8), global_thigh_angle_bp)
         if Atan2 < 0:
             Atan2 = Atan2 + 2 * np.pi
 
-        measurement = np.array([[GlobThigh], [GlobThighVel_lp], [Atan2]])
+        measurement = np.array([[global_thigh_angle], [global_thigh_angle_vel_lp], [Atan2]])
 
         ### EKF implementation
         ekf.prediction(dt)
@@ -188,9 +190,21 @@ try:
         loco.log_OSL({**dataOSL,**misclog}, logger)
         
         ### Move the OSL
-        ankMotCou, kneMotCou = loco.joi2motTic(encMap, knee_angle_cmd, ankle_angle_cmd)
-        fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, ankMotCou)
-        fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, kneMotCou)
+        #ankMotCou, kneMotCou = loco.joi2motTic(encMap, knee_angle_cmd, ankle_angle_cmd)
+        #fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, ankMotCou)
+        #fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, kneMotCou)
+
+
+        elapsed_time = time.time() - start_time
+        
+        if ptr%10 == 0:
+            sender.graph(elapsed_time, global_thigh_angle, 'Global Thigh Angle', 'deg',
+                         ekf.z_hat[0], 'Global Thigh Angle Pred', 'deg',
+                         global_thigh_angle_vel_lp, 'Global Thigh Angle Vel', 'deg/s',
+                         ekf.z_hat[1], 'Global Thigh Angle Vel Pred', '-')
+        
+        print('Elapsed time:', elapsed_time, ptr)
+        ptr+=1
 
         print("Thigh: {:>10.4f} [deg] || LoadCellFz: {:>10.4f} [N] || Ph. Va.: {:10.4f} "
             "|| Ref. Ankle: {:10.4f} [deg] || Ref. Knee: {:10.4f} [deg]".format(

@@ -4,6 +4,7 @@ import numpy as np
 from flexsea import flexsea as flex
 from flexsea import fxEnums as fxe
 
+sys.path.append(r'/home/pi/prosthetic_phase_estimation/')
 sys.path.append(r'/home/pi/OSL/locoAPI/')      # Path to Loco module
 sys.path.append(r'/usr/share/python3-mscl/')   # Path of the MSCL - API for the IMU
 import locoOSL as loco                          # Module from Locolab
