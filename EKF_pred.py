@@ -2,16 +2,7 @@ import numpy as np
 from model_framework import *
 from continuous_data import *
 from model_fit import *
-import time
 
-###### load control model & coefficients (for OSL implementation) ######
-c_model = model_loader('Control_model.pickle')
-
-with open('PikPsi_knee_G.pickle', 'rb') as file:
-    Psi_knee = pickle.load(file)
-with open('PikPsi_ankle_G.pickle', 'rb') as file:
-    Psi_ankle = pickle.load(file)
-########################################################################
 
 def warpToOne(phase):
     phase_wrap = np.remainder(phase, 1)
@@ -33,10 +24,6 @@ def phase_error(phase_est, phase_truth):
         return abs(phase_est - phase_truth)
     else:
         return 1 - abs(phase_est - phase_truth)
-
-def joints_control(phases, phase_dots, step_lengths, ramps):
-    joint_angles = c_model.evaluate_h_func([Psi_knee, Psi_ankle], phases, phase_dots, step_lengths, ramps)
-    return joint_angles
     
 class myStruct:
     pass
@@ -59,9 +46,9 @@ class extended_kalman_filter:
 
     def prediction(self, dt):
         # EKF propagation (prediction) step
-        self.x = self.f(self.x, dt)  # predicted state
-        self.x[0, 0] = warpToOne(self.x[0, 0]) # wrap to be between 0 and 1
-        self.Sigma = self.A(dt) @ self.Sigma @ self.A(dt).T + self.Q  # predicted state covariance
+        self.x_pred = self.f(self.x, dt)  # predicted state
+        self.x_pred[0, 0] = warpToOne(self.x_pred[0, 0]) # wrap to be between 0 and 1
+        self.Sigma_pred = self.A(dt) @ self.Sigma @ self.A(dt).T + self.Q  # predicted state covariance
         
         # state saturation
         #self.state_saturation()
@@ -72,26 +59,24 @@ class extended_kalman_filter:
         #   z:  measurement
 
         # evaluate measurement Jacobian at current operating point
-        
-        H = self.h.evaluate_dh_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
-        
+        H = self.h.evaluate_dh_func(Psi, self.x_pred[0,0], self.x_pred[1,0], self.x_pred[2,0], self.x_pred[3,0])
+
         # predicted measurements
-        self.z_hat = self.h.evaluate_h_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
-        
+        self.z_hat = self.h.evaluate_h_func(Psi, self.x_pred[0,0], self.x_pred[1,0], self.x_pred[2,0], self.x_pred[3,0])
 
         ### Jacobian test#########################################################
-        #print("HPH=",  H @ self.Sigma @ H.T)
+        #print("HPH=",  H @ self.Sigma_pred @ H.T)
         #print("R=", self.R)
-        #z2 = self.h.evaluate_h_func(Psi, self.x[0,0]-0.01, self.x[1,0]-0.01, self.x[2,0]+0.01, self.x[3,0]-0.01)
+        #z2 = self.h.evaluate_h_func(Psi, self.x_pred[0,0]-0.01, self.x_pred[1,0]-0.01, self.x_pred[2,0]+0.01, self.x_pred[3,0]-0.01)
         #print(z2 - self.z_hat)
         #print(H @ np.array([[-0.01], [-0.01], [0.01], [-0.01]]))
         ###########################################################################
 
         if arctan2:
             H[-1, 0] += 2*np.pi
-            self.z_hat[-1] += self.x[0,0] * 2 * np.pi
+            self.z_hat[-1] += self.x_pred[0,0] * 2 * np.pi
             # wrap to 2pi
-            self.z_hat[-1] = wrapTo2pi(self.z_hat[-1]) #self.z_hat[-1] % (2*np.pi) # 
+            self.z_hat[-1] = wrapTo2pi(self.z_hat[-1])
                     
         # innovation
         z = np.array([z]).T
@@ -102,59 +87,57 @@ class extended_kalman_filter:
             self.v[-1] = np.arctan2(np.sin(self.v[-1]), np.cos(self.v[-1]))
 
         R = self.R
-        #lost = False
+        lost = False
         # Detect kidnapping event
         self.MD = np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) # Mahalanobis distance
         if self.MD > np.sqrt(22.458): # 6-DOF Chi-square test np.sqrt(22.458)
-            #lost = True
+            lost = True
             # scale R of thigh angle vel
             #U = np.diag([1, 1, 1, 1, 1, 1/2])
             #R = U @ R @ U.T
             #print("kd!: ", MD)
-            self.Sigma += np.diag([2e-5, 2e-4, 4e-3, 4])
+            self.Sigma_pred += np.diag([2e-5, 2e-4, 4e-3, 4])
 
         # innovation covariance
-        S = H @ self.Sigma @ H.T + R
+        S = H @ self.Sigma_pred @ H.T + R
         # check singularity/invertibility/ of S
 
         # filter gain
-        K = self.Sigma @ H.T @ np.linalg.inv(S)
-        
+        K = self.Sigma_pred @ H.T @ np.linalg.inv(S)
 
         # correct the predicted state statistics
-        self.x = self.x + K @ self.v
+        self.x = self.x_pred + K @ self.v
         self.x[0, 0] = warpToOne(self.x[0, 0])
-        
+
         # set phase according to atan2
         #if lost and arctan2:
             #print(K @ self.v)
             #self.x[0, 0] = z[-1] / (2 * np.pi)
 
         I = np.eye(np.shape(self.x)[0])
-        self.Sigma = (I - K @ H) @ self.Sigma
+        self.Sigma = (I - K @ H) @ self.Sigma_pred
         
     def state_saturation(self, saturation_range):
         phase_dots_max = saturation_range[0]
         phase_dots_min = saturation_range[1]
         step_lengths_max = saturation_range[2]
         step_lengths_min = saturation_range[3]
-        #if self.x[0, 0] > 1:
-        #    self.x[0, 0] = 1
-        #elif self.x[0, 0] < 0:
-        #    self.x[0, 0] = 0
+        #if self.x_pred[0, 0] > 1:
+        #    self.x_pred[0, 0] = 1
+        #elif self.x_pred[0, 0] < 0:
+        #    self.x_pred[0, 0] = 0
         
-        if self.x[1, 0] > phase_dots_max:
-            self.x[1, 0] = phase_dots_max
-        elif self.x[1, 0] < phase_dots_min:
-            self.x[1, 0] = phase_dots_min
+        if self.x_pred[1, 0] > phase_dots_max:
+            self.x_pred[1, 0] = phase_dots_max
+        elif self.x_pred[1, 0] < phase_dots_min:
+            self.x_pred[1, 0] = phase_dots_min
 
-        if self.x[2, 0] > step_lengths_max:
-            self.x[2, 0] = step_lengths_max
-        elif self.x[2, 0] < step_lengths_min:
-            self.x[2, 0] = step_lengths_min
+        if self.x_pred[2, 0] > step_lengths_max:
+            self.x_pred[2, 0] = step_lengths_max
+        elif self.x_pred[2, 0] < step_lengths_min:
+            self.x_pred[2, 0] = step_lengths_min
 
-        if self.x[3, 0] > 10:
-            self.x[3, 0] = 10
-        elif self.x[3, 0] < -10:
-            self.x[3, 0] = -10
-    
+        if self.x_pred[3, 0] > 10:
+            self.x_pred[3, 0] = 10
+        elif self.x_pred[3, 0] < -10:
+            self.x_pred[3, 0] = -10

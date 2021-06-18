@@ -240,6 +240,7 @@ if __name__ == '__main__':
         np.savez(file, **dict_gt)
     """
 
+    """
     #dict_gt_bp = dict()
     #dict_gtv_5hz = dict()
     #dict_gtv_2x5hz = dict()
@@ -304,8 +305,20 @@ if __name__ == '__main__':
     #    np.savez(file, **dict_gtv_2hz)
     with open('Gait_cycle_data/atan2_s.npz', 'wb') as file:
         np.savez(file, **dict_atan2_s)
+    """
 
-
+    dict_knee = dict()
+    for subject in subject_names:
+        dict_knee[subject] = -get_joint_angle(subject, 'knee', 'x')
+    with open('Gait_cycle_data/knee_angle.npz', 'wb') as file:
+        np.savez(file, **dict_knee)
+    
+    dict_ankle = dict()
+    for subject in subject_names:
+        dict_ankle[subject] = get_joint_angle(subject, 'ankle', 'x')
+    with open('Gait_cycle_data/ankle_angle.npz', 'wb') as file:
+        np.savez(file, **dict_ankle)
+    
     """
     dict_rw = dict()
     for subject in subject_names:
@@ -327,6 +340,4 @@ if __name__ == '__main__':
         np.savez(file, RW)
     print(np.shape(RW))
     """
-
-
     

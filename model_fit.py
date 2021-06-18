@@ -15,12 +15,8 @@ def model_fit(model, mode):
 
     # dictionary of Fourier coefficients: psi
     PSI = dict()
-
-    # dictionary of  RMS error: rmse
-    #RMSE = dict()
-
-    # Calculate a SUBJECT SPECIFIC model
-    #for subject in ['AB01']:
+    """
+    ##### SUBJECT SPECIFIC model #####
     for subject in subject_names:
         # generate data
         print("Doing subject: " + subject)
@@ -85,38 +81,127 @@ def model_fit(model, mode):
                                phases.ravel(), phase_dots.ravel(), step_lengths.ravel(), ramps.ravel())
         
         PSI[subject] = psi
-
-        # RMSE of each stride
-        """
-        rmse = np.zeros((np.shape(measurement_input)[0], 1))
-        for i in range(np.shape(measurement_input)[0]):
-            measurement_pred = model_prediction(model, psi, phases[i,:], phase_dots[i,:], step_lengths[i,:], ramps[i,:])
-            mse = np.square(np.subtract(measurement_input[i,:], measurement_pred)).mean()
-            rmse[i] = np.sqrt(mse)
+    """
+    ##### GENERIC model #####
+    for subject in subject_names:
+        # generate data
+        if mode == 'global_thigh_angle_Y':
+            with open('Gait_cycle_data/Global_thigh_angle.npz', 'rb') as file:
+                g_t = np.load(file)
+                if subject == 'AB01':
+                    measurement_input = g_t[subject][0]
+                else:
+                    measurement_input = np.vstack((measurement_input, g_t[subject][0]))
+        elif mode =='reaction_force_z_ankle':
+            with open('Gait_cycle_data/Reaction_wrench.npz', 'rb') as file:
+                r_w = np.load(file)
+                if subject == 'AB01':
+                    measurement_input = r_w[subject][2]
+                else:
+                    measurement_input = np.vstack((measurement_input, r_w[subject][2]))
+        elif mode =='reaction_force_x_ankle':
+            with open('Gait_cycle_data/Reaction_wrench.npz', 'rb') as file:
+                r_w = np.load(file)
+                if subject == 'AB01':
+                    measurement_input = r_w[subject][0]
+                else:
+                    measurement_input = np.vstack((measurement_input, r_w[subject][0]))
+        elif mode =='reaction_moment_y_ankle':
+            with open('Gait_cycle_data/Reaction_wrench.npz', 'rb') as file:
+                r_w = np.load(file)
+                if subject == 'AB01':
+                    measurement_input = r_w[subject][4]
+                else:
+                    measurement_input = np.vstack((measurement_input, r_w[subject][4]))
+        elif mode == 'global_thigh_angVel_2hz':
+            with open('Gait_cycle_data/global_thigh_angVel_2hz.npz', 'rb') as file:
+                g_tv = np.load(file)
+                if subject == 'AB01':
+                    measurement_input = g_tv[subject]
+                else:
+                    measurement_input = np.vstack((measurement_input, g_tv[subject]))
+        elif mode == 'atan2':
+            with open('Gait_cycle_data/atan2_s.npz', 'rb') as file: # scaled
+                atan2 = np.load(file)
+                if subject == 'AB01':
+                    measurement_input = atan2[subject]
+                else:
+                    measurement_input = np.vstack((measurement_input, atan2[subject]))
         
-        RMSE[subject] = rmse
-        #print("mode: ", str(mode), "; Subject: ", str(subject))
-        print("RMSE mean: ", rmse.mean())
-        print("RMSE max: ", rmse.max())
-        """
-    return PSI #, RMSE
+        ## for control
+        elif mode == 'knee_angle':
+            with open('Gait_cycle_data/knee_angle.npz', 'rb') as file:
+                k_a = np.load(file)
+                if subject == 'AB01':
+                    measurement_input = k_a[subject]
+                else:
+                    measurement_input = np.vstack((measurement_input, k_a[subject]))
+        elif mode == 'ankle_angle':
+            with open('Gait_cycle_data/ankle_angle.npz', 'rb') as file:
+                ak_a = np.load(file)
+                if subject == 'AB01':
+                    measurement_input = ak_a[subject]
+                else:
+                    measurement_input = np.vstack((measurement_input, ak_a[subject]))
 
-def load_Psi(subject):
-    with open('Psi/Psi_thigh_Y.npz', 'rb') as file:
-        p = np.load(file, allow_pickle = True)
-        Psi_thigh_Y = p['arr_0'].item()[subject]
+        else:
+            sys.exit('Error: no such mode of input')
 
-    with open('Psi/Psi_force_Z.npz', 'rb') as file:
-        p = np.load(file, allow_pickle = True)
-        Psi_force_Z = p['arr_0'].item()[subject]
+        if subject == 'AB01':
+            phase_dots = get_phase_dot(subject)
+            step_lengths = get_step_length(subject)
+            ramps = get_ramp(subject)
+        else:
+            phase_dots = np.vstack((phase_dots, get_phase_dot(subject)))
+            step_lengths = np.vstack((step_lengths, get_step_length(subject)))
+            ramps = np.vstack((ramps, get_ramp(subject)))
 
-    with open('Psi/Psi_force_X.npz', 'rb') as file:
-        p = np.load(file, allow_pickle = True)
-        Psi_force_X = p['arr_0'].item()[subject]
+    phases = get_phase(measurement_input)
 
-    with open('Psi/Psi_moment_Y.npz', 'rb') as file:
-        p = np.load(file, allow_pickle = True)
-        Psi_moment_Y = p['arr_0'].item()[subject]
+    # Fit the model
+    if mode == 'atan2':
+        measurement = measurement_input.ravel() - 2 * np.pi * phases.ravel()
+        # wrap to [-pi, pi]
+        for i in range(np.shape(measurement)[0]):
+            if measurement[i] < -np.pi:
+                measurement[i] += 2 * np.pi
+            elif measurement[i] > np.pi:
+                measurement[i] -= 2 * np.pi
+        psi = least_squares(model, measurement,\
+                            phases.ravel(), phase_dots.ravel(), step_lengths.ravel(), ramps.ravel())
+    else:
+        psi = least_squares(model, measurement_input.ravel(),\
+                            phases.ravel(), phase_dots.ravel(), step_lengths.ravel(), ramps.ravel())
+        
+    PSI = psi
+
+    return PSI
+
+#def load_Psi():
+def load_Psi(subject='AB01'):    
+    #with open('Psi/Psi_thigh_Y.npz', 'rb') as file:
+    #    p = np.load(file, allow_pickle = True)
+    #    Psi_thigh_Y = p['arr_0'].item()[subject]
+    with open('PikPsi_thigh_Y_G.pickle', 'rb') as file:
+        Psi_thigh_Y = pickle.load(file)
+
+    #with open('Psi/Psi_force_Z.npz', 'rb') as file:
+    #    p = np.load(file, allow_pickle = True)
+    #    Psi_force_Z = p['arr_0'].item()[subject]
+    with open('PikPsi_force_Z_G.pickle', 'rb') as file:
+        Psi_force_Z = pickle.load(file)
+
+    #with open('Psi/Psi_force_X.npz', 'rb') as file:
+    #    p = np.load(file, allow_pickle = True)
+    #    Psi_force_X = p['arr_0'].item()[subject]
+    with open('PikPsi_force_X_G.pickle', 'rb') as file:
+        Psi_force_X = pickle.load(file)
+
+    #with open('Psi/Psi_moment_Y.npz', 'rb') as file:
+    #    p = np.load(file, allow_pickle = True)
+    #    Psi_moment_Y = p['arr_0'].item()[subject]
+    with open('PikPsi_moment_Y_G.pickle', 'rb') as file:
+        Psi_moment_Y = pickle.load(file)
    
     with open('Psi/Psi_thighVel_5hz.npz', 'rb') as file:
         p = np.load(file, allow_pickle = True)
@@ -126,13 +211,17 @@ def load_Psi(subject):
         p = np.load(file, allow_pickle = True)
         Psi_thighVel_2x5hz = p['arr_0'].item()[subject]
     
-    with open('Psi/Psi_thighVel_2hz_p.npz', 'rb') as file:
-        p = np.load(file, allow_pickle = True)
-        Psi_thighVel_2hz = p['arr_0'].item()[subject]
+    #with open('Psi/Psi_thighVel_2hz_p.npz', 'rb') as file:
+    #    p = np.load(file, allow_pickle = True)
+    #    Psi_thighVel_2hz = p['arr_0'].item()[subject]
+    with open('PikPsi_thighVel_2hz_G.pickle', 'rb') as file:
+        Psi_thighVel_2hz = pickle.load(file)
     
-    with open('Psi/Psi_atan2_s_p.npz', 'rb') as file:
-        p = np.load(file, allow_pickle = True)
-        Psi_atan2 = p['arr_0'].item()[subject]
+    #with open('Psi/Psi_atan2_s_p.npz', 'rb') as file:
+    #   p = np.load(file, allow_pickle = True)
+    #    Psi_atan2 = p['arr_0'].item()[subject]
+    with open('PikPsi_atan2_G.pickle', 'rb') as file:
+        Psi_atan2 = pickle.load(file)
 
     Psi = np.array([Psi_thigh_Y, Psi_force_Z, Psi_force_X, Psi_moment_Y,\
                     Psi_thighVel_5hz, Psi_thighVel_2x5hz, Psi_thighVel_2hz, Psi_atan2], dtype = object)
@@ -255,6 +344,51 @@ def measurement_error_cov(subject):
     print("R = ", R)
     return R
 
+def Psi_to_pickle():
+    Psi_thigh_Y = dict()
+    Psi_force_Z = dict()
+    Psi_force_X = dict()
+    Psi_moment_Y = dict()
+    Psi_thighVel_2hz = dict()
+    Psi_atan2 = dict()
+    for subject in subject_names:
+        with open('Psi/Psi_thigh_Y.npz', 'rb') as file:
+            p = np.load(file, allow_pickle = True)
+            Psi_thigh_Y[subject] = p['arr_0'].item()[subject]
+        
+        with open('Psi/Psi_force_Z.npz', 'rb') as file:
+            p = np.load(file, allow_pickle = True)
+            Psi_force_Z[subject] = p['arr_0'].item()[subject]
+
+        with open('Psi/Psi_force_X.npz', 'rb') as file:
+            p = np.load(file, allow_pickle = True)
+            Psi_force_X[subject] = p['arr_0'].item()[subject]
+
+        with open('Psi/Psi_moment_Y.npz', 'rb') as file:
+            p = np.load(file, allow_pickle = True)
+            Psi_moment_Y[subject] = p['arr_0'].item()[subject]
+        
+        with open('Psi/Psi_thighVel_2hz_p.npz', 'rb') as file:
+            p = np.load(file, allow_pickle = True)
+            Psi_thighVel_2hz[subject] = p['arr_0'].item()[subject]
+        
+        with open('Psi/Psi_atan2_s_p.npz', 'rb') as file:
+            p = np.load(file, allow_pickle = True)
+            Psi_atan2[subject] = p['arr_0'].item()[subject]
+
+    with open('PikPsi_thigh_Y.pickle', 'wb') as file:
+        pickle.dump(Psi_thigh_Y, file)
+    with open('PikPsi_force_Z.pickle', 'wb') as file:
+        pickle.dump(Psi_force_Z, file)
+    with open('PikPsi_force_X.pickle', 'wb') as file:
+        pickle.dump(Psi_force_X, file)
+    with open('PikPsi_moment_Y.pickle', 'wb') as file:
+        pickle.dump(Psi_moment_Y, file)
+    with open('PikPsi_thighVel_2hz.pickle', 'wb') as file:
+        pickle.dump(Psi_thighVel_2hz, file)
+    with open('PikPsi_atan2.pickle', 'wb') as file:
+        pickle.dump(Psi_atan2, file)
+
 if __name__ == '__main__':
     
     # dictionary storing all measurement model coefficients
@@ -273,42 +407,44 @@ if __name__ == '__main__':
     # Measrurement model for global_thigh_angle_Y
     model_thigh_Y = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_thigh_Y = model_fit(model_thigh_Y, 'global_thigh_angle_Y')
-    #with open('Psi/Psi_thigh_Y_2.npz', 'wb') as file:
-    #    np.savez(file, psi_thigh_Y, allow_pickle = True) 
-    
+    #with open('Psi/Psi_thigh_Y.npz', 'wb') as file:
+    #    np.savez(file, psi_thigh_Y, allow_pickle = True)
+    #with open('PikPsi_thigh_Y_G.pickle', 'wb') as file:
+    #    pickle.dump(psi_thigh_Y, file)
+
     # Measrurement model for reaction_force_z_ankle
     model_force_z = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_force_Z = model_fit(model_force_z, 'reaction_force_z_ankle')
     #with open('Psi/Psi_force_Z_2.npz', 'wb') as file:
     #    np.savez(file, psi_force_Z, allow_pickle = True)
-    #Measurement_model_coeff['reaction_force_z_ankle'] = psi_force_z
-    #Measurement_model_RMSE['reaction_force_z_ankle'] = RMSE_force_z
+    #with open('PikPsi_force_Z_G.pickle', 'wb') as file:
+    #    pickle.dump(psi_force_Z, file)
 
     # Measrurement model for reaction_force_x_ankle
     model_force_x = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_force_X = model_fit(model_force_x, 'reaction_force_x_ankle')
     #with open('Psi/Psi_force_X_2.npz', 'wb') as file:
     #    np.savez(file, psi_force_X, allow_pickle = True)
-    #Measurement_model_coeff['reaction_force_x_ankle'] = psi_force_x
-    #Measurement_model_RMSE['reaction_force_x_ankle'] = RMSE_force_x
+    #with open('PikPsi_force_X_G.pickle', 'wb') as file:
+    #    pickle.dump(psi_force_X, file)
 
     # Measrurement model for reaction_moment_y_ankle
     model_moment_y = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_moment_Y = model_fit(model_moment_y, 'reaction_moment_y_ankle')
     #with open('Psi/Psi_moment_Y_2.npz', 'wb') as file:
     #    np.savez(file, psi_moment_Y, allow_pickle = True) 
-    #Measurement_model_coeff['reaction_moment_y_ankle'] = psi_moment_y
-    #Measurement_model_RMSE['reaction_moment_y_ankle'] = RMSE_moment_y
+    #with open('PikPsi_moment_Y_G.pickle', 'wb') as file:
+    #    pickle.dump(psi_moment_Y, file)
     
     #phase_dot_model = Polynomial_Basis(2, 'phase_dot')
 
     # NEW ADDED: Measrurement model for global_thigh_angVel_Y
-    model_thighVel_5hz = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    #model_thighVel_5hz = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_thighVel_5hz = model_fit(model_thighVel_5hz, 'global_thigh_angVel_5hz')
     #with open('Psi/Psi_thighVel_5hz_2.npz', 'wb') as file:
     #    np.savez(file, psi_thighVel_5hz, allow_pickle = True) 
 
-    model_thighVel_2x5hz = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    #model_thighVel_2x5hz = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_thighVel_2x5hz = model_fit(model_thighVel_2x5hz, 'global_thigh_angVel_2x5hz')
     #with open('Psi/Psi_thighVel_2x5hz_2.npz', 'wb') as file:
     #    np.savez(file, psi_thighVel_2x5hz, allow_pickle = True)
@@ -317,6 +453,8 @@ if __name__ == '__main__':
     #psi_thighVel_2hz = model_fit(model_thighVel_2hz, 'global_thigh_angVel_2hz')
     #with open('Psi/Psi_thighVel_2hz_p.npz', 'wb') as file:
     #   np.savez(file, psi_thighVel_2hz, allow_pickle = True)
+    #with open('PikPsi_thighVel_2hz_G.pickle', 'wb') as file:
+    #    pickle.dump(psi_thighVel_2hz, file)
 
     #phase_dot_model = Polynomial_Basis(1, 'phase_dot')
     step_length_model = Berstein_Basis(0,'step_length')
@@ -325,24 +463,8 @@ if __name__ == '__main__':
     #psi_atan2 = model_fit(model_atan2, 'atan2')
     #with open('Psi/Psi_atan2_s_pv.npz', 'wb') as file:
     #    np.savez(file, psi_atan2, allow_pickle = True)
-
-    """
-    with open('Measurement_model_coeff.npz', 'rb') as file:
-        Measurement_model_coeff = np.load(file, allow_pickle = True)
-        psi_thigh_Y = Measurement_model_coeff['global_thigh_angle_Y']
-        psi_force_Z = Measurement_model_coeff['reaction_force_z_ankle']
-        psi_force_X = Measurement_model_coeff['reaction_force_x_ankle']
-        psi_moment_Y = Measurement_model_coeff['reaction_moment_y_ankle']
-    
-    with open('Psi/Psi_thigh_Y.npz', 'wb') as file:
-        np.savez(file, psi_thigh_Y, allow_pickle = True) 
-    with open('Psi/Psi_force_Z.npz', 'wb') as file:
-        np.savez(file, psi_force_Z, allow_pickle = True) 
-    with open('Psi/Psi_force_X.npz', 'wb') as file:
-        np.savez(file, psi_force_X, allow_pickle = True) 
-    with open('Psi/Psi_moment_Y.npz', 'wb') as file:
-        np.savez(file, psi_moment_Y, allow_pickle = True) 
-    """
+    #with open('PikPsi_atan2_G.pickle', 'wb') as file:
+    #    pickle.dump(psi_atan2, file)
     
     #####################################################################################################
 
@@ -355,13 +477,36 @@ if __name__ == '__main__':
     #    np.savez(file, **Measurement_model_RMSE, allow_pickle = True)
 
     # save measurement model
-    m_model = Measurement_Model(model_thigh_Y, model_force_z, model_force_x, model_moment_y,\
-                                model_thighVel_2hz)
+    #m_model = Measurement_Model(model_thigh_Y, model_thighVel_2hz, model_atan2)
     #m_model = Measurement_Model(model_thigh_Y, model_force_z, model_force_x, model_moment_y, model_thighVel_2hz)
-    model_saver(m_model, 'Measurement_model_5_sp.pickle')
+    #model_saver(m_model, 'Measurement_model_3_sp.pickle')
 
     #R = dict()
     #for subject in subject_names:
     #    R[subject] = measurement_error_cov(subject)
     #with open('R_s.pickle', 'wb') as file:
     #	pickle.dump(R, file)
+
+    
+    ### Joint angles mapping for control ###
+    F = 11
+    N = 3
+    phase_model = Fourier_Basis(F, 'phase')
+    phase_dot_model = Polynomial_Basis(1, 'phase_dot')
+    step_length_model = Berstein_Basis(N,'step_length')
+    ramp_model = Berstein_Basis(N, 'ramp')
+
+    model_knee = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    psi_knee = model_fit(model_knee, 'knee_angle')
+    with open('PikPsi_knee_G.pickle', 'wb') as file:
+        pickle.dump(psi_knee, file)
+
+    print("=====")
+
+    model_ankle = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    psi_ankle = model_fit(model_ankle, 'ankle_angle')
+    with open('PikPsi_ankle_G.pickle', 'wb') as file:
+        pickle.dump(psi_ankle, file)
+    
+    c_model = Measurement_Model(model_knee, model_ankle)
+    model_saver(c_model, 'Control_model.pickle')

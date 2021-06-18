@@ -21,7 +21,7 @@ from model_fit import *
 # 1: force_z_ankle, 2: force_x_ankle; 3: moment_y_ankle;
 # 4: global_thigh_angVel_5hz; 5: global_thigh_angVel_2x5hz; 6: global_thigh_angVel_2hz;
 # 7: atan2
-sensors = [0, 1, 2, 3, 6, 7] # [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1] looks good
+sensors = [0, 6, 7] # [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1] looks good
 arctan2 = False
 if sensors[-1] == 7:
     arctan2 = True
@@ -47,6 +47,8 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
                 global_thigh_angVel_5hz, global_thigh_angVel_2x5hz, global_thigh_angVel_2hz, atan2\
                                         = load_Conti_measurement_data(subject, trial, side)
 
+    knee_angle, ankle_angle = load_Conti_joints_control(subject, trial, side)
+
     z = np.array([[global_thigh_angle_Y],\
                   [force_z_ankle],\
                   [force_x_ankle],\
@@ -69,7 +71,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     sys.Q = np.diag([0, 1e-5, 1e-5, 1e-1]) #[0, 6e-5, 1e-6, 1e-1] #process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
     # measurement noise covariance
     sys.R = R[subject][np.ix_(sensors, sensors)]
-    U = np.diag([2, 2, 2, 2, 2, 2])
+    U = np.diag([2, 2, 2])
     sys.R = U @ sys.R @ U.T
 
     # initialize the state
@@ -101,35 +103,39 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     Sigma_norm = np.zeros((total_step, 1))
     Sigma_diag = np.zeros((total_step, 4))
     Mahal_dist = np.zeros((total_step, 1))
+    knee_angle_cmd = np.zeros((total_step, 1))
+    ankle_angle_cmd = np.zeros((total_step, 1))
     #t_step_max = 0
-    #t_step_tot = 0
-    
     for i in range(total_step):
         Sigma_norm[i] = np.linalg.norm(ekf.Sigma)
-        
-        #t = time.time()
         # kidnap
         #if kidnap == True and i == kidnap_index:
         #    ekf.x = state_kidnap
         if kidnap != False and i == kidnap_index:
             ekf.x[kidnap] = state_kidnap[kidnap]
-
+        
         ekf.prediction(dt)
         ekf.state_saturation(saturation_range)
+
         ekf.correction(z[:, i], Psi, arctan2)
+        ekf.state_saturation(saturation_range)
+        
+        #if t_step[i] > t_step_max:
+        #    t_step_max = t_step[i]
+
         x[i,:] = ekf.x.T
         z_pred[i,:] = ekf.z_hat.T
         #Sigma_diag[i,:] = np.array([ekf.Sigma[k,k] for k in range(4)])
         Sigma_diag[i,:] = np.diag(ekf.Sigma)
         Mahal_dist[i] = ekf.MD
 
-        #t_step = time.time() - t
-        #t_step_tot += t_step
-        #if t_step > t_step_max:
-        #    t_step_max = t_step
+        # control commands
+        joint_angles = joints_control(x[i,0], x[i,1], x[i,2], x[i,3])
+        knee_angle_cmd[i] = joint_angles[0]
+        ankle_angle_cmd[i] = joint_angles[1]
 
     #print("longest time step = ", t_step_max)
-    #print("mean time step = ", t_step_tot / total_step)
+    #print("mean time step = ", np.mean(t_step))
 
     # evaluate robustness
     # compare x and ground truth:
@@ -219,6 +225,19 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         plt.ylabel('MD')
         plt.xlabel('time (s)')
 
+        plt.figure("Control Commands: Joint Angles")
+        plt.title("Control Commands: Joint Angles")
+        plt.subplot(211)
+        plt.plot(tt, knee_angle[0:total_step], 'k-')
+        plt.plot(tt, knee_angle_cmd, 'r--')
+        plt.ylabel('knee angle')
+        plt.subplot(212)
+        plt.plot(tt, ankle_angle[0:total_step], 'k-')
+        plt.plot(tt, ankle_angle_cmd, 'r--')
+        plt.ylabel('ankle angle')
+        plt.xlabel('time (s)')
+
+        """
         plt.figure("Original Measurements")
         plt.subplot(411)
         plt.title("Original Measurements")
@@ -263,7 +282,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         plt.ylabel('$\dot{\\theta}_{Y_{2.5Hz}} ~(deg/s)$')
         #plt.ylim([-150, 150])
         plt.xlim([0, tt[-1]+0.1])
-        """
+        
         plt.subplot(413)
         plt.plot(tt, z[6, 0:total_step], 'k-')
         plt.plot(tt, z_pred[:, 6], 'r--')
@@ -358,6 +377,7 @@ def ekf_bank_test(subject, trial, side, N = 30, kidnap = [0,1,2,3], plot = True)
             ekf.prediction(dt)
             ekf.state_saturation(saturation_range)
             ekf.correction(z[:, i], Psi, arctan2)
+            ekf.state_saturation(saturation_range)
             x[n, i,:] = ekf.x.T
         
         phase_rakn[n] = state_kidnap[0]#x[n, kidnap_index, 0] #- phases[kidnap_index]
@@ -403,7 +423,7 @@ def ekf_bank_test(subject, trial, side, N = 30, kidnap = [0,1,2,3], plot = True)
         plt.subplot(411)
         plt.title('EKFs-Bank Test')
         plt.plot(tt, phases, 'k--', linewidth=2)
-        plt.plot(tt,  x[:, :, 0].T, '--',  alpha = 0.35)
+        plt.plot(tt,  x[:, :, 0].T, '--')#,alpha = 0.35
         plt.ylabel('$\phi$')
         plt.legend(('ground truth', 'estimate'))
         #plt.legend(('ground truth', 'estimate'), bbox_to_anchor=(1, 1.05))
@@ -502,18 +522,21 @@ def ekf_robustness(kidnap = True):
 
     robustness = 0
 
+    with open('Measurements_with_Nan.pickle', 'rb') as file:
+        nan_dict = pickle.load(file)
+
     #for subject in Conti_subject_names():
-    for subject in ['AB04']: # , 'AB02', 'AB03', 'AB08', 'AB09', 'AB10'
+    for subject in ['AB06']: # , 'AB02', 'AB03', 'AB08', 'AB09', 'AB10'
         print("subject: ", subject)
         for trial in Conti_trial_names(subject):
         #for trial in ['s1x2d2x5', 's1x2d7x5', 's0x8i10', 's0x8i5']:
             if trial == 'subjectdetails':
                 continue
             print("trial: ", trial)
-            if subject == 'AB03' and trial == 's0x8i10':
-                print("Trial skipped!")
-                continue
             for side in ['left']:
+                if nan_dict[subject][trial][side] == False:
+                    print(subject + "/"+ trial + "/"+ side+ ": Trial skipped!")
+                    continue
                 #print("side: ", side)
                 total_trials = total_trials + 1
                 
@@ -551,11 +574,11 @@ def ekf_robustness(kidnap = True):
     return robustness
 
 if __name__ == '__main__':
-    subject = 'AB03'
-    trial = 's0x8i10'#'s1x2d2x5'#'s0x8d7x5'#
+    subject = 'AB01'
+    trial = 's0x8i10'
     side = 'left'
 
-    ekf_test(subject, trial, side, kidnap = [0,1,2,3], plot = True)
-    #ekf_bank_test(subject, trial, side, N = 30, kidnap = [0, 1, 2, 3], plot = True)
+    ekf_test(subject, trial, side, kidnap = [0, 1, 2, 3], plot = True)
+    #ekf_bank_test(subject, trial, side, N = 40, kidnap = [0, 1, 2, 3], plot = True)
     #ekf_robustness(kidnap = True)
     #print(np.diag(R[subject]))
