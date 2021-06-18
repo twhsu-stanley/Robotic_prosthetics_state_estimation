@@ -13,6 +13,7 @@ sys.path.append(r'/usr/share/python3-mscl/')     # Path of the MSCL - API for th
 import locoOSL as loco                           # Module from Locolab
 import mscl as msl                               # Module from Microstrain
 
+sys.path.append(r'/home/pi/prosthetic_phase_estimation/')
 from EKF import *
 from model_framework import *
 from data_generators import *
