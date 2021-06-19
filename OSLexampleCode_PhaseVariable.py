@@ -15,10 +15,10 @@ import mscl as msl                               # Module from Microstrain
 import sender                                    # for real-time plotting
 
 sys.path.append(r'/home/pi/prosthetic_phase_estimation/')
-from EKF import *
+from ekf import *
 from model_framework import *
 from data_generators import *
-from continuous_data import *
+#from continuous_data import *
 from model_fit import *
 from scipy.signal import butter, lfilter, lfilter_zi
 
@@ -82,7 +82,8 @@ try:
 
     dataOSL = loco.read_OSL(kneSta, ankSta, IMUPac)
     misclog = {'PV': [0.0, 'phase'], 'refAnk': [0.0,'deg'], 'refKnee': [0.0,'deg']}
-    logger = loco.ini_log({**dataOSL, **misclog}, sensors="all_sensors", trialName="PV_TwoStates_1000Hz")
+    state_est = {'phase': [0.0, 'phase'], 'phase_dot':[0.0, 'phase/s'], 'stride_length':[0.0, 'm'], 'ramp':[0.0, 'deg']}
+    logger = loco.ini_log({**dataOSL, **misclog, **state_est}, sensors="all_sensors", trialName="test1")
 
     ### Intitialize EKF
     sensors = [0, 6, 7] # [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1] looks good
@@ -94,16 +95,17 @@ try:
 
     m_model = model_loader('Measurement_model_' + str(len(sensors)) +'_sp.pickle')
     Psi = load_Psi()[sensors]
-    saturation_range = Conti_maxmin(subject, plot = False)
+    #saturation_range = Conti_maxmin(subject, plot = False)
+    saturation_range = [1.3, 0.6, 1.5, 0.6]
 
     ## build the system
     sys = myStruct()
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-5, 1e-5, 1e-1]) #[0, 6e-5, 1e-6, 1e-1] #process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
+    sys.Q = np.diag([0, 1e-5, 1e-10, 1e-5]) #[0, 6e-5, 1e-6, 1e-1] #process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
     # measurement noise covariance
-    sys.R = R[subject][np.ix_(sensors, sensors)]
+    sys.R = R['AB01'][np.ix_(sensors, sensors)]
     U = np.diag([2, 2, 2])
     sys.R = U @ sys.R @ U.T
 
@@ -118,7 +120,6 @@ try:
     # configure low-pass filter (1-order)
     nyq = 0.5 * 100
     normal_cutoff = 2 / nyq
-    order = 1
     b_lp, a_lp = butter(1, normal_cutoff, btype='low', analog=False)
     z_lp = lfilter_zi(b_lp,  a_lp)
     # configure band-pass filter (2-order)
@@ -145,7 +146,9 @@ try:
 
         ### measurement data
         ## global thigh angle
-        global_thigh_angle = -dataOSL['ThighSagi'][0] * 180 / np.pi
+        global_thigh_angle = -dataOSL['ThighSagi'][0] * 180 / np.pi # negative sign
+        ankle_angle = dataOSL['ankJoiPos'][0] * 180 / np.pi
+        knee_angle = dataOSL['kneJoiPos'][0] * 180 / np.pi
         
         # time
         t = time.time()
@@ -154,62 +157,93 @@ try:
 
         ## Compute global thigh angle velocity
         if ptr == 0:
-            global_thigh_angle_vel = 0 
+            global_thigh_angle_vel_lp = 0 
         else:
             global_thigh_angle_vel = (global_thigh_angle - global_thigh_angle_0) / dt
             # low-pass filtering
-            global_thigh_angle_vel_lp, z_lp = lfilter(b_lp, a_lp, global_thigh_angle_vel, zi = z_lp) # low-pass filtering
+            global_thigh_angle_vel_lp, z_lp = lfilter(b_lp, a_lp, [global_thigh_angle_vel], zi = z_lp)
+            global_thigh_angle_vel_lp = global_thigh_angle_vel_lp[0]
 
         global_thigh_angle_0 = global_thigh_angle
 
         ## Compute atan2
         # band-pass filtering
-        global_thigh_angle_bp, z_bp = lfilter(b_bp, a_bp, global_thigh_angle, zi = z_bp) 
+        global_thigh_angle_bp, z_bp = lfilter(b_bp, a_bp, [global_thigh_angle], zi = z_bp) 
+        global_thigh_angle_bp = global_thigh_angle_bp[0]
         Atan2 = np.arctan2(-global_thigh_angle_vel_lp / (2*np.pi*0.8), global_thigh_angle_bp)
         if Atan2 < 0:
             Atan2 = Atan2 + 2 * np.pi
 
         measurement = np.array([[global_thigh_angle], [global_thigh_angle_vel_lp], [Atan2]])
+        measurement = np.squeeze(measurement)
+        #print(measurement)
 
         ### EKF implementation
         ekf.prediction(dt)
-        ekf.state_saturation(saturation_range)
+        ekf.state_saturation(saturation_range) # BETTER TO BE FIXED VALUES
         ekf.correction(measurement, Psi, arctan2)
+        #print(ekf.x)
         ekf.state_saturation(saturation_range)
 
         ### Control commands: joints angles
-        joint_angles = joints_control(ekf.x[0], ekf.x[1], ekf.x[2], ekf.x[3])
+        joint_angles = joints_control(ekf.x[0, 0], ekf.x[1, 0], ekf.x[2, 0], ekf.x[3, 0])
         knee_angle_cmd = joint_angles[0]
+        # saturation for actuators
+        if knee_angle_cmd > -2: 
+            knee_angle_cmd = -2
+        if knee_angle_cmd < -50: 
+            knee_angle_cmd = -50
+        
         ankle_angle_cmd = joint_angles[1]
+        if ankle_angle_cmd > 18: 
+            ankle_angle_cmd = 18
+        if ankle_angle_cmd < -10: 
+            ankle_angle_cmd = -10
 
         # Estimate percentage within the gait cycle - Output from 0 to 998
         #pv = int(loco.getPhaseVariable_vTwoStates(dataOSL, FCThr = -5)*998) 
-        misclog['PV'][0] = ekf.x[0] # gait phase
+        misclog['PV'][0] = ekf.x[0, 0] # gait phase
         misclog['refAnk'][0] = ankle_angle_cmd
         misclog['refKnee'][0] = knee_angle_cmd
-        loco.log_OSL({**dataOSL,**misclog}, logger)
+
+        state_est['phase'][0] = ekf.x[0, 0]
+        state_est['phase_dot'][0] = ekf.x[1, 0]
+        state_est['stride_length'][0] = ekf.x[2, 0]
+        state_est['ramp'][0] = ekf.x[3, 0]
+
+        loco.log_OSL({**dataOSL,**misclog, **state_est}, logger)
         
         ### Move the OSL
-        #ankMotCou, kneMotCou = loco.joi2motTic(encMap, knee_angle_cmd, ankle_angle_cmd)
-        #fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, ankMotCou)
-        #fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, kneMotCou)
-
+        ankMotCou, kneMotCou = loco.joi2motTic(encMap, knee_angle_cmd, ankle_angle_cmd)
+        fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, ankMotCou)
+        fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, kneMotCou)
 
         elapsed_time = time.time() - start_time
         
-        if ptr%10 == 0:
-            sender.graph(elapsed_time, global_thigh_angle, 'Global Thigh Angle', 'deg',
-                         ekf.z_hat[0], 'Global Thigh Angle Pred', 'deg',
-                         global_thigh_angle_vel_lp, 'Global Thigh Angle Vel', 'deg/s',
-                         ekf.z_hat[1], 'Global Thigh Angle Vel Pred', '-')
+        if ptr%2 == 0:
+            sender.graph(elapsed_time, 
+                         #global_thigh_angle, 'Global Thigh Angle', 'deg',
+                         #ekf.z_hat[0], 'Global Thigh Angle Pred', 'deg',
+                         #global_thigh_angle_vel_lp, 'Global Thigh Angle Vel', 'deg/s',
+                         #ekf.z_hat[1], 'Global Thigh Angle Vel Pred', '-'
+                         #knee_angle, 'knee_angle', 'deg',
+                         #knee_angle_cmd, 'knee_angle_cmd', 'deg',
+                         #ankle_angle, 'ankle_angle', 'deg',
+                         #ankle_angle_cmd, 'ankle_angle_cmd', 'deg'
+                         ekf.x[0, 0], 'phase', '-',
+                         ekf.x[1, 0], 'phase_dot', '1/s',
+                         ekf.x[2, 0], 'step_length', 'm',
+                         ekf.x[3, 0], 'ramp_angle', 'deg'
+                         )
         
         print('Elapsed time:', elapsed_time, ptr)
+        
         ptr+=1
 
-        print("Thigh: {:>10.4f} [deg] || LoadCellFz: {:>10.4f} [N] || Ph. Va.: {:10.4f} "
-            "|| Ref. Ankle: {:10.4f} [deg] || Ref. Knee: {:10.4f} [deg]".format(
-                dataOSL['ThighSagi'][0]*180/np.pi, dataOSL['loadCelFz'][0], ekf.x[0], 
-                ankle_angle_cmd, knee_angle_cmd) )
+        #print("Thigh: {:>10.4f} [deg] || LoadCellFz: {:>10.4f} [N] || Ph. Va.: {:10.4f} "
+        #    "|| Ref. Ankle: {:10.4f} [deg] || Ref. Knee: {:10.4f} [deg]".format(
+        #        dataOSL['ThighSagi'][0]*180/np.pi, dataOSL['loadCelFz'][0], ekf.x[0], 
+        #        ankle_angle_cmd, knee_angle_cmd) )
 except KeyboardInterrupt:
         print('\n*** OSL shutting down ***\n')
 finally:        
