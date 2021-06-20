@@ -3,7 +3,7 @@ def graph(elapsed_time, transmit1, ylabel1, ylabelU1=None, transmit2=None, ylabe
 	import socket
 	import struct
 
-	UDP_IP = "67.194.41.23"	## Change to IP address you are streaming data to
+	UDP_IP = "35.3.40.105"	## Change to IP address you are streaming data to
 	
 	# elapsed time and data streams
 	UDP_PORT0 = 5012

@@ -10,7 +10,7 @@ sys.path.append(r'/usr/share/python3-mscl/')   # Path of the MSCL - API for the 
 import locoOSL as loco                          # Module from Locolab
 import mscl as msl                              # Module from Microstrain
 
-from scipy.signal import butter, lfilter, lfilter_zi
+#from scipy.signal import butter, lfilter, lfilter_zi
 import sender
 import time
 
@@ -84,7 +84,7 @@ try:
         dataOSL = loco.read_OSL(kneSta, ankSta, IMUPac, encoderMap = encMap)
 
         # Read measurement data
-        GlobThighY = dataOSL['ThighSagi'][0] * 180 / np.pi
+        global_thigh_angle = -dataOSL['ThighSagi'][0] * 180 / np.pi
         Ankle_angle = dataOSL['ankJoiPos'][0] * 180 / np.pi
         Knee_angle = dataOSL['kneJoiPos'][0] * 180 / np.pi
         #AnkleForceZ = dataOSL[][0]
@@ -115,13 +115,14 @@ try:
 
         elapsed_time = time.time()-start_time
 
-        transmit1 = GlobThighY
+        transmit1 = global_thigh_angle
         transmit2 = Ankle_angle
         transmit3 = Knee_angle
         transmit4 = 0
         
-        sender.graph(elapsed_time, transmit1, 'Global Thigh Angle', 'deg', transmit2, 'Ankle_angle', 'deg',\
-                     transmit3, 'Knee_angle', 'deg', transmit4, 'none', '-')
+        if ptr%10 == 0:
+            sender.graph(elapsed_time, transmit1, 'Global Thigh Angle', 'deg', transmit2, 'Ankle_angle', 'deg',\
+                        transmit3, 'Knee_angle', 'deg', transmit4, 'none', '-')
         
         print('Elapsed time:', elapsed_time, ptr)
         ptr+=1

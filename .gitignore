@@ -7,3 +7,5 @@ utils/__pycache__/
 *.npz
 *.npy
 *.pickle
+*.log
+*.csv

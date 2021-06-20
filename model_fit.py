@@ -2,10 +2,10 @@ from data_generators import *
 from model_framework import *
 import matplotlib.pyplot as plt
 import numpy as np
-import h5py
+#import h5py
 
 ##Get the names of all the subjects
-subject_names = get_subject_names()
+#subject_names = get_subject_names()
 
 def model_fit(model, mode):
     #mode: input data 

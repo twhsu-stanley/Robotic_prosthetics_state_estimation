@@ -1,6 +1,6 @@
 import numpy as np
 from model_framework import *
-from continuous_data import *
+#from continuous_data import *
 from model_fit import *
 import time
 
@@ -103,14 +103,14 @@ class extended_kalman_filter:
         R = self.R
         #lost = False
         # Detect kidnapping event
-        self.MD = np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) # Mahalanobis distance
-        if self.MD > np.sqrt(22.458): # 6-DOF Chi-square test np.sqrt(22.458)
+        #self.MD = np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) # Mahalanobis distance
+        #if self.MD > np.sqrt(22.458): # 6-DOF Chi-square test np.sqrt(22.458)
             #lost = True
             # scale R of thigh angle vel
             #U = np.diag([1, 1, 1, 1, 1, 1/2])
             #R = U @ R @ U.T
             #print("kd!: ", MD)
-            self.Sigma += np.diag([2e-5, 2e-4, 4e-3, 4])
+            #self.Sigma += np.diag([2e-5, 2e-4, 4e-3, 4])
 
         # innovation covariance
         S = H @ self.Sigma @ H.T + R
