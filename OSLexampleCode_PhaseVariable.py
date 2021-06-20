@@ -191,15 +191,15 @@ try:
 
         # Estimate percentage within the gait cycle - Output from 0 to 998
         #pv = int(loco.getPhaseVariable_vTwoStates(dataOSL, FCThr = -5)*998) 
-        #misclog['PV'][0] = ekf.x[0] # gait phase
-        #misclog['refAnk'][0] = ankle_angle_cmd
-        #misclog['refKnee'][0] = knee_angle_cmd
-        #loco.log_OSL({**dataOSL,**misclog}, logger)
+        misclog['PV'][0] = ekf.x[0, 0] # gait phase
+        misclog['refAnk'][0] = ankle_angle_cmd
+        misclog['refKnee'][0] = knee_angle_cmd
+        loco.log_OSL({**dataOSL,**misclog}, logger)
         
         ### Move the OSL
-        #ankMotCou, kneMotCou = loco.joi2motTic(encMap, knee_angle_cmd, ankle_angle_cmd)
-        #fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, ankMotCou)
-        #fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, kneMotCou)
+        ankMotCou, kneMotCou = loco.joi2motTic(encMap, knee_angle_cmd, ankle_angle_cmd)
+        fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, ankMotCou)
+        fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, kneMotCou)
 
         elapsed_time = time.time() - start_time
         

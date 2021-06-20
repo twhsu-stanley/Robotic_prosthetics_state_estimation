@@ -45,7 +45,7 @@ win.showMaximized()
 # Enable antialiasing for prettier plots
 pg.setConfigOptions(antialias=False)  # set to true for smoother lines (expensive process)
 
-numPoints = 200 ## number of max data points on each plot
+numPoints = 150 ## number of max data points on each plot
 
 class sock:
 	# create socket object 
@@ -183,7 +183,7 @@ soc2.block()
 soc3.block()
 soc4.block()
 
-counter = 3	# counter that determines how many data points to receive 
+counter = 15	# counter that determines how many data points to receive 
 				# before updating the plot
 
 # these will be used to check if there is any delay between the server 
