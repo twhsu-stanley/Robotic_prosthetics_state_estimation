@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import StrMethodFormatter
 from mpl_toolkits import mplot3d
 import time
-from EKF import *
+from ekf import *
 from model_framework import *
 from data_generators import *
 from continuous_data import *

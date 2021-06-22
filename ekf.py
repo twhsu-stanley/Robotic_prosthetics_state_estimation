@@ -62,9 +62,6 @@ class extended_kalman_filter:
         self.x = self.f(self.x, dt)  # predicted state
         self.x[0, 0] = warpToOne(self.x[0, 0]) # wrap to be between 0 and 1
         self.Sigma = self.A(dt) @ self.Sigma @ self.A(dt).T + self.Q  # predicted state covariance
-        
-        # state saturation
-        #self.state_saturation()
 
     def correction(self, z, Psi, arctan2 = False):
         # EKF correction step
@@ -72,7 +69,6 @@ class extended_kalman_filter:
         #   z:  measurement
 
         # evaluate measurement Jacobian at current operating point
-        
         H = self.h.evaluate_dh_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
         
         # predicted measurements
@@ -101,33 +97,27 @@ class extended_kalman_filter:
             self.v[-1] = np.arctan2(np.sin(self.v[-1]), np.cos(self.v[-1]))
 
         R = self.R
-        #lost = False
+        
         # Detect kidnapping event
-        #self.MD = np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) # Mahalanobis distance
-        #if self.MD > np.sqrt(22.458): # 6-DOF Chi-square test np.sqrt(22.458)
+        #lost = False
+        self.MD = np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) # Mahalanobis distance
+        if self.MD > np.sqrt(22.458): # 6-DOF Chi-square test np.sqrt(22.458)
             #lost = True
             # scale R of thigh angle vel
             #U = np.diag([1, 1, 1, 1, 1, 1/2])
             #R = U @ R @ U.T
             #print("kd!: ", MD)
-            #self.Sigma += np.diag([2e-5, 2e-4, 4e-3, 4])
+            self.Sigma += np.diag([2e-5, 2e-4, 4e-3, 4])
 
         # innovation covariance
         S = H @ self.Sigma @ H.T + R
-        # check singularity/invertibility/ of S
 
         # filter gain
         K = self.Sigma @ H.T @ np.linalg.inv(S)
-        
 
         # correct the predicted state statistics
         self.x = self.x + K @ self.v
         self.x[0, 0] = warpToOne(self.x[0, 0])
-        
-        # set phase according to atan2
-        #if lost and arctan2:
-            #print(K @ self.v)
-            #self.x[0, 0] = z[-1] / (2 * np.pi)
 
         I = np.eye(np.shape(self.x)[0])
         self.Sigma = (I - K @ H) @ self.Sigma

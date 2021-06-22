@@ -1,4 +1,4 @@
-#import h5py
+import h5py
 import numpy as np
 from incline_experiment_utils import *
 
@@ -7,7 +7,7 @@ from incline_experiment_utils import *
 # https://ieee-dataport.org/open-access/
 dataset_location = '../'
 filename = 'InclineExperiment.mat'
-#raw_walking_data = h5py.File(dataset_location + filename, 'r')
+raw_walking_data = h5py.File(dataset_location + filename, 'r')
 
 #Example of the structure:
 #left_hip = raw_walking_data['Gaitcycle']['AB01']['s0x8i10']['kinematics']['jointangles']['left']['hip']['x']

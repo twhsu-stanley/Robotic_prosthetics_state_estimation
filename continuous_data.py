@@ -1,10 +1,11 @@
 import numpy as numpy
 import h5py as hp
 import pickle
-import math
+#import math
 from incline_experiment_utils import *
 from model_framework import *
 from model_fit import *
+from scipy.signal import butter, lfilter, lfilter_zi
 
 # Generate measurement data from the "Continuous" data structure
 
@@ -512,14 +513,69 @@ if __name__ == '__main__':
     subject = 'AB09'
     trial = 's1x2d10'
     side = 'left'
-    plot_Conti_joints_control(subject, trial, side)
+    #plot_Conti_joints_control(subject, trial, side)
     #detect_nan()
     #Conti_global_thigh_angle_Y(subject, trial, side)
     #plt.show()
     #plot_Conti_measurement_data(subject, trial, side)
     #Conti_maxmin('AB01', plot = True)
+
+    ######## test real0time filters #############
+    global_thigh_angle_Y, _, _, _, _, _, global_thigh_angVel_2hz, atan2 = load_Conti_measurement_data(subject, trial, side)
     
-    #####################
+    # configure low-pass filter (1-order)
+    nyq = 0.5 * 100
+    normal_cutoff = 2 / nyq
+    b_lp, a_lp = butter(1, normal_cutoff, btype='low', analog=False)
+    z_lp_1 = lfilter_zi(b_lp,  a_lp)
+    z_lp_2 = lfilter_zi(b_lp,  a_lp)
+    # configure band-pass filter (2-order)
+    nyq = 0.5 * 100
+    normal_lowcut = 0.5 / nyq
+    normal_highcut = 2 / nyq
+    b_bp, a_bp = butter(2, [normal_lowcut, normal_highcut], btype='band', analog=False)
+    z_bp = lfilter_zi(b_bp,  a_bp)
+
+    dt = 1/100
+    global_thigh_angle_vel_lp = np.zeros((len(global_thigh_angle_Y), 1))
+    Atan2 = np.zeros((len(global_thigh_angle_Y), 1))
+    for i in range(len(global_thigh_angle_Y)):
+        if i == 0:
+            global_thigh_angle_vel_lp[i] = 0 
+        else:
+            global_thigh_angle_vel = (global_thigh_angle_Y[i] - global_thigh_angle_0) / dt
+            # low-pass filtering
+            vel_lp, z_lp_1 = lfilter(b_lp, a_lp, [global_thigh_angle_vel], zi = z_lp_1)
+            global_thigh_angle_vel_lp[i] = vel_lp[0]
+
+        global_thigh_angle_0 = global_thigh_angle_Y[i]
+
+        # Compute atan2
+        ang_bp, z_bp = lfilter(b_bp, a_bp, [global_thigh_angle_Y[i]], zi = z_bp) 
+        global_thigh_angle_bp = ang_bp[0]
+        if i == 0:
+            global_thigh_angle_vel_blp = 0
+        else:
+            global_thigh_angle_vel_bp = (global_thigh_angle_bp - global_thigh_angle_bp_0) / dt
+            # low-pass filtering
+            vel_blp, z_lp_2 = lfilter(b_lp, a_lp, [global_thigh_angle_vel_bp], zi = z_lp_2)
+            global_thigh_angle_vel_blp = vel_blp[0]
+
+        global_thigh_angle_bp_0 = global_thigh_angle_bp
+
+        Atan2[i] = np.arctan2(-global_thigh_angle_vel_blp / (2*np.pi*0.8), global_thigh_angle_bp)
+        if Atan2[i] < 0:
+            Atan2[i] = Atan2[i] + 2 * np.pi
+
+    plt.figure()
+    plt.plot(global_thigh_angle_vel_lp, 'r-')
+    plt.plot(global_thigh_angVel_2hz, 'k--')
+    plt.figure()
+    plt.plot(Atan2, 'r-')
+    plt.plot(atan2, 'k--')
+    plt.show()
+
+    #############################################
     """
     dt = get_time_step(subject)
     with open('Gait_cycle_data/Global_thigh_angle.npz', 'rb') as file:
