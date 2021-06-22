@@ -578,7 +578,7 @@ if __name__ == '__main__':
     trial = 's0x8i10'
     side = 'left'
 
-    ekf_test(subject, trial, side, kidnap = [0, 1, 2, 3], plot = True)
+    ekf_test(subject, trial, side, kidnap = False, plot = True)
     #ekf_bank_test(subject, trial, side, N = 40, kidnap = [0, 1, 2, 3], plot = True)
     #ekf_robustness(kidnap = True)
     #print(np.diag(R[subject]))

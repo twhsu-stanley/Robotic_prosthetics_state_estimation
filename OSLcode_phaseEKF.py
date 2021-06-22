@@ -179,8 +179,6 @@ try:
         if Atan2 < 0:
             Atan2 = Atan2 + 2 * np.pi
 
-        """ PLOT ATAN2 before testing the filters """
-
         measurement = np.array([[global_thigh_angle], [global_thigh_angle_vel_lp], [Atan2]])
         measurement = np.squeeze(measurement)
 

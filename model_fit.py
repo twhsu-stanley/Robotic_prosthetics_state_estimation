@@ -2,6 +2,7 @@ from data_generators import *
 from model_framework import *
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
 #import h5py
 
 ##Get the names of all the subjects
@@ -178,54 +179,74 @@ def model_fit(model, mode):
     return PSI
 
 #def load_Psi():
-def load_Psi(subject='AB01'):    
+def load_Psi(subject = 'Generic'):
+    if subject == 'Generic':
+        with open('Psi/PikPsi_thigh_Y_G.pickle', 'rb') as file:
+            Psi_thigh_Y = pickle.load(file)
+        with open('Psi/PikPsi_force_Z_G.pickle', 'rb') as file:
+            Psi_force_Z = pickle.load(file)
+        with open('Psi/PikPsi_force_X_G.pickle', 'rb') as file:
+            Psi_force_X = pickle.load(file)
+        with open('Psi/PikPsi_moment_Y_G.pickle', 'rb') as file:
+            Psi_moment_Y = pickle.load(file)
+        with open('Psi/PikPsi_thighVel_2hz_G.pickle', 'rb') as file:
+            Psi_thighVel_2hz = pickle.load(file)
+        with open('Psi/PikPsi_atan2_G.pickle', 'rb') as file:
+            Psi_atan2 = pickle.load(file)
+    else:
+        with open('Psi/PikPsi_thigh_Y.pickle', 'rb') as file:
+            p = pickle.load(file)
+            Psi_thigh_Y = p[subject]
+        with open('Psi/PikPsi_force_Z.pickle', 'rb') as file:
+            p = pickle.load(file)
+            Psi_force_Z = p[subject]
+        with open('Psi/PikPsi_force_X.pickle', 'rb') as file:
+            p = pickle.load(file)
+            Psi_force_X = p[subject]
+        with open('Psi/PikPsi_moment_Y.pickle', 'rb') as file:
+            p = pickle.load(file)
+            Psi_moment_Y = p[subject]
+        with open('Psi/PikPsi_thighVel_2hz.pickle', 'rb') as file:
+            p = pickle.load(file)
+            Psi_thighVel_2hz = p[subject]
+        with open('Psi/PikPsi_atan2.pickle', 'rb') as file:
+            p = pickle.load(file)
+            Psi_atan2 = p[subject]
     #with open('Psi/Psi_thigh_Y.npz', 'rb') as file:
     #    p = np.load(file, allow_pickle = True)
     #    Psi_thigh_Y = p['arr_0'].item()[subject]
-    with open('PikPsi_thigh_Y_G.pickle', 'rb') as file:
-        Psi_thigh_Y = pickle.load(file)
-
     #with open('Psi/Psi_force_Z.npz', 'rb') as file:
     #    p = np.load(file, allow_pickle = True)
     #    Psi_force_Z = p['arr_0'].item()[subject]
-    with open('PikPsi_force_Z_G.pickle', 'rb') as file:
-        Psi_force_Z = pickle.load(file)
-
     #with open('Psi/Psi_force_X.npz', 'rb') as file:
     #    p = np.load(file, allow_pickle = True)
     #    Psi_force_X = p['arr_0'].item()[subject]
-    with open('PikPsi_force_X_G.pickle', 'rb') as file:
-        Psi_force_X = pickle.load(file)
-
     #with open('Psi/Psi_moment_Y.npz', 'rb') as file:
     #    p = np.load(file, allow_pickle = True)
     #    Psi_moment_Y = p['arr_0'].item()[subject]
-    with open('PikPsi_moment_Y_G.pickle', 'rb') as file:
-        Psi_moment_Y = pickle.load(file)
-   
-    with open('Psi/Psi_thighVel_5hz.npz', 'rb') as file:
+    
+    #### probably not using this anymore, should be deleted eventually ####
+    subject = 'AB10'
+    with open('Psi_npz/Psi_thighVel_5hz.npz', 'rb') as file:
         p = np.load(file, allow_pickle = True)
         Psi_thighVel_5hz = p['arr_0'].item()[subject]
     
-    with open('Psi/Psi_thighVel_2x5hz.npz', 'rb') as file:
+    with open('Psi_npz/Psi_thighVel_2x5hz.npz', 'rb') as file:
         p = np.load(file, allow_pickle = True)
         Psi_thighVel_2x5hz = p['arr_0'].item()[subject]
+    #######################################################################
     
     #with open('Psi/Psi_thighVel_2hz_p.npz', 'rb') as file:
     #    p = np.load(file, allow_pickle = True)
     #    Psi_thighVel_2hz = p['arr_0'].item()[subject]
-    with open('PikPsi_thighVel_2hz_G.pickle', 'rb') as file:
-        Psi_thighVel_2hz = pickle.load(file)
+    
     
     #with open('Psi/Psi_atan2_s_p.npz', 'rb') as file:
     #   p = np.load(file, allow_pickle = True)
     #    Psi_atan2 = p['arr_0'].item()[subject]
-    with open('PikPsi_atan2_G.pickle', 'rb') as file:
-        Psi_atan2 = pickle.load(file)
-
+    
     Psi = np.array([Psi_thigh_Y, Psi_force_Z, Psi_force_X, Psi_moment_Y,\
                     Psi_thighVel_5hz, Psi_thighVel_2x5hz, Psi_thighVel_2hz, Psi_atan2], dtype = object)
-    
     return Psi
 
 def measurement_error_cov(subject):

@@ -7,9 +7,9 @@ import time
 ###### load control model & coefficients (for OSL implementation) ######
 c_model = model_loader('Control_model.pickle')
 
-with open('PikPsi_knee_G.pickle', 'rb') as file:
+with open('Psi/PikPsi_knee_G.pickle', 'rb') as file:
     Psi_knee = pickle.load(file)
-with open('PikPsi_ankle_G.pickle', 'rb') as file:
+with open('Psi/PikPsi_ankle_G.pickle', 'rb') as file:
     Psi_ankle = pickle.load(file)
 ########################################################################
 

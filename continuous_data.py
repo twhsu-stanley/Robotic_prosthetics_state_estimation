@@ -129,7 +129,7 @@ def plot_Conti_measurement_data(subject, trial, side):
                                          global_thigh_angVel_5hz, global_thigh_angVel_2x5hz, global_thigh_angVel_2hz, atan2\
                                          = load_Conti_measurement_data(subject, trial, side)
     m_model = model_loader('Measurement_model_6_sp.pickle') # load new model w/ linear phase_dot
-    Psi = load_Psi(subject)
+    Psi = load_Psi('Generic')
 
     global_thigh_angle_Y_pred = model_prediction(m_model.models[0], Psi[0], phases, phase_dots, step_lengths, ramps)
     force_z_ankle_pred = model_prediction(m_model.models[1], Psi[1], phases, phase_dots, step_lengths, ramps)
@@ -410,9 +410,9 @@ def plot_Conti_joints_control(subject, trial, side):
     
     c_model = model_loader('Control_model.pickle')
 
-    with open('PikPsi_knee_G.pickle', 'rb') as file:
+    with open('Psi/PikPsi_knee_G.pickle', 'rb') as file:
         Psi_knee = pickle.load(file)
-    with open('PikPsi_ankle_G.pickle', 'rb') as file:
+    with open('Psi/PikPsi_ankle_G.pickle', 'rb') as file:
         Psi_ankle = pickle.load(file)
     
     knee_angle_pred = model_prediction(c_model.models[0], Psi_knee, phases, phase_dots, step_lengths, ramps)
@@ -422,10 +422,12 @@ def plot_Conti_joints_control(subject, trial, side):
     plt.subplot(211)
     plt.plot(knee_angle, 'k-')
     plt.plot(knee_angle_pred, 'b--')
+    plt.ylabel('knee angle')
     plt.legend(('actual', 'least squares'))
     plt.subplot(212)
     plt.plot(ankle_angle, 'k-')
     plt.plot(ankle_angle_pred, 'b--')
+    plt.ylabel('ankle angle')
     plt.show()
 
 if __name__ == '__main__':
@@ -510,10 +512,20 @@ if __name__ == '__main__':
     	pickle.dump(Continuous_measurement_data, file)
 
     """
-    subject = 'AB09'
-    trial = 's1x2d10'
+    subject = 'AB01'
+    trial = 's0x8i0'
     side = 'left'
-    #plot_Conti_joints_control(subject, trial, side)
+    #jointangles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]
+    #k_Y = -jointangles['knee'][0, :]
+    #k_X = -jointangles['knee'][1, :]
+    #k_Z = -jointangles['knee'][2, :]
+    #plt.plot(k_Y)
+    #plt.plot(k_X)
+    #plt.plot(k_Z)
+    #plt.legend(('Y', 'X', 'Z'))
+    #plt.show()
+
+    plot_Conti_joints_control(subject, trial, side)
     #detect_nan()
     #Conti_global_thigh_angle_Y(subject, trial, side)
     #plt.show()
@@ -521,6 +533,7 @@ if __name__ == '__main__':
     #Conti_maxmin('AB01', plot = True)
 
     ######## test real0time filters #############
+    """
     global_thigh_angle_Y, _, _, _, _, _, global_thigh_angVel_2hz, atan2 = load_Conti_measurement_data(subject, trial, side)
     
     # configure low-pass filter (1-order)
@@ -574,8 +587,9 @@ if __name__ == '__main__':
     plt.plot(Atan2, 'r-')
     plt.plot(atan2, 'k--')
     plt.show()
-
+    """
     #############################################
+
     """
     dt = get_time_step(subject)
     with open('Gait_cycle_data/Global_thigh_angle.npz', 'rb') as file:
