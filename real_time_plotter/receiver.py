@@ -96,7 +96,7 @@ time.sleep(0.5) # gives extra time for sockets to be created
 # Making the first plot
 p1 = win.addPlot() ## setting plot name
 #p1.setTitle('',**{'size': '40pt'})
-curve1 = p1.plot(pen=pg.mkPen(width = 15, color=(217, 83, 25))) ## setting plot color
+curve1 = p1.plot(pen=pg.mkPen(width = 10, color=(217, 83, 25))) ## setting plot color
 ylabel1 = soc5.read_str()
 ylabelU1 = soc9.read_str()
 p1.setLabel('left', ylabel1, units = ylabelU1, **{'font-size':'30pt'}) ## setting y-axis label and units
@@ -117,7 +117,7 @@ try:
 	soc2.read_data()
 	p2 = win.addPlot() # creating the graph
 	#p2.setTitle('',**{'size': '40pt'})
-	curve2 = p2.plot(pen=pg.mkPen(width = 15, color=(0, 114, 189)))
+	curve2 = p2.plot(pen=pg.mkPen(width = 10, color=(0, 114, 189)))
 	ylabel2 = soc6.read_str()
 	ylabelU2 = soc10.read_str()
 	p2.setLabel('left', ylabel2, units = ylabelU2, **{'font-size':'30pt'}) 
@@ -138,7 +138,7 @@ try:
 	win.nextRow() # creates new row of plots
 	p3 = win.addPlot() # creating the graph
 	#p3.setTitle('',**{'size': '40pt'})
-	curve3 = p3.plot(pen=pg.mkPen(width = 15, color=(162, 20, 47)))
+	curve3 = p3.plot(pen=pg.mkPen(width = 10, color=(162, 20, 47)))
 	ylabel3 = soc7.read_str()
 	ylabelU3 = soc11.read_str()
 	p3.setLabel('left', ylabel3, units = ylabelU3, **{'font-size':'30pt'})
@@ -158,7 +158,7 @@ try:
 	soc4.read_data()
 	p4 = win.addPlot() # creating the graph
 	#p4.setTitle('',**{'size': '40pt'})
-	curve4 = p4.plot(pen=pg.mkPen(width = 15, color=(126, 47, 142), style=QtCore.Qt.SolidLine))
+	curve4 = p4.plot(pen=pg.mkPen(width = 10, color=(126, 47, 142), style=QtCore.Qt.SolidLine))
 	ylabel4 = soc8.read_str()
 	ylabelU4 = soc12.read_str()
 	p4.setLabel('left', ylabel4, units = ylabelU4, **{'font-size':'30pt'}) 

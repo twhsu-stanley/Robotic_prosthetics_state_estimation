@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import csv
-logFile = r"/home/pi/OSL/210617_121732_PV_Siavash_walk.csv"
+logFile = r"210616_173226_PV_Siavash_swing.csv"
 
 
 

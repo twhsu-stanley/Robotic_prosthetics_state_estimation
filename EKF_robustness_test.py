@@ -298,7 +298,6 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         plt.xlabel("time (s)")
         """
         plt.show()
-
     return result
 
 def ekf_bank_test(subject, trial, side, N = 30, kidnap = [0,1,2,3], plot = True):

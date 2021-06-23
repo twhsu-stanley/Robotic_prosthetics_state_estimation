@@ -512,20 +512,42 @@ if __name__ == '__main__':
     	pickle.dump(Continuous_measurement_data, file)
 
     """
+
+    ##### Find the saturation range for all subjects ###############
+    phase_dots_max = np.zeros((10,1))
+    phase_dots_min = np.zeros((10,1))
+    step_lengths_max = np.zeros((10,1))
+    step_lengths_min = np.zeros((10,1))
+    s = 0
+    for subject in Conti_subject_names():
+        saturation_range = Conti_maxmin(subject, plot = False)
+        #print(saturation_range)
+        phase_dots_max[s] = saturation_range[0]
+        phase_dots_min[s] = saturation_range[1]
+        step_lengths_max[s] = saturation_range[2]
+        step_lengths_min[s] = saturation_range[3]
+        s += 1
+    print("phase_dots_max = ", np.min(phase_dots_max))
+    print("phase_dots_min = ", np.max(phase_dots_min))
+    print("step_lengths_max = ", np.min(step_lengths_max))
+    print("step_lengths_min = ", np.max(step_lengths_min))
+    ##################################################################
+    
     subject = 'AB01'
     trial = 's0x8i0'
     side = 'left'
-    #jointangles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]
-    #k_Y = -jointangles['knee'][0, :]
+    jointangles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]
+    k_Y = -jointangles['knee'][0, :]
     #k_X = -jointangles['knee'][1, :]
     #k_Z = -jointangles['knee'][2, :]
-    #plt.plot(k_Y)
+    plt.plot(k_Y)
     #plt.plot(k_X)
     #plt.plot(k_Z)
     #plt.legend(('Y', 'X', 'Z'))
-    #plt.show()
+    plt.ylabel('knee angle')
+    plt.show()
 
-    plot_Conti_joints_control(subject, trial, side)
+    #plot_Conti_joints_control(subject, trial, side)
     #detect_nan()
     #Conti_global_thigh_angle_Y(subject, trial, side)
     #plt.show()
