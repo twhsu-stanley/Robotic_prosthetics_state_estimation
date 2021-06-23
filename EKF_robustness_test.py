@@ -321,7 +321,7 @@ def ekf_bank_test(subject, trial, side, N = 30, kidnap = [0,1,2,3], plot = True)
     z = np.squeeze(z)
     z = z[sensors, :]
 
-    Psi = load_Psi(subject)[sensors]
+    Psi = load_Psi('Generic')[sensors]
     saturation_range = Conti_maxmin(subject, plot = False)
 
     # build the system
@@ -332,7 +332,7 @@ def ekf_bank_test(subject, trial, side, N = 30, kidnap = [0,1,2,3], plot = True)
     sys.Q = np.diag([0, 1e-5, 1e-5, 1e-1]) #[0, 6e-5, 1e-6, 1e-1] #process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
     # measurement noise covariance
     sys.R = R[subject][np.ix_(sensors, sensors)]
-    U = np.diag([2, 2, 2, 2, 2, 2])
+    U = np.diag([2, 2, 2])
     sys.R = U @ sys.R @ U.T
     
     init = myStruct()
@@ -573,11 +573,11 @@ def ekf_robustness(kidnap = True):
     return robustness
 
 if __name__ == '__main__':
-    subject = 'AB01'
-    trial = 's0x8i10'
-    side = 'left'
+    subject = 'AB05'
+    trial = 's0x8d10'
+    side = 'right'
 
-    ekf_test(subject, trial, side, kidnap = False, plot = True)
-    #ekf_bank_test(subject, trial, side, N = 40, kidnap = [0, 1, 2, 3], plot = True)
+    #ekf_test(subject, trial, side, kidnap = False, plot = True)
+    ekf_bank_test(subject, trial, side, N = 20, kidnap = [0, 1, 2, 3], plot = True)
     #ekf_robustness(kidnap = True)
     #print(np.diag(R[subject]))

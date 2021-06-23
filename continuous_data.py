@@ -527,10 +527,10 @@ if __name__ == '__main__':
         step_lengths_max[s] = saturation_range[2]
         step_lengths_min[s] = saturation_range[3]
         s += 1
-    print("phase_dots_max = ", np.min(phase_dots_max))
-    print("phase_dots_min = ", np.max(phase_dots_min))
-    print("step_lengths_max = ", np.min(step_lengths_max))
-    print("step_lengths_min = ", np.max(step_lengths_min))
+    print("phase_dots_max = ", np.max(phase_dots_max))
+    print("phase_dots_min = ", np.min(phase_dots_min))
+    print("step_lengths_max = ", np.max(step_lengths_max))
+    print("step_lengths_min = ", np.min(step_lengths_min))
     ##################################################################
     
     subject = 'AB01'
