@@ -99,9 +99,9 @@ time.sleep(0.5) # gives extra time for sockets to be created
 # Making the first plot
 p1 = win.addPlot() ## setting plot name
 #p1.setTitle('',**{'size': '40pt'})
-curve1 = p1.plot(pen=pg.mkPen(width = 10, color=(217, 83, 25))) ## setting plot color
+curve1 = p1.plot(pen=pg.mkPen(width = 10, color=(217, 83, 25)), name = '1') ## setting plot color
 #### additional data streams #######################################################################
-curve1_2 = p1.plot(pen=pg.mkPen(width = 10, color=(27, 218, 211))) ## setting plot color
+curve1_2 = p1.plot(pen=pg.mkPen(width = 10, color=(27, 218, 211)), name = '2') ## setting plot color
 ####################################################################################################
 ylabel1 = soc5.read_str()
 ylabelU1 = soc9.read_str()
@@ -112,6 +112,7 @@ p1.getAxis('left').setStyle(textFillLimits=[(0,0.2)])
 datay1 = [0]*numPoints ## initializing with all zeros on plot
 #### additional data streams #####################################################################
 datay1_2 = [0]*numPoints ## initializing with all zeros on plot
+p1.setLegend()
 ##################################################################################################
 p1.enableAutoRange('y', True) # auto rescale of y-axis
 p1.getAxis('left').setWidth(140)

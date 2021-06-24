@@ -3,10 +3,7 @@ import matplotlib.pyplot as plt
 import csv
 logFile = r"210616_173226_PV_Siavash_swing.csv"
 
-
-
 datatxt = np.genfromtxt(logFile , delimiter=',', names=True)
-
 
 #names to be tracked from the log file
 var1 = "ankMotTic"

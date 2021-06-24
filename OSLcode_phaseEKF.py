@@ -105,7 +105,7 @@ try:
     sys.h = m_model
     sys.Q = np.diag([0, 1e-5, 1e-10, 1e-5]) #[0, 6e-5, 1e-6, 1e-1] #process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
     # measurement noise covariance
-    sys.R = R['AB01'][np.ix_(sensors, sensors)]
+    sys.R = R['Generic'][np.ix_(sensors, sensors)]
     U = np.diag([2, 2, 2])
     sys.R = U @ sys.R @ U.T
 
@@ -242,7 +242,7 @@ try:
                          # Atan2, 'atan2', '-'
                          # ekf.z_hat[2], 'atan2 Pred', '-'
                          #knee_angle, 'knee_angle', 'deg',
-                         knee_angle_model, 'knee_angle_model', 'deg',
+                         knee_angle_cmd, knee_angle_model, 'knee_angle', 'deg', # additional data stream to the same plot
                          #knee_angle_cmd, 'knee_angle_cmd', 'deg',
                          #ankle_angle, 'ankle_angle', 'deg',
                          #ankle_angle_cmd, 'ankle_angle_cmd', 'deg',

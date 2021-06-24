@@ -21,7 +21,7 @@ from model_fit import *
 # 1: force_z_ankle, 2: force_x_ankle; 3: moment_y_ankle;
 # 4: global_thigh_angVel_5hz; 5: global_thigh_angVel_2x5hz; 6: global_thigh_angVel_2hz;
 # 7: atan2
-sensors = [0, 1, 2, 3, 6, 7] # [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1] looks good
+sensors = [0, 6, 7] # [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1] looks good
 arctan2 = False
 if sensors[-1] == 7:
     arctan2 = True
@@ -70,7 +70,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     sys.h = m_model
     sys.Q = np.diag([0, 1e-7, 1e-7, 1e-3]) #[0, 1e-5, 1e-5, 1e-1]
     # measurement noise covariance
-    sys.R = R[subject][np.ix_(sensors, sensors)]
+    sys.R = R['Generic'][np.ix_(sensors, sensors)]
     U = np.diag([2, 2, 2,2,2,2])
     sys.R = U @ sys.R @ U.T
 
@@ -332,7 +332,7 @@ def ekf_bank_test(subject, trial, side, N = 30, kidnap = [0,1,2,3], plot = True)
     sys.h = m_model
     sys.Q = np.diag([0, 1e-5, 1e-5, 1e-1]) #[0, 6e-5, 1e-6, 1e-1] #process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
     # measurement noise covariance
-    sys.R = R[subject][np.ix_(sensors, sensors)]
+    sys.R = R['Generic'][np.ix_(sensors, sensors)]
     U = np.diag([2, 2, 2])
     sys.R = U @ sys.R @ U.T
     
@@ -578,7 +578,7 @@ if __name__ == '__main__':
     trial = 's0x8d10'
     side = 'left'
 
-    ekf_test(subject, trial, side, kidnap = False, plot = True)
-    #ekf_bank_test(subject, trial, side, N = 20, kidnap = [0, 1, 2, 3], plot = True)
+    #ekf_test(subject, trial, side, kidnap = False, plot = True)
+    ekf_bank_test(subject, trial, side, N = 20, kidnap = [0, 1, 2, 3], plot = True)
     #ekf_robustness(kidnap = True)
     #print(np.diag(R[subject]))

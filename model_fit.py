@@ -6,7 +6,7 @@ import sys
 #import h5py
 
 ##Get the names of all the subjects
-#subject_names = get_subject_names()
+subject_names = get_subject_names()
 
 def model_fit(model, mode):
     #mode: input data 
@@ -412,6 +412,20 @@ def Psi_to_pickle():
 
 if __name__ == '__main__':
     
+    with open('R_s.pickle', 'rb') as file:
+        R = pickle.load(file)
+    R_sum = np.zeros((8,8))
+    for subject in subject_names:
+        R_sum += R[subject]
+        #print(subject)
+        #print(R[subject])
+    R_sum /= 10
+    #print("R=", R_sum)
+    R['Generic'] = R_sum
+    
+    with open('R_s_2.pickle', 'wb') as file:
+    	pickle.dump(R, file)
+
     # dictionary storing all measurement model coefficients
     #Measurement_model_coeff = dict()
     #Measurement_model_RMSE = dict()
