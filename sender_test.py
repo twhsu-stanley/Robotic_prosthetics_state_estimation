@@ -1,5 +1,8 @@
-def graph(elapsed_time, transmit1, ylabel1, ylabelU1=None, transmit2=None, ylabel2=None, ylabelU2=None,
-			transmit3=None, ylabel3=None, ylabelU3=None, transmit4=None, ylabel4=None, ylabelU4=None):
+def graph(elapsed_time, 
+          transmit1, transmit1_2, ylabel1, ylabelU1=None,
+		  transmit2=None, ylabel2=None, ylabelU2=None,
+		  transmit3=None, ylabel3=None, ylabelU3=None, 
+		  transmit4=None, ylabel4=None, ylabelU4=None):
 	import socket
 	import struct
 
@@ -11,6 +14,13 @@ def graph(elapsed_time, transmit1, ylabel1, ylabelU1=None, transmit2=None, ylabe
 	UDP_PORT2 = 5014
 	UDP_PORT3 = 5015
 	UDP_PORT4 = 5016
+
+	### additional data streams ###
+	UDP_PORT1_2 = 5025
+	UDP_PORT2_2 = 5026
+	UDP_PORT3_2 = 5027
+	UDP_PORT4_2 = 5028
+	###############################
 
 	# y labels
 	UDP_PORTY1 = 5017
@@ -31,6 +41,10 @@ def graph(elapsed_time, transmit1, ylabel1, ylabelU1=None, transmit2=None, ylabe
 	sock.sendto(data0, (UDP_IP, UDP_PORT0))
 	data1 =struct.pack('d', transmit1)
 	sock.sendto(data1, (UDP_IP, UDP_PORT1))
+	##### additional data streams #########################
+	data1_2 =struct.pack('d', transmit1_2)
+	sock.sendto(data1_2, (UDP_IP, UDP_PORT1_2))
+	#######################################################
 	sock.sendto(ylabel1.encode(), (UDP_IP, UDP_PORTY1))
 	sock.sendto(ylabelU1.encode(), (UDP_IP, UDP_PORTU1))
 	if transmit2 is not None:

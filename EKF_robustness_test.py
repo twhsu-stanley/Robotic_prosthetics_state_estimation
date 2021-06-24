@@ -21,7 +21,7 @@ from model_fit import *
 # 1: force_z_ankle, 2: force_x_ankle; 3: moment_y_ankle;
 # 4: global_thigh_angVel_5hz; 5: global_thigh_angVel_2x5hz; 6: global_thigh_angVel_2hz;
 # 7: atan2
-sensors = [0, 6, 7] # [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1] looks good
+sensors = [0, 1, 2, 3, 6, 7] # [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1] looks good
 arctan2 = False
 if sensors[-1] == 7:
     arctan2 = True
@@ -60,7 +60,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     z = np.squeeze(z)
     z = z[sensors, :]
 
-    Psi = load_Psi(subject)[sensors]
+    Psi = load_Psi('Generic')[sensors]  # use generic model
     saturation_range = Conti_maxmin(subject, plot = False)
 
     # build the system
@@ -68,10 +68,10 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-5, 1e-5, 1e-1]) #[0, 6e-5, 1e-6, 1e-1] #process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
+    sys.Q = np.diag([0, 1e-7, 1e-7, 1e-3]) #[0, 1e-5, 1e-5, 1e-1]
     # measurement noise covariance
     sys.R = R[subject][np.ix_(sensors, sensors)]
-    U = np.diag([2, 2, 2])
+    U = np.diag([2, 2, 2,2,2,2])
     sys.R = U @ sys.R @ U.T
 
     # initialize the state
@@ -237,7 +237,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         plt.ylabel('ankle angle')
         plt.xlabel('time (s)')
 
-        """
+        
         plt.figure("Original Measurements")
         plt.subplot(411)
         plt.title("Original Measurements")
@@ -268,6 +268,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         plt.xlabel("time (s)")
         
         plt.figure("Auxiliary Measurements")
+        """
         plt.subplot(411)
         plt.title("Original Measurements")
         plt.plot(tt, z[4, 0:total_step], 'k-')
@@ -282,21 +283,21 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         plt.ylabel('$\dot{\\theta}_{Y_{2.5Hz}} ~(deg/s)$')
         #plt.ylim([-150, 150])
         plt.xlim([0, tt[-1]+0.1])
-        
-        plt.subplot(413)
-        plt.plot(tt, z[6, 0:total_step], 'k-')
-        plt.plot(tt, z_pred[:, 6], 'r--')
+        """
+        plt.subplot(211)
+        plt.plot(tt, z[4, 0:total_step], 'k-')
+        plt.plot(tt, z_pred[:, 4], 'r--')
         plt.ylabel('$\dot{\\theta}_{Y_{2Hz}} ~(deg/s)$')
         #plt.ylim([-150, 150])
         plt.xlim([0, tt[-1]+0.1])
-        plt.subplot(414)
-        plt.plot(tt, z[7, 0:total_step], 'k-')
-        plt.plot(tt, z_pred[:, 7], 'r--')
+        plt.subplot(212)
+        plt.plot(tt, z[5, 0:total_step], 'k-')
+        plt.plot(tt, z_pred[:, 5], 'r--')
         plt.ylabel('$atan2$')
         plt.ylim([0, 10])
         plt.xlim([0, tt[-1]+0.1])
         plt.xlabel("time (s)")
-        """
+        
         plt.show()
     return result
 
@@ -573,11 +574,11 @@ def ekf_robustness(kidnap = True):
     return robustness
 
 if __name__ == '__main__':
-    subject = 'AB05'
+    subject = 'AB02'
     trial = 's0x8d10'
-    side = 'right'
+    side = 'left'
 
-    #ekf_test(subject, trial, side, kidnap = False, plot = True)
-    ekf_bank_test(subject, trial, side, N = 20, kidnap = [0, 1, 2, 3], plot = True)
+    ekf_test(subject, trial, side, kidnap = False, plot = True)
+    #ekf_bank_test(subject, trial, side, N = 20, kidnap = [0, 1, 2, 3], plot = True)
     #ekf_robustness(kidnap = True)
     #print(np.diag(R[subject]))

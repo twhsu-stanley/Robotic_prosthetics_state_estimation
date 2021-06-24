@@ -29,7 +29,7 @@ import sys
 import struct
 import time
 
-input("Press Enter to start...")
+#input("Press Enter to start...")
 print('')
 
 app = QtGui.QApplication([])
@@ -78,6 +78,9 @@ soc1 = sock(5013)
 soc2 = sock(5014)
 soc3 = sock(5015)
 soc4 = sock(5016)
+#### additional data streams #############
+soc1_2 = sock(5025)
+##########################################
 
 # create sockets for y axis labels
 soc5 = sock(5017)
@@ -97,13 +100,19 @@ time.sleep(0.5) # gives extra time for sockets to be created
 p1 = win.addPlot() ## setting plot name
 #p1.setTitle('',**{'size': '40pt'})
 curve1 = p1.plot(pen=pg.mkPen(width = 10, color=(217, 83, 25))) ## setting plot color
+#### additional data streams #######################################################################
+curve1_2 = p1.plot(pen=pg.mkPen(width = 10, color=(27, 218, 211))) ## setting plot color
+####################################################################################################
 ylabel1 = soc5.read_str()
 ylabelU1 = soc9.read_str()
 p1.setLabel('left', ylabel1, units = ylabelU1, **{'font-size':'20pt'}) ## setting y-axis label and units
 p1.getAxis('left').tickFont = tickFont ## setting tick font
 p1.getAxis('bottom').setStyle(showValues=False)
 p1.getAxis('left').setStyle(textFillLimits=[(0,0.2)])
-datay1 = [0]*numPoints ## initializing with all zeros on plot	
+datay1 = [0]*numPoints ## initializing with all zeros on plot
+#### additional data streams #####################################################################
+datay1_2 = [0]*numPoints ## initializing with all zeros on plot
+##################################################################################################
 p1.enableAutoRange('y', True) # auto rescale of y-axis
 p1.getAxis('left').setWidth(140)
 p1.showGrid(y=True, alpha = 0.5)
@@ -175,13 +184,15 @@ except socket.error:
 	
 
 # setting soc0-soc4 to blocking.
-# we don't care to set the rest to blocking
-# because they won't be used anymore
+# we don't care to set the rest to blocking because they won't be used anymore
 soc0.block()
 soc1.block()
 soc2.block()
 soc3.block()
 soc4.block()
+## additional datastreams ##########################################################
+soc1_2.block()
+####################################################################################
 
 counter = 15	# counter that determines how many data points to receive 
 				# before updating the plot
@@ -192,7 +203,10 @@ start_time_receiver = time.time()
 start_time_sender = soc0.read_data()
 
 def update():
-	global ptr, counter, fps, lastTime, curve1, curve2, curve3, curve4, datay1, datay2, datay3, datay4, p1, p2, p3, p4
+	global ptr, counter, fps, lastTime,\
+	       curve1, curve1_2, curve2, curve3, curve4,\
+		   datay1, datay1_2, datay2, datay3, datay4,\
+		   p1, p2, p3, p4
 	
 	elapsed_time_receiver = time.time()-start_time_receiver
 	sender_time = soc0.read_data()
@@ -200,6 +214,9 @@ def update():
 	lag = elapsed_time_receiver-elapsed_time_sender
 	
 	ys1 = soc1.read_data() # reading in plot 1 data
+	#### additional datastreams #####################################################
+	ys1_2 = soc1_2.read_data()
+	#################################################################################
 	# reading in other plots' data if the plot was made
 	if numGraphs > 1:
 		ys2 = soc2.read_data()
@@ -209,6 +226,9 @@ def update():
 		ys4 = soc4.read_data()
 	
 	datay1.append(ys1)
+	##
+	datay1_2.append(ys1_2)
+	##
 	if numGraphs > 1:
 		datay2.append(ys2)
 	if numGraphs > 2:
@@ -217,6 +237,9 @@ def update():
 		datay4.append(ys4)
 	
 	datay1 = datay1[-numPoints:]
+	#### additional datastreams ######################################################
+	datay1_2 = datay1_2[-numPoints:]
+	##################################################################################
 	if numGraphs > 1:
 		datay2 = datay2[-numPoints:]
 	if numGraphs > 2:
@@ -237,6 +260,9 @@ def update():
 	if ptr % counter==0:
 		# updating plots
 		curve1.setData(datay1)
+		#### additional datastreams ###################################################
+		curve1_2.setData(datay1_2)
+		###############################################################################
 		if numGraphs > 1:
 			curve2.setData(datay2)
 		if numGraphs > 2:

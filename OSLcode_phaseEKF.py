@@ -12,7 +12,7 @@ sys.path.append(r'/home/pi/OSL-master/locoAPI/') # Path to Loco module
 sys.path.append(r'/usr/share/python3-mscl/')     # Path of the MSCL - API for the IMU
 import locoOSL as loco                           # Module from Locolab
 import mscl as msl                               # Module from Microstrain
-import sender                                    # for real-time plotting
+
 
 sys.path.append(r'/home/pi/prosthetic_phase_estimation/')
 from ekf import *
@@ -21,6 +21,7 @@ from model_framework import *
 #from continuous_data import *
 from model_fit import load_Psi
 from scipy.signal import butter, lfilter, lfilter_zi
+import sender                                    # for real-time plotting
 
 # Process model for the EKF
 def A(dt):
