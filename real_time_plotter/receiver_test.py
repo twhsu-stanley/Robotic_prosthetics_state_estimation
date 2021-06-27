@@ -29,7 +29,7 @@ import sys
 import struct
 import time
 
-#input("Press Enter to start...")
+input("Press Enter to start...")
 print('')
 
 app = QtGui.QApplication([])

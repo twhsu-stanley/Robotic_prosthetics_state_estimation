@@ -4,7 +4,7 @@ Code to test drive the phase variable for level-ground walking
 import sys, time, os
 from flexsea import flexsea as flex
 from flexsea import fxEnums as fxe
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import numpy as np
 
 sys.path.append(r'/home/pi/OSL-master/locoAPI/') # Path to Loco module

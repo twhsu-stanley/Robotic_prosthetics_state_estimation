@@ -8,9 +8,12 @@ import sys, time, os, csv
 import numpy as np
 sys.path.append(r'/usr/share/python3-mscl/')                # Path of the MSCL - API for the IMU
 sys.path.append(r'/home/pi/OSL/Reference_Trajectories')     # Path to reference trajectories
+
+
 import mscl as ms
 from flexsea import flexsea as flex
 from flexsea import fxEnums as fxe
+
 
 # TODO
 # Check loadcell scale. It is reading about 140N when Edgar is stading only in the OSL. (We should be able to measure something close to 700N)

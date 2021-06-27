@@ -71,7 +71,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     sys.Q = np.diag([0, 1e-7, 1e-7, 1e-3]) #[0, 1e-5, 1e-5, 1e-1]
     # measurement noise covariance
     sys.R = R['Generic'][np.ix_(sensors, sensors)]
-    U = np.diag([2, 2, 2,2,2,2])
+    U = np.diag([2, 2, 2])
     sys.R = U @ sys.R @ U.T
 
     # initialize the state
@@ -250,15 +250,16 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         plt.subplot(412)
         plt.plot(tt, z[1, 0:total_step], 'k-')
         plt.plot(tt, z_pred[:, 1], 'r--')
-        plt.ylabel('$f_Z$')
+        #plt.ylabel('$f_Z$')
         #plt.ylim([0, 1500])
         plt.xlim([0, tt[-1]+0.1])
         plt.subplot(413)
         plt.plot(tt, z[2, 0:total_step], 'k-')
         plt.plot(tt, z_pred[:, 2], 'r--')
-        plt.ylabel('$f_X$')
+        #plt.ylabel('$f_X$')
         #plt.ylim([-500, 200])
         plt.xlim([0, tt[-1]+0.1])
+        """
         plt.subplot(414)
         plt.plot(tt, z[3, 0:total_step], 'k-')
         plt.plot(tt, z_pred[:, 3], 'r--')
@@ -268,7 +269,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         plt.xlabel("time (s)")
         
         plt.figure("Auxiliary Measurements")
-        """
+        
         plt.subplot(411)
         plt.title("Original Measurements")
         plt.plot(tt, z[4, 0:total_step], 'k-')
@@ -283,7 +284,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         plt.ylabel('$\dot{\\theta}_{Y_{2.5Hz}} ~(deg/s)$')
         #plt.ylim([-150, 150])
         plt.xlim([0, tt[-1]+0.1])
-        """
+        
         plt.subplot(211)
         plt.plot(tt, z[4, 0:total_step], 'k-')
         plt.plot(tt, z_pred[:, 4], 'r--')
@@ -297,7 +298,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         plt.ylim([0, 10])
         plt.xlim([0, tt[-1]+0.1])
         plt.xlabel("time (s)")
-        
+        """
         plt.show()
     return result
 
@@ -575,10 +576,10 @@ def ekf_robustness(kidnap = True):
 
 if __name__ == '__main__':
     subject = 'AB02'
-    trial = 's0x8d10'
+    trial = 's0x8i0'
     side = 'left'
 
-    #ekf_test(subject, trial, side, kidnap = False, plot = True)
-    ekf_bank_test(subject, trial, side, N = 20, kidnap = [0, 1, 2, 3], plot = True)
+    ekf_test(subject, trial, side, kidnap = False, plot = True)
+    #ekf_bank_test(subject, trial, side, N = 20, kidnap = [0, 1, 2, 3], plot = True)
     #ekf_robustness(kidnap = True)
     #print(np.diag(R[subject]))

@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import csv
-logFile = r"210616_173226_PV_Siavash_swing.csv"
+logFile = r"Test.csv"
 
-datatxt = np.genfromtxt(logFile , delimiter=',', names=True)
+datatxt = np.genfromtxt(logFile , delimiter=',', names = True)
 
 #names to be tracked from the log file
 var1 = "ankMotTic"
@@ -38,8 +38,6 @@ referenceTrajectory= {
     'KneeRef':datatxt['refKnee']
 }
 
-
-    
 #plotting the graphs and saving them as png
 
 ranA =500#2420#1100# Range A
