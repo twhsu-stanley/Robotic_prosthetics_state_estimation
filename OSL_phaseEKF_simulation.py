@@ -13,15 +13,20 @@ from scipy.signal import butter, lfilter, lfilter_zi
 import sender as sender   # for real-time plotting
 
 ### Load pre-recorded walking data 
-logFile = r"OSL_walking_data/210617_121732_PV_Siavash_walk_300_1600.csv"
+logFile = r"OSL_walking_data/210617_113644_PV_Siavash_walk_oscillations in phase.csv"
+# 210617_113644_PV_Siavash_walk_oscillations in phase
+# 210617_121732_PV_Siavash_walk_300_1600
+# 210617_122334_PV_Siavash_walk_500_2500
 datatxt = np.genfromtxt(logFile , delimiter=',', names = True)
 dataOSL = {
     "Time": datatxt["Time"],
     "ThighSagi": datatxt["ThighSagi"],
     "PV": datatxt['PV'],
     'AnkleAngle': datatxt["ankJoiPos"],
+    'AnkleAngleRef': datatxt["refAnk"],
     'KneeAngle': datatxt["kneJoiPos"],
-    'AnkleTorque': datatxt["ankMotTor"]
+    'KneeAngleRef': datatxt["refKnee"],
+    'AnkleTorque': datatxt["ankMotTor"],
 }
 #print(len(dataOSL["Time"]))
 
@@ -84,22 +89,22 @@ try:
 
     m_model = model_loader('Measurement_model_' + str(len(sensors)) +'_sp.pickle')
     Psi = load_Psi('Generic')[sensors]
-    saturation_range = [0.97, 0.74, 1.27, 0.95]    # minimal range
+    saturation_range = [0.8, 0.4, 1.25, 0.95]    # minimal range
 
     ## build the system
     sys = myStruct()
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-7, 0, 0]) #[0, 6e-5, 1e-6, 1e-1] #process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
+    sys.Q = np.diag([0, 1e-5, 1e-5, 1e-1]) #[0, 6e-5, 1e-6, 1e-1] #process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
     # measurement noise covariance
     sys.R = R['Generic'][np.ix_(sensors, sensors)]
-    U = np.diag([5, 5, 5])
+    U = np.diag([2, 2, 2])
     sys.R = U @ sys.R @ U.T
 
     # initialize the state
     init = myStruct()
-    init.x = np.array([[0], [0.8], [1.1], [0]])
+    init.x = np.array([[0], [0.4], [1.1], [0]])
     init.Sigma = np.diag([10, 10, 10, 100])
 
     ekf = extended_kalman_filter(sys, init)
@@ -108,20 +113,26 @@ try:
     fs = 100          # sampling rate = 100 Hz (actual: ~77 Hz)
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
     # configure low-pass filter (1-order)
-    normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
+    normal_cutoff = 1 / nyq   #cut-off frequency = 2Hz
     b_lp, a_lp = butter(1, normal_cutoff, btype = 'low', analog = False)
     z_lp_1 = lfilter_zi(b_lp,  a_lp)
     z_lp_2 = lfilter_zi(b_lp,  a_lp)
     
     # configure band-pass filter (2-order)
-    normal_lowcut = 0.5 / nyq    #lower cut-off frequency = 0.5Hz
-    normal_highcut = 2 / nyq     #upper cut-off frequency = 2Hz
+    normal_lowcut = 0.2 / nyq    #lower cut-off frequency = 0.5Hz
+    normal_highcut = 0.8 / nyq     #upper cut-off frequency = 2Hz
     b_bp, a_bp = butter(2, [normal_lowcut, normal_highcut], btype = 'band', analog = False)
     z_bp = lfilter_zi(b_bp,  a_bp)
 
+    if input('\n\nAbout to walk. Would you like to continue? (y/n): ').lower() == 'y':
+        print("\n Let's walk!")
+    else:
+        sys.exit("User stopped the execution")
+    
     ptr = 0
     t_0 = dataOSL["Time"][0]     # for EKF
     start_time = t_0             # for live plotting
+    
     simulation_log = {
         # state estimates
         "phase_est": np.zeros((len(dataOSL["Time"]), 1)),
@@ -144,14 +155,9 @@ try:
         "knee_angle_cmd": np.zeros((len(dataOSL["Time"]), 1))
     }
 
-    if input('\n\nAbout to walk. Would you like to continue? (y/n): ').lower() == 'y':
-        print("\n Let's walk!")
-    else:
-        sys.exit("User stopped the execution")
-
     while True:
         ### Read OSL measurement data
-        global_thigh_angle = dataOSL["ThighSagi"][ptr] * 180 / np.pi # deg #negative sign
+        global_thigh_angle = dataOSL["ThighSagi"][ptr] * 180 / np.pi # deg #negative sign # ?
         ankle_angle = dataOSL['AnkleAngle'][ptr]
         knee_angle = dataOSL['KneeAngle'][ptr]
         
@@ -161,6 +167,7 @@ try:
         t_0 = t
 
         ## Compute global thigh angle velocity
+        
         if ptr == 0:
             global_thigh_angle_vel_lp = 0 
         else:
@@ -188,9 +195,10 @@ try:
         Atan2 = np.arctan2(-global_thigh_angle_vel_blp / (2*np.pi*0.8), global_thigh_angle_bp)
         if Atan2 < 0:
             Atan2 = Atan2 + 2 * np.pi
-
-        measurement = np.array([[global_thigh_angle], [global_thigh_angle_vel_lp], [Atan2]])
+        
+        measurement = np.array([[global_thigh_angle], [global_thigh_angle_vel_lp], [Atan2]]) #
         measurement = np.squeeze(measurement)
+        #measurement = measurement[sensors]
 
         ### EKF implementation
         ekf.prediction(dt)
@@ -286,13 +294,36 @@ finally:
     plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle"])
     plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle_pred"])
     plt.legend(('global thigh', 'global thigh pred'))
+    plt.ylabel("Global Thigh Angle (deg)")
     plt.subplot(312)
     plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle_vel"])
     plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle_vel_pred"])
     plt.legend(('global thigh vel', 'global thigh vel pred'))
+    plt.ylabel("Global Thigh Angle Vel (deg/s)")
     plt.subplot(313)
     plt.plot(dataOSL["Time"], simulation_log["Atan2"])
     plt.plot(dataOSL["Time"], simulation_log["Atan2_pred"])
     plt.legend(('Atan2', 'Atan2 pred'))
+    plt.ylabel("Atan2")
+    plt.xlabel("Time")
+
+    plt.figure("Joints Angles")
+    plt.subplot(211)
+    plt.plot(dataOSL["Time"], dataOSL['AnkleAngle'], 'r--')
+    plt.plot(dataOSL["Time"], dataOSL["AnkleAngleRef"])
+    plt.plot(dataOSL["Time"], simulation_log["ankle_angle_cmd"])
+    #plt.plot(dataOSL["Time"], simulation_log["ankle_angle_model"])
+    plt.legend(('Ankle angle (actual)', 'Ankle angle command (recorded)', 'Ankle angle command (simulated)'))
+    plt.ylabel("Ankle angle (deg)")
+    plt.subplot(212)
+    plt.plot(dataOSL["Time"], dataOSL['KneeAngle'], 'r--')
+    plt.plot(dataOSL["Time"], dataOSL["KneeAngleRef"])
+    plt.plot(dataOSL["Time"], simulation_log["knee_angle_cmd"])
+    #plt.plot(dataOSL["Time"], simulation_log["knee_angle_model"])
+    plt.legend(('Knee angle (actual)', 'Knee angle command (recorded)', 'Knee angle command (simulated)'))
+    plt.ylabel("Knee angle (deg)")
+    plt.xlabel("Time")
+    #plt.figure("Ankle Torque")
+    #plt.plot(dataOSL["Time"], dataOSL["AnkleTorque"])
 
     plt.show()

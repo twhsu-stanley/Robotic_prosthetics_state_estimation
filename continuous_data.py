@@ -536,22 +536,22 @@ if __name__ == '__main__':
     subject = 'AB01'
     trial = 's0x8i0'
     side = 'left'
-    jointangles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]
-    k_Y = -jointangles['knee'][0, :]
+    #jointangles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]
+    #k_Y = -jointangles['knee'][0, :]
     #k_X = -jointangles['knee'][1, :]
     #k_Z = -jointangles['knee'][2, :]
-    plt.plot(k_Y)
+    #plt.plot(k_Y)
     #plt.plot(k_X)
     #plt.plot(k_Z)
     #plt.legend(('Y', 'X', 'Z'))
-    plt.ylabel('knee angle')
-    plt.show()
+    #plt.ylabel('knee angle')
+    #plt.show()
 
     #plot_Conti_joints_control(subject, trial, side)
     #detect_nan()
     #Conti_global_thigh_angle_Y(subject, trial, side)
     #plt.show()
-    #plot_Conti_measurement_data(subject, trial, side)
+    plot_Conti_measurement_data(subject, trial, side)
     #Conti_maxmin('AB01', plot = True)
 
     ######## test real0time filters #############

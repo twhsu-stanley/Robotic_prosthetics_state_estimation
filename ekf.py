@@ -127,6 +127,7 @@ class extended_kalman_filter:
         phase_dots_min = saturation_range[1]
         step_lengths_max = saturation_range[2]
         step_lengths_min = saturation_range[3]
+        
         #if self.x[0, 0] > 1:
         #    self.x[0, 0] = 1
         #elif self.x[0, 0] < 0:
@@ -142,8 +143,10 @@ class extended_kalman_filter:
         elif self.x[2, 0] < step_lengths_min:
             self.x[2, 0] = step_lengths_min
 
-        if self.x[3, 0] > 10:
-            self.x[3, 0] = 10
-        elif self.x[3, 0] < -10:
-            self.x[3, 0] = -10
+        ### Set it ZERO for now ################################
+        if self.x[3, 0] > 0:
+            self.x[3, 0] = 0
+        elif self.x[3, 0] < 0:
+            self.x[3, 0] = 0
+        #######################################################
     

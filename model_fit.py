@@ -411,7 +411,7 @@ def Psi_to_pickle():
         pickle.dump(Psi_atan2, file)
 
 if __name__ == '__main__':
-    
+    """
     with open('R_s.pickle', 'rb') as file:
         R = pickle.load(file)
     R_sum = np.zeros((8,8))
@@ -425,7 +425,7 @@ if __name__ == '__main__':
     
     with open('R_s_2.pickle', 'wb') as file:
     	pickle.dump(R, file)
-
+    """
     # dictionary storing all measurement model coefficients
     #Measurement_model_coeff = dict()
     #Measurement_model_RMSE = dict()
@@ -491,7 +491,7 @@ if __name__ == '__main__':
     #with open('PikPsi_thighVel_2hz_G.pickle', 'wb') as file:
     #    pickle.dump(psi_thighVel_2hz, file)
 
-    #phase_dot_model = Polynomial_Basis(1, 'phase_dot')
+    phase_dot_model = Polynomial_Basis(1, 'phase_dot')
     step_length_model = Berstein_Basis(0,'step_length')
     ramp_model = Berstein_Basis(0, 'ramp')
     model_atan2 = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
@@ -512,9 +512,9 @@ if __name__ == '__main__':
     #    np.savez(file, **Measurement_model_RMSE, allow_pickle = True)
 
     # save measurement model
-    #m_model = Measurement_Model(model_thigh_Y, model_thighVel_2hz, model_atan2)
+    m_model = Measurement_Model(model_thigh_Y, model_atan2)
     #m_model = Measurement_Model(model_thigh_Y, model_force_z, model_force_x, model_moment_y, model_thighVel_2hz)
-    #model_saver(m_model, 'Measurement_model_3_sp.pickle')
+    model_saver(m_model, 'Measurement_model_2_sp.pickle')
 
     #R = dict()
     #for subject in subject_names:
