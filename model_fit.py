@@ -512,9 +512,9 @@ if __name__ == '__main__':
     #    np.savez(file, **Measurement_model_RMSE, allow_pickle = True)
 
     # save measurement model
-    m_model = Measurement_Model(model_thigh_Y, model_atan2)
+    #m_model = Measurement_Model(model_thigh_Y, model_atan2)
     #m_model = Measurement_Model(model_thigh_Y, model_force_z, model_force_x, model_moment_y, model_thighVel_2hz)
-    model_saver(m_model, 'Measurement_model_2_sp.pickle')
+    #model_saver(m_model, 'Measurement_model_2_sp.pickle')
 
     #R = dict()
     #for subject in subject_names:
@@ -523,7 +523,7 @@ if __name__ == '__main__':
     #	pickle.dump(R, file)
 
     
-    ### Joint angles mapping for control ###
+    ####### Joint angles mapping for control ############################################################
     F = 11
     N = 3
     phase_model = Fourier_Basis(F, 'phase')
@@ -533,14 +533,14 @@ if __name__ == '__main__':
 
     model_knee = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     psi_knee = model_fit(model_knee, 'knee_angle')
-    with open('PikPsi_knee_G.pickle', 'wb') as file:
+    with open('Psi/PikPsi_knee_G.pickle', 'wb') as file:
         pickle.dump(psi_knee, file)
 
     print("=====")
 
     model_ankle = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     psi_ankle = model_fit(model_ankle, 'ankle_angle')
-    with open('PikPsi_ankle_G.pickle', 'wb') as file:
+    with open('Psi/PikPsi_ankle_G.pickle', 'wb') as file:
         pickle.dump(psi_ankle, file)
     
     c_model = Measurement_Model(model_knee, model_ankle)

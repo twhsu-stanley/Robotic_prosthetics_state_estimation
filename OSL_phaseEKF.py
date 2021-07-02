@@ -39,8 +39,8 @@ TIMEOUT  = 500                          #Timeout in (ms) to read the IMU
 fxs = flex.FlexSEA()
 # ------------------ INITIALIZATION ------------------------------------------------------
 # Connect with knee and ankle actuator packs
-kneID = fxs.open(port = KNE_PORT, baud_rate = 230400, log_level = 0)
-ankID = fxs.open(port = ANK_PORT, baud_rate = 230400, log_level = 0)
+kneID = fxs.open(port = KNE_PORT, baud_rate = 230400, log_level = 6)
+ankID = fxs.open(port = ANK_PORT, baud_rate = 230400, log_level = 6)
 
 # Initialize IMU - The sample rate (SR) of the IMU controls the SR of the OSL 
 connection = msl.Connection.Serial(IMU_PORT, 921600)
@@ -50,17 +50,24 @@ packets = IMU.getDataPackets(TIMEOUT)   # Clean the internal circular buffer.
 
 # Set streaming        
 IMU.resume()
-fxs.start_streaming(kneID, freq = 500, log_en = False)
-fxs.start_streaming(ankID, freq = 500, log_en = False)
+fxs.start_streaming(kneID, freq = 100, log_en = False)
+fxs.start_streaming(ankID, freq = 100, log_en = False)
 time.sleep(1)                           # Healthy pause before using ActPacks or IMU
+
+# Soft start
+G_K = {"kp": 40, "ki": 400, "K": 10, "B": 0, "FF": 128}  # Knee controller gains
+G_A = {"kp": 40, "ki": 400, "K": 10, "B": 0, "FF": 128}  # Ankle controller gains
+fxs.set_gains(ankID, G_A["kp"], G_A["ki"], 0, G_A["K"], G_A["B"], G_A["FF"])
+fxs.set_gains(kneID, G_K["kp"], G_K["ki"], 0, G_K["K"], G_K["B"], G_K["FF"])
+fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, fxs.read_device(ankID).mot_ang)
+fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, fxs.read_device(kneID).mot_ang)
+time.sleep(2/100)
 
 # ------------------ MAIN LOOP -----------------------------------------------------------
 try:
     # For gain details check https://dephy.com/wiki/flexsea/doku.php?id=controlgains
-    # G_K = {"kp": 40, "ki": 400, "K": 600, "B": 300, "FF": 128}  # Knee controller gains
-    G_K = {"kp": 40, "ki": 400, "K": 300, "B": 1600, "FF": 128}  # Knee controller gains
-    # G_A = {"kp": 40, "ki": 400, "K": 600, "B": 300, "FF": 128}  # Ankle controller gains
-    G_A = {"kp": 40, "ki": 400, "K": 300, "B": 1600, "FF": 128}  # Ankle controller gains
+    G_K = {"kp": 40, "ki": 400, "K": 30, "B": 160, "FF": 128}  # Knee controller gains
+    G_A = {"kp": 40, "ki": 400, "K": 30, "B": 160, "FF": 128}  # Ankle controller gains
 
     kneSta  = fxs.read_device(kneID)
     ankSta  = fxs.read_device(ankID)
@@ -70,9 +77,9 @@ try:
     fxs.set_gains(kneID, G_K["kp"], G_K["ki"], 0, G_K["K"], G_K["B"], G_K["FF"])
 
     # Load trajectory
-    tra = loco.loadTrajectory(trajectory = 'walking')
-    refAnk = tra["ankl"]
-    refKne = tra["knee"]
+    refTrajectory  = loco.loadTrajectory(trajectory = 'walking')
+    refAnk = refTrajectory ["ankl"]
+    refKne = refTrajectory ["knee"]
 
     # Create encoder map
     kneSta  = fxs.read_device(kneID)
@@ -83,7 +90,7 @@ try:
     dataOSL = loco.read_OSL(kneSta, ankSta, IMUPac)
     cmd_log = {'refAnk': [0.0, 'deg'], 'refKnee': [0.0, 'deg']}
     state_est_log = {'phase': [0.0, 'phase'], 'phase_dot':[0.0, 'phase/s'], 'stride_length':[0.0, 'm'], 'ramp':[0.0, 'deg']}
-    logger = loco.ini_log({**dataOSL, **cmd_log, **state_est_log}, sensors = "all_sensors", trialName = "OSL_test")
+    logger = loco.ini_log({**dataOSL, **cmd_log, **state_est_log}, sensors = "all_sensors", trialName = "OSL_benchtop_test")
 
     ### Intitialize EKF
     sensors = [0, 6, 7] # [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1] looks good
@@ -95,15 +102,14 @@ try:
 
     m_model = model_loader('Measurement_model_' + str(len(sensors)) +'_sp.pickle')
     Psi = load_Psi('Generic')[sensors]
-    saturation_range = [0.97, 0.74, 1.27, 0.95]    # minimal range
-    #saturation_range = [1.23, 0.60, 1.60, 0.71]    # maximal range
-
+    saturation_range = [1, 0, 2, 0.8] 
+    
     ## build the system
     sys = myStruct()
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-5, 1e-10, 1e-5]) #[0, 6e-5, 1e-6, 1e-1] #process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
+    sys.Q = np.diag([0, 1e-7, 1e-7, 0])
     # measurement noise covariance
     sys.R = R['Generic'][np.ix_(sensors, sensors)]
     U = np.diag([2, 2, 2])
@@ -111,8 +117,8 @@ try:
 
     # initialize the state
     init = myStruct()
-    init.x = np.array([[0], [0.8], [1.1], [0]])
-    init.Sigma = np.diag([10, 10, 10, 100])
+    init.x = np.array([[0], [0.5], [1.1], [0]])
+    init.Sigma = np.diag([1, 1, 1, 0])
 
     ekf = extended_kalman_filter(sys, init)
 
@@ -120,14 +126,14 @@ try:
     fs = 100          # sampling rate = 100Hz (actual: ~77Hz)
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
     # configure low-pass filter (1-order)
-    normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
+    normal_cutoff = 1 / nyq   #cut-off frequency = 2Hz
     b_lp, a_lp = butter(1, normal_cutoff, btype = 'low', analog = False)
     z_lp_1 = lfilter_zi(b_lp,  a_lp)
     z_lp_2 = lfilter_zi(b_lp,  a_lp)
     
     # configure band-pass filter (2-order)
-    normal_lowcut = 0.5 / nyq    #lower cut-off frequency = 0.5Hz
-    normal_highcut = 2 / nyq     #upper cut-off frequency = 2Hz
+    normal_lowcut = 0.1 / nyq    #lower cut-off frequency = 0.5Hz
+    normal_highcut = 1 / nyq     #upper cut-off frequency = 2Hz
     b_bp, a_bp = butter(2, [normal_lowcut, normal_highcut], btype = 'band', analog = False)
     z_bp = lfilter_zi(b_bp,  a_bp)
 
@@ -137,8 +143,9 @@ try:
         sys.exit("User stopped the execution")
 
     ptr = 0
-    t_0 = time.time()         # for EKF
-    start_time = time.time()  # for live plotting
+    t_0 = time.time()     # for EKF
+    start_time = t_0      # for live plotting
+
     while True:
         # Read OSL
         kneSta  = fxs.read_device(kneID)
@@ -147,7 +154,7 @@ try:
         dataOSL = loco.read_OSL(kneSta, ankSta, IMUPac, logger['ini_time'], encMap)
 
         ### measurement data
-        global_thigh_angle = -dataOSL['ThighSagi'][0] * 180 / np.pi # negative sign
+        global_thigh_angle = dataOSL['ThighSagi'][0] * 180 / np.pi
         ankle_angle = dataOSL['ankJoiPos'][0] * 180 / np.pi
         knee_angle = dataOSL['kneJoiPos'][0] * 180 / np.pi
         
@@ -196,9 +203,10 @@ try:
         
         ### Control commands: joints angles
         ## 1) Control commands generated by the trainned model
+        """
         joint_angles = joints_control(ekf.x[0, 0], ekf.x[1, 0], ekf.x[2, 0], ekf.x[3, 0])
         knee_angle_model = joint_angles[0]
-        ankle_angle_model = joint_angles[1]
+        ankle_angle_model = -joint_angles[1] # negative sign
         # saturate commands to actuators
         if knee_angle_model > -5: 
             knee_angle_model = -5
@@ -209,9 +217,10 @@ try:
             ankle_angle_model = 18
         if ankle_angle_model < -10: 
             ankle_angle_model = -10
+        """
         
         ## 2) Control commands generated by the established trajectory
-        pv = ekf.x[0, 0] * 998  # phase variable conversion (scaling)
+        pv = int(ekf.x[0, 0] * 998)  # phase variable conversion (scaling)
         ankle_angle_cmd = refAnk[pv]
         knee_angle_cmd = refKne[pv]
 
@@ -234,23 +243,24 @@ try:
         ### Live plotting
         elapsed_time = time.time() - start_time
         if ptr % 2 == 0:
-            sender.graph(elapsed_time, 
-                         #global_thigh_angle, 'Global Thigh Angle', 'deg',
+            sender.graph(elapsed_time,
+                         ekf.x[0, 0], ekf.x[0, 0], 'phase', '-',
+                         global_thigh_angle, ekf.z_hat[0], 'Global Thigh Angle', 'deg',
                          #ekf.z_hat[0], 'Global Thigh Angle Pred', 'deg',
                          #global_thigh_angle_vel_lp, 'Global Thigh Angle Vel', 'deg/s',
                          #ekf.z_hat[1], 'Global Thigh Angle Vel Pred', 'deg/s'
                          # Atan2, 'atan2', '-'
                          # ekf.z_hat[2], 'atan2 Pred', '-'
                          #knee_angle, 'knee_angle', 'deg',
-                         knee_angle_cmd, knee_angle_model, 'knee_angle', 'deg', # additional data stream to the same plot
+                         knee_angle_cmd, knee_angle, 'knee_angle', 'deg', # additional data stream to the same plot
                          #knee_angle_cmd, 'knee_angle_cmd', 'deg',
                          #ankle_angle, 'ankle_angle', 'deg',
-                         #ankle_angle_cmd, 'ankle_angle_cmd', 'deg',
-                         ankle_angle_model, 'ankle_angle_model', 'deg',
-                         ekf.x[0, 0], 'phase', '-',
-                         ekf.x[1, 0], 'phase_dot', '1/s',
-                         ekf.x[2, 0], 'step_length', 'm',
-                         ekf.x[3, 0], 'ramp_angle', 'deg'
+                         ankle_angle_cmd, ankle_angle, 'ankle_angle', 'deg',
+                         #ankle_angle_model, 'ankle_angle_model', 'deg',
+                         #ekf.x[0, 0], 'phase', '-',
+                         #ekf.x[1, 0], 'phase_dot', '1/s',
+                         #ekf.x[2, 0], 'step_length', 'm',
+                         #ekf.x[3, 0], 'ramp_angle', 'deg'
                          )
         print('Elapsed time:', elapsed_time, ptr)
         ptr+=1
@@ -263,6 +273,7 @@ finally:
     fxs.send_motor_command(ankID, fxe.FX_NONE, 0)
     fxs.send_motor_command(kneID, fxe.FX_NONE, 0)
     IMU.setToIdle()
+    time.sleep(0.5)    
     fxs.close(ankID)
     fxs.close(kneID)  
     print('Communication with ActPacks closed and IMU set to idle')

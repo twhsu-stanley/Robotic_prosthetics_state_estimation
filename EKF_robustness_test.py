@@ -11,6 +11,7 @@ from model_framework import *
 from data_generators import *
 from continuous_data import *
 from model_fit import *
+import csv
 
 # [0123] tuning for normal case: Q=[0, 1e-7, 1e-7, 5e-3]
 # [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1]
@@ -31,6 +32,41 @@ with open('R_s.pickle', 'rb') as file:
 
 m_model = model_loader('Measurement_model_' + str(len(sensors)) +'_sp.pickle')
 
+## From loco_OSL.py: Load referenced trajectories
+def loadTrajectory(trajectory = 'walking'):
+    # Create path to the reference csv trajectory
+    if trajectory.lower() == 'walking':
+        # walking data uses convention from D. A. Winter, “Biomechanical Motor Patterns in Normal Walking,”  
+        # J. Mot. Behav., vol. 15, no. 4, pp. 302–330, Dec. 1983.
+        pathFile = r'OSL_walking_data/walkingWinter_deg.csv'
+        # Gains to scale angles to OSL convention
+        ankGain = -1
+        ankOffs = -0.15 # [deg] Small offset to take into accoun that ankle ROM is -10 deg< ankle < 19.65 deg
+        kneGain = -1
+        kneOffs = 0
+        hipGain = 1
+        hipOffs = 0
+    else:
+        raise ValueError('Please select a suported trajectory type')
+    # Extract content from csv
+    with open(pathFile, 'r') as f:
+        datasetReader = csv.reader(f, quoting = csv.QUOTE_NONNUMERIC)
+        data = np.transpose( np.array([row for row in datasetReader ]) )
+    # Parse data to knee-ankle trajectories using OSL angle convention (+ ankle = plantarflexion. + knee = flexion)
+    trajectory = dict(ankl = ankGain*data[0] + ankOffs)
+    trajectory["ankd"] = ankGain*data[1]
+    trajectory["andd"] = ankGain*data[2]
+    trajectory["knee"] = kneGain*data[3] + kneOffs
+    trajectory["kned"] = kneGain*data[4]
+    trajectory["kndd"] = kneGain*data[5]
+    trajectory["hip_"] = hipGain*data[6] + hipOffs
+    trajectory["hipd"] = hipGain*data[7]
+    trajectory["hidd"] = hipGain*data[8]
+    trajectory["phas"] = data[9]
+    trajectory["time"] = data[10]
+
+    return trajectory
+
 def A(dt):
     return np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
 
@@ -47,7 +83,13 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
                 global_thigh_angVel_5hz, global_thigh_angVel_2x5hz, global_thigh_angVel_2hz, atan2\
                                         = load_Conti_measurement_data(subject, trial, side)
 
-    knee_angle, ankle_angle = load_Conti_joints_control(subject, trial, side)
+    #### Joint Control ############################################################
+    knee_angle, ankle_angle = load_Conti_joints_angles(subject, trial, side)
+    ### Load reference trajectory
+    refTrajectory = loadTrajectory(trajectory = 'walking')
+    refAnk = refTrajectory["ankl"]
+    refKne = refTrajectory["knee"]
+    ################################################################################
 
     z = np.array([[global_thigh_angle_Y],\
                   [force_z_ankle],\
@@ -68,7 +110,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-7, 1e-7, 1e-3]) #[0, 1e-5, 1e-5, 1e-1]
+    sys.Q = np.diag([0, 1e-7, 1e-7, 0]) #[0, 1e-5, 1e-5, 1e-1]
     # measurement noise covariance
     sys.R = R['Generic'][np.ix_(sensors, sensors)]
     U = np.diag([2, 2, 2])
@@ -77,7 +119,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     # initialize the state
     init = myStruct()
     init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
-    init.Sigma = np.diag([10, 10, 10, 100])
+    init.Sigma = np.diag([10, 10, 10, 0])
 
     ekf = extended_kalman_filter(sys, init)
     
@@ -130,9 +172,12 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         Mahal_dist[i] = ekf.MD
 
         # control commands
-        joint_angles = joints_control(x[i,0], x[i,1], x[i,2], x[i,3])
-        knee_angle_cmd[i] = joint_angles[0]
-        ankle_angle_cmd[i] = joint_angles[1]
+        #joint_angles = joints_control(x[i,0], x[i,1], x[i,2], x[i,3])
+        #knee_angle_cmd[i] = joint_angles[0]
+        #ankle_angle_cmd[i] = joint_angles[1]
+        pv = int(ekf.x[0, 0] * 998)  # phase variable conversion (scaling)
+        ankle_angle_cmd[i] = refAnk[pv]
+        knee_angle_cmd[i] = refKne[pv]
 
     #print("longest time step = ", t_step_max)
     #print("mean time step = ", np.mean(t_step))
@@ -576,7 +621,7 @@ def ekf_robustness(kidnap = True):
 
 if __name__ == '__main__':
     subject = 'AB02'
-    trial = 's0x8i0'
+    trial = 's1i10'
     side = 'left'
 
     ekf_test(subject, trial, side, kidnap = False, plot = True)

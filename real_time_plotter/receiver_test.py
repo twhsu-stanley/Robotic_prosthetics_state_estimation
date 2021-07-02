@@ -80,6 +80,9 @@ soc3 = sock(5015)
 soc4 = sock(5016)
 #### additional data streams #############
 soc1_2 = sock(5025)
+soc2_2 = sock(5026)
+soc3_2 = sock(5027)
+soc4_2 = sock(5028)
 ##########################################
 
 # create sockets for y axis labels
@@ -99,9 +102,9 @@ time.sleep(0.5) # gives extra time for sockets to be created
 # Making the first plot
 p1 = win.addPlot() ## setting plot name
 #p1.setTitle('',**{'size': '40pt'})
-curve1 = p1.plot(pen=pg.mkPen(width = 10, color=(217, 83, 25)), name = '1') ## setting plot color
+curve1 = p1.plot(pen=pg.mkPen(width = 5, color=(217, 83, 25)), name = '1') ## setting plot color
 #### additional data streams #######################################################################
-curve1_2 = p1.plot(pen=pg.mkPen(width = 10, color=(27, 218, 211)), name = '2') ## setting plot color
+curve1_2 = p1.plot(pen=pg.mkPen(width = 5, color=(27, 218, 211)), name = '2') ## setting plot color
 ####################################################################################################
 ylabel1 = soc5.read_str()
 ylabelU1 = soc9.read_str()
@@ -112,7 +115,6 @@ p1.getAxis('left').setStyle(textFillLimits=[(0,0.2)])
 datay1 = [0]*numPoints ## initializing with all zeros on plot
 #### additional data streams #####################################################################
 datay1_2 = [0]*numPoints ## initializing with all zeros on plot
-p1.setLegend()
 ##################################################################################################
 p1.enableAutoRange('y', True) # auto rescale of y-axis
 p1.getAxis('left').setWidth(140)
@@ -127,13 +129,19 @@ try:
 	soc2.read_data()
 	p2 = win.addPlot() # creating the graph
 	#p2.setTitle('',**{'size': '40pt'})
-	curve2 = p2.plot(pen=pg.mkPen(width = 10, color=(0, 114, 189)))
+	curve2 = p2.plot(pen=pg.mkPen(width = 5, color=(0, 114, 189)), name = '2')
+	#### additional data streams #######################################################################
+	curve2_2 = p2.plot(pen=pg.mkPen(width = 5, color=(27, 218, 211)), name = '2') ## setting plot color
+	####################################################################################################
 	ylabel2 = soc6.read_str()
 	ylabelU2 = soc10.read_str()
 	p2.setLabel('left', ylabel2, units = ylabelU2, **{'font-size':'20pt'}) 
 	p2.getAxis('left').tickFont = tickFont 
 	p2.getAxis('bottom').setStyle(showValues=False)
 	datay2 = [0]*numPoints
+	#### additional data streams #####################################################################
+	datay2_2 = [0]*numPoints ## initializing with all zeros on plot
+	##################################################################################################
 	p2.enableAutoRange('y', True)
 	p2.getAxis('left').setWidth(140) 
 	p2.getAxis('left').setStyle(textFillLimits=[(0,0.2)])
@@ -148,13 +156,19 @@ try:
 	win.nextRow() # creates new row of plots
 	p3 = win.addPlot() # creating the graph
 	#p3.setTitle('',**{'size': '40pt'})
-	curve3 = p3.plot(pen=pg.mkPen(width = 10, color=(162, 20, 47)))
+	curve3 = p3.plot(pen=pg.mkPen(width = 5, color=(162, 20, 47)), name = '1')
+	#### additional data streams #######################################################################
+	curve3_2 = p3.plot(pen=pg.mkPen(width = 5, color=(27, 218, 211)), name = '2') ## setting plot color
+	####################################################################################################
 	ylabel3 = soc7.read_str()
 	ylabelU3 = soc11.read_str()
 	p3.setLabel('left', ylabel3, units = ylabelU3, **{'font-size':'20pt'})
 	p3.getAxis('left').tickFont = tickFont 
 	p3.getAxis('bottom').setStyle(showValues=False)
 	datay3 = [0]*numPoints
+	#### additional data streams #####################################################################
+	datay3_2 = [0]*numPoints ## initializing with all zeros on plot
+	##################################################################################################
 	p3.enableAutoRange('y', True)
 	p3.getAxis('left').setWidth(140)
 	p3.getAxis('left').setStyle(textFillLimits=[(0,0.2)])
@@ -168,13 +182,19 @@ try:
 	soc4.read_data()
 	p4 = win.addPlot() # creating the graph
 	#p4.setTitle('',**{'size': '40pt'})
-	curve4 = p4.plot(pen=pg.mkPen(width = 10, color=(126, 47, 142), style=QtCore.Qt.SolidLine))
+	curve4 = p4.plot(pen=pg.mkPen(width = 5, color=(126, 47, 142)), name = '1')
+	#### additional data streams #######################################################################
+	curve4_2 = p4.plot(pen=pg.mkPen(width = 5, color=(27, 218, 211)), name = '2') ## setting plot color
+	####################################################################################################
 	ylabel4 = soc8.read_str()
 	ylabelU4 = soc12.read_str()
 	p4.setLabel('left', ylabel4, units = ylabelU4, **{'font-size':'20pt'}) 
 	p4.getAxis('left').tickFont = tickFont 
 	p4.getAxis('bottom').setStyle(showValues=False)
 	datay4 = [0]*numPoints
+	#### additional data streams #####################################################################
+	datay4_2 = [0]*numPoints ## initializing with all zeros on plot
+	##################################################################################################
 	p4.enableAutoRange('y', True)
 	p4.getAxis("left").setWidth(140)
 	p4.getAxis('left').setStyle(textFillLimits=[(0,0.2)])
@@ -193,6 +213,9 @@ soc3.block()
 soc4.block()
 ## additional datastreams ##########################################################
 soc1_2.block()
+soc2_2.block()
+soc3_2.block()
+soc4_2.block()
 ####################################################################################
 
 counter = 15	# counter that determines how many data points to receive 
@@ -205,8 +228,8 @@ start_time_sender = soc0.read_data()
 
 def update():
 	global ptr, counter, fps, lastTime,\
-	       curve1, curve1_2, curve2, curve3, curve4,\
-		   datay1, datay1_2, datay2, datay3, datay4,\
+	       curve1, curve1_2, curve2, curve2_2, curve3, curve3_2, curve4, curve4_2,\
+		   datay1, datay1_2, datay2, datay2_2, datay3, datay3_2, datay4, datay4_2,\
 		   p1, p2, p3, p4
 	
 	elapsed_time_receiver = time.time()-start_time_receiver
@@ -221,21 +244,39 @@ def update():
 	# reading in other plots' data if the plot was made
 	if numGraphs > 1:
 		ys2 = soc2.read_data()
+		#### additional datastreams #####################################################
+		ys2_2 = soc2_2.read_data()
+		#################################################################################
 	if numGraphs > 2:
 		ys3 = soc3.read_data()
+		#### additional datastreams #####################################################
+		ys3_2 = soc3_2.read_data()
+		#################################################################################
 	if numGraphs > 3:
 		ys4 = soc4.read_data()
+		#### additional datastreams #####################################################
+		ys4_2 = soc4_2.read_data()
+		#################################################################################
 	
 	datay1.append(ys1)
-	##
+	### additional datastreams #####################################################
 	datay1_2.append(ys1_2)
-	##
+	################################################################################
 	if numGraphs > 1:
 		datay2.append(ys2)
+		### additional datastreams #####################################################
+		datay2_2.append(ys2_2)
+		################################################################################
 	if numGraphs > 2:
 		datay3.append(ys3)
+		### additional datastreams #####################################################
+		datay3_2.append(ys3_2)
+		################################################################################
 	if numGraphs > 3:
 		datay4.append(ys4)
+		### additional datastreams #####################################################
+		datay4_2.append(ys4_2)
+		################################################################################
 	
 	datay1 = datay1[-numPoints:]
 	#### additional datastreams ######################################################
@@ -243,10 +284,19 @@ def update():
 	##################################################################################
 	if numGraphs > 1:
 		datay2 = datay2[-numPoints:]
+		#### additional datastreams ######################################################
+		datay2_2 = datay2_2[-numPoints:]
+		##################################################################################
 	if numGraphs > 2:
 		datay3 = datay3[-numPoints:]
+		#### additional datastreams ######################################################
+		datay3_2 = datay3_2[-numPoints:]
+		##################################################################################
 	if numGraphs > 3:
 		datay4 = datay4[-numPoints:]
+		#### additional datastreams ######################################################
+		datay4_2 = datay4_2[-numPoints:]
+		##################################################################################
 	
 	# evaluating if counter needs to be changed based on how much latency 
 	# there is between server sending and client plotting. the larger the 
@@ -266,10 +316,19 @@ def update():
 		###############################################################################
 		if numGraphs > 1:
 			curve2.setData(datay2)
+			#### additional datastreams ###################################################
+			curve2_2.setData(datay2_2)
+			###############################################################################
 		if numGraphs > 2:
 			curve3.setData(datay3)
+			#### additional datastreams ###################################################
+			curve3_2.setData(datay3_2)
+			###############################################################################
 		if numGraphs > 3:
 			curve4.setData(datay4)
+			#### additional datastreams ###################################################
+			curve4_2.setData(datay4_2)
+			###############################################################################
 	
 		# FPS/refresh rate calulator
 		now = tim()

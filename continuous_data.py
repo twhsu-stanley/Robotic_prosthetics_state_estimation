@@ -394,7 +394,7 @@ def detect_nan():
     with open('Measurements_with_Nan.pickle', 'wb') as file:
     	pickle.dump(nan_dict, file)
 
-def load_Conti_joints_control(subject, trial, side):
+def load_Conti_joints_angles(subject, trial, side):
     with open('Continuous_joint_data.pickle', 'rb') as file:
         Continuous_joint_data = pickle.load(file)
 
@@ -404,9 +404,9 @@ def load_Conti_joints_control(subject, trial, side):
 
     return knee_angle, ankle_angle
 
-def plot_Conti_joints_control(subject, trial, side):
+def plot_Conti_joints_angles(subject, trial, side):
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
-    knee_angle, ankle_angle = load_Conti_joints_control(subject, trial, side)
+    knee_angle, ankle_angle = load_Conti_joints_angles(subject, trial, side)
     
     c_model = model_loader('Control_model.pickle')
 
@@ -419,14 +419,16 @@ def plot_Conti_joints_control(subject, trial, side):
     ankle_angle_pred = model_prediction(c_model.models[1], Psi_ankle, phases, phase_dots, step_lengths, ramps)
 
     plt.figure("Joint Angle Control")
+    start = 1000
+    end = 2000
     plt.subplot(211)
-    plt.plot(knee_angle, 'k-')
-    plt.plot(knee_angle_pred, 'b--')
+    plt.plot(knee_angle[start:end], 'k-')
+    plt.plot(knee_angle_pred[start:end], 'b--')
     plt.ylabel('knee angle')
     plt.legend(('actual', 'least squares'))
     plt.subplot(212)
-    plt.plot(ankle_angle, 'k-')
-    plt.plot(ankle_angle_pred, 'b--')
+    plt.plot(ankle_angle[start:end], 'k-')
+    plt.plot(-ankle_angle_pred[start:end], 'b--')
     plt.ylabel('ankle angle')
     plt.show()
 
@@ -443,7 +445,7 @@ if __name__ == '__main__':
                 jointangles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]
                 Continuous_joint_data[subject][trial][side] = dict()
                 Continuous_joint_data[subject][trial][side]['knee'] = -jointangles['knee'][0, :]
-                Continuous_joint_data[subject][trial][side]['ankle'] = jointangles['ankle'][0, :]
+                Continuous_joint_data[subject][trial][side]['ankle'] = -jointangles['ankle'][0, :]
     with open('Continuous_joint_data.pickle', 'wb') as file:
     	pickle.dump(Continuous_joint_data, file)
     """
@@ -514,6 +516,7 @@ if __name__ == '__main__':
     """
 
     ##### Find the saturation range for all subjects ###############
+    """
     phase_dots_max = np.zeros((10,1))
     phase_dots_min = np.zeros((10,1))
     step_lengths_max = np.zeros((10,1))
@@ -531,10 +534,11 @@ if __name__ == '__main__':
     print("phase_dots_min = ", np.min(phase_dots_min))
     print("step_lengths_max = ", np.max(step_lengths_max))
     print("step_lengths_min = ", np.min(step_lengths_min))
+    """
     ##################################################################
     
-    subject = 'AB01'
-    trial = 's0x8i0'
+    subject = 'AB10'
+    trial = 's1i0'
     side = 'left'
     #jointangles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]
     #k_Y = -jointangles['knee'][0, :]
@@ -547,11 +551,11 @@ if __name__ == '__main__':
     #plt.ylabel('knee angle')
     #plt.show()
 
-    #plot_Conti_joints_control(subject, trial, side)
+    plot_Conti_joints_angles(subject, trial, side)
     #detect_nan()
     #Conti_global_thigh_angle_Y(subject, trial, side)
     #plt.show()
-    plot_Conti_measurement_data(subject, trial, side)
+    #plot_Conti_measurement_data(subject, trial, side)
     #Conti_maxmin('AB01', plot = True)
 
     ######## test real0time filters #############

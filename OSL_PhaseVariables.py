@@ -126,7 +126,7 @@ try:
         dataOSL['loadCelFz'] =  int(np.median(loadcell_z))
         
         # Estimate percentage within the gait cycle - Output from 0 to 998
-        pv = int(loco.getPhaseVariable_vTwoStates(dataOSL, maxHip, minHip, dataOSL['loadCelFz'],FCThr = 24) * 998) 
+        pv = int(loco.getPhaseVariable_vTwoStates(dataOSL, maxHip, minHip, dataOSL['loadCelFz'],FCThr = 24) * 998)
         # pv = 0
 
         misclog['PV'] = pv
