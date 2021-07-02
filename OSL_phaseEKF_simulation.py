@@ -28,7 +28,6 @@ dataOSL = {
     'KneeAngleRef': datatxt["refKnee"],
     'AnkleTorque': datatxt["ankMotTor"],
 }
-#print(len(dataOSL["Time"]))
 
 ## From loco_OSL.py: Load referenced trajectories
 def loadTrajectory(trajectory = 'walking'):
@@ -252,6 +251,7 @@ try:
         elapsed_time = time.time() - start_time
         if ptr % 2 == 0:
             sender.graph(elapsed_time, 
+                         dataOSL["PV"][ptr] / 998, ekf.x[0, 0], 'Phase', '-',
                          global_thigh_angle, ekf.z_hat[0], 'Global Thigh Angle', 'deg',
                          #ekf.z_hat[0], 'Global Thigh Angle Pred', 'deg',
                          #global_thigh_angle_vel_lp, 'Global Thigh Angle Vel', 'deg/s',
@@ -259,10 +259,9 @@ try:
                          #Atan2, 'atan2', '-',
                          #ekf.z_hat[2], 'atan2 Pred', '-'
                          #knee_angle, 'knee_angle', 'deg',
-                         knee_angle_cmd, dataOSL["KneeAngleRef"][ptr], 'knee_angle', 'deg',
+                         dataOSL["KneeAngleRef"][ptr], knee_angle_cmd, 'Knee Angle', 'deg',
                          #knee_angle_model, 'knee_angle_model', 'deg',
-                         ankle_angle_cmd, dataOSL["AnkleAngleRef"][ptr], 'ankle_angle', 'deg',
-                         ekf.x[0, 0], dataOSL["PV"][ptr] / 998, 'phase', '-',
+                         dataOSL["AnkleAngleRef"][ptr], ankle_angle_cmd, 'Ankle Angle', 'deg',
                          #ekf.x[1, 0], 'phase_dot', '1/s',
                          #ekf.x[2, 0], 'step_length', 'm',
                          #ekf.x[3, 0], 'ramp_angle', 'deg'

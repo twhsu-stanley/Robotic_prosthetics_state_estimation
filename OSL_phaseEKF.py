@@ -13,7 +13,6 @@ sys.path.append(r'/usr/share/python3-mscl/')     # Path of the MSCL - API for th
 import locoOSL as loco                           # Module from Locolab
 import mscl as msl                               # Module from Microstrain
 
-
 sys.path.append(r'/home/pi/prosthetic_phase_estimation/')
 from ekf import *
 from model_framework import *
@@ -21,7 +20,7 @@ from model_framework import *
 #from continuous_data import *
 from model_fit import load_Psi
 from scipy.signal import butter, lfilter, lfilter_zi
-import sender                                    # for real-time plotting
+import sender_test as sender   # for real-time plotting
 
 # Process model for the EKF
 def A(dt):
@@ -89,8 +88,10 @@ try:
 
     dataOSL = loco.read_OSL(kneSta, ankSta, IMUPac)
     cmd_log = {'refAnk': [0.0, 'deg'], 'refKnee': [0.0, 'deg']}
-    state_est_log = {'phase': [0.0, 'phase'], 'phase_dot':[0.0, 'phase/s'], 'stride_length':[0.0, 'm'], 'ramp':[0.0, 'deg']}
-    logger = loco.ini_log({**dataOSL, **cmd_log, **state_est_log}, sensors = "all_sensors", trialName = "OSL_benchtop_test")
+    ekf_log = {'phase': [0.0, '-'], 'phase_dot':[0.0, '1/s'], 'stride_length':[0.0, 'm'], 'ramp':[0.0, 'deg'],
+               'thigh_angle_pred': [0.0, 'deg'], 'thigh_angle_vel_pred': [0.0, 'deg/s'], 'atan2_pred':[0.0, '-'],
+               'thigh_angle_vel': [0.0, 'deg/s'], 'atan2':[0.0, '-']}
+    logger = loco.ini_log({**dataOSL, **cmd_log, **ekf_log}, sensors = "all_sensors", trialName = "OSL_benchtop_test")
 
     ### Intitialize EKF
     sensors = [0, 6, 7] # [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1] looks good
@@ -225,15 +226,20 @@ try:
         knee_angle_cmd = refKne[pv]
 
         ### Logging data
-        # log joints control commands
+        # log joint control commands
         cmd_log['refAnk'][0] = ankle_angle_cmd
         cmd_log['refKnee'][0] = knee_angle_cmd
-        # log state estimate
-        state_est_log['phase'][0] = ekf.x[0, 0]
-        state_est_log['phase_dot'][0] = ekf.x[1, 0]
-        state_est_log['stride_length'][0] = ekf.x[2, 0]
-        state_est_log['ramp'][0] = ekf.x[3, 0]
-        loco.log_OSL({**dataOSL,**cmd_log, **state_est_log}, logger)
+        # log ekf
+        ekf_log['phase'][0] = ekf.x[0, 0]
+        ekf_log['phase_dot'][0] = ekf.x[1, 0]
+        ekf_log['stride_length'][0] = ekf.x[2, 0]
+        ekf_log['ramp'][0] = ekf.x[3, 0]
+        ekf_log['thigh_angle_pred'][0] = ekf.z_hat[0]
+        ekf_log['thigh_angle_vel_pred'][0] = ekf.z_hat[1]
+        ekf_log['atan2_pred'][0] = ekf.z_hat[2]
+        ekf_log['thigh_angle_vel'][0] = global_thigh_angle_vel_lp
+        ekf_log['atan2'][0] = Atan2
+        loco.log_OSL({**dataOSL,**cmd_log, **ekf_log}, logger)
         
         ### Move the OSL
         ankMotCou, kneMotCou = loco.joi2motTic(encMap, knee_angle_cmd, ankle_angle_cmd)
@@ -244,23 +250,16 @@ try:
         elapsed_time = time.time() - start_time
         if ptr % 2 == 0:
             sender.graph(elapsed_time,
-                         ekf.x[0, 0], ekf.x[0, 0], 'phase', '-',
-                         global_thigh_angle, ekf.z_hat[0], 'Global Thigh Angle', 'deg',
-                         #ekf.z_hat[0], 'Global Thigh Angle Pred', 'deg',
-                         #global_thigh_angle_vel_lp, 'Global Thigh Angle Vel', 'deg/s',
-                         #ekf.z_hat[1], 'Global Thigh Angle Vel Pred', 'deg/s'
-                         # Atan2, 'atan2', '-'
-                         # ekf.z_hat[2], 'atan2 Pred', '-'
-                         #knee_angle, 'knee_angle', 'deg',
-                         knee_angle_cmd, knee_angle, 'knee_angle', 'deg', # additional data stream to the same plot
-                         #knee_angle_cmd, 'knee_angle_cmd', 'deg',
-                         #ankle_angle, 'ankle_angle', 'deg',
-                         ankle_angle_cmd, ankle_angle, 'ankle_angle', 'deg',
-                         #ankle_angle_model, 'ankle_angle_model', 'deg',
+                         ekf.x[0, 0], ekf.x[0, 0], 'Phase', '--',
                          #ekf.x[0, 0], 'phase', '-',
                          #ekf.x[1, 0], 'phase_dot', '1/s',
                          #ekf.x[2, 0], 'step_length', 'm',
                          #ekf.x[3, 0], 'ramp_angle', 'deg'
+                         global_thigh_angle, ekf.z_hat[0], 'Global Thigh Angle', 'deg',
+                         #global_thigh_angle_vel_lp, ekf.z_hat[1], 'Global Thigh Angle Vel', 'deg/s',
+                         # Atan2, ekf.z_hat[2], 'Atan2', '-',
+                         knee_angle, knee_angle_cmd, 'Knee Angle', 'deg',
+                         ankle_angle, ankle_angle_cmd, 'Ankle Angle', 'deg'
                          )
         print('Elapsed time:', elapsed_time, ptr)
         ptr+=1

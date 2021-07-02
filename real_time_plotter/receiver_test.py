@@ -101,14 +101,15 @@ time.sleep(0.5) # gives extra time for sockets to be created
 
 # Making the first plot
 p1 = win.addPlot() ## setting plot name
+#p1.addLegend()
 #p1.setTitle('',**{'size': '40pt'})
-curve1 = p1.plot(pen=pg.mkPen(width = 5, color=(217, 83, 25)), name = '1') ## setting plot color
+curve1 = p1.plot(pen=pg.mkPen(width = 3, color=(0, 0, 0)))
 #### additional data streams #######################################################################
-curve1_2 = p1.plot(pen=pg.mkPen(width = 5, color=(27, 218, 211)), name = '2') ## setting plot color
+curve1_2 = p1.plot(pen=pg.mkPen(width = 3, color=(255, 0, 0)))
 ####################################################################################################
 ylabel1 = soc5.read_str()
 ylabelU1 = soc9.read_str()
-p1.setLabel('left', ylabel1, units = ylabelU1, **{'font-size':'20pt'}) ## setting y-axis label and units
+p1.setLabel('left', ylabel1, units = ylabelU1, **{'font-size':'15pt'}) ## setting y-axis label and units
 p1.getAxis('left').tickFont = tickFont ## setting tick font
 p1.getAxis('bottom').setStyle(showValues=False)
 p1.getAxis('left').setStyle(textFillLimits=[(0,0.2)])
@@ -128,14 +129,15 @@ numGraphs = 1 # counter used to keep track of how many graphs will be plotted
 try:
 	soc2.read_data()
 	p2 = win.addPlot() # creating the graph
+	p2.addLegend()
 	#p2.setTitle('',**{'size': '40pt'})
-	curve2 = p2.plot(pen=pg.mkPen(width = 5, color=(0, 114, 189)), name = '2')
+	curve2 = p2.plot(pen=pg.mkPen(width = 3, color=(0, 0, 0)), name = 'measured')
 	#### additional data streams #######################################################################
-	curve2_2 = p2.plot(pen=pg.mkPen(width = 5, color=(27, 218, 211)), name = '2') ## setting plot color
+	curve2_2 = p2.plot(pen=pg.mkPen(width = 3, color=(255, 0, 0)), name = 'predicted')
 	####################################################################################################
 	ylabel2 = soc6.read_str()
 	ylabelU2 = soc10.read_str()
-	p2.setLabel('left', ylabel2, units = ylabelU2, **{'font-size':'20pt'}) 
+	p2.setLabel('left', ylabel2, units = ylabelU2, **{'font-size':'15pt'}) 
 	p2.getAxis('left').tickFont = tickFont 
 	p2.getAxis('bottom').setStyle(showValues=False)
 	datay2 = [0]*numPoints
@@ -155,14 +157,15 @@ try:
 	soc3.read_data()
 	win.nextRow() # creates new row of plots
 	p3 = win.addPlot() # creating the graph
+	p3.addLegend()
 	#p3.setTitle('',**{'size': '40pt'})
-	curve3 = p3.plot(pen=pg.mkPen(width = 5, color=(162, 20, 47)), name = '1')
+	curve3 = p3.plot(pen=pg.mkPen(width = 3, color=(0, 0, 0)), name = 'measured')
 	#### additional data streams #######################################################################
-	curve3_2 = p3.plot(pen=pg.mkPen(width = 5, color=(27, 218, 211)), name = '2') ## setting plot color
+	curve3_2 = p3.plot(pen=pg.mkPen(width = 3, color=(255, 0, 0)), name = 'command')
 	####################################################################################################
 	ylabel3 = soc7.read_str()
 	ylabelU3 = soc11.read_str()
-	p3.setLabel('left', ylabel3, units = ylabelU3, **{'font-size':'20pt'})
+	p3.setLabel('left', ylabel3, units = ylabelU3, **{'font-size':'15pt'})
 	p3.getAxis('left').tickFont = tickFont 
 	p3.getAxis('bottom').setStyle(showValues=False)
 	datay3 = [0]*numPoints
@@ -181,14 +184,15 @@ except socket.error:
 try:
 	soc4.read_data()
 	p4 = win.addPlot() # creating the graph
+	p4.addLegend()
 	#p4.setTitle('',**{'size': '40pt'})
-	curve4 = p4.plot(pen=pg.mkPen(width = 5, color=(126, 47, 142)), name = '1')
+	curve4 = p4.plot(pen=pg.mkPen(width = 3, color=(0, 0, 0)), name = 'measured')
 	#### additional data streams #######################################################################
-	curve4_2 = p4.plot(pen=pg.mkPen(width = 5, color=(27, 218, 211)), name = '2') ## setting plot color
+	curve4_2 = p4.plot(pen=pg.mkPen(width = 3, color=(255, 0, 0)), name = 'command')
 	####################################################################################################
 	ylabel4 = soc8.read_str()
 	ylabelU4 = soc12.read_str()
-	p4.setLabel('left', ylabel4, units = ylabelU4, **{'font-size':'20pt'}) 
+	p4.setLabel('left', ylabel4, units = ylabelU4, **{'font-size':'15pt'}) 
 	p4.getAxis('left').tickFont = tickFont 
 	p4.getAxis('bottom').setStyle(showValues=False)
 	datay4 = [0]*numPoints

@@ -28,7 +28,7 @@ def graph(elapsed_time,
 	UDP_PORTY3 = 5019
 	UDP_PORTY4 = 5020
 	
-	# y labels' units
+	# y labels' units => legend
 	UDP_PORTU1 = 5021
 	UDP_PORTU2 = 5022
 	UDP_PORTU3 = 5023

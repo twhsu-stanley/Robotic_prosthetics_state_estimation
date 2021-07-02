@@ -21,10 +21,6 @@ def warpToOne(phase):
 
 def wrapTo2pi(ang):
     ang = ang % (2*np.pi)
-    #while ang > 2*np.pi:
-    #    ang -= 2*np.pi
-    #while ang < 0:
-    #    ang += 2*np.pi
     return ang
 
 def phase_error(phase_est, phase_truth):
@@ -100,7 +96,7 @@ class extended_kalman_filter:
         
         # Detect kidnapping event
         #lost = False
-        self.MD = np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) # Mahalanobis distance
+        #self.MD = np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) # Mahalanobis distance
         #if self.MD > np.sqrt(22.458): # 6-DOF Chi-square test np.sqrt(22.458)
             #lost = True
             # scale R of thigh angle vel
@@ -144,10 +140,8 @@ class extended_kalman_filter:
         elif self.x[2, 0] < step_lengths_min:
             self.x[2, 0] = step_lengths_min
 
-        ### Set ramp estimate ZERO for now ################################
         if self.x[3, 0] > 10:
             self.x[3, 0] = 10
         elif self.x[3, 0] < -10:
             self.x[3, 0] = -10
-        #######################################################
     
