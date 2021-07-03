@@ -1,13 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import csv
-logFile = r"OSL_walking_data/210617_122334_PV_Siavash_walk_500_2500.csv"
+logFile = r"210702_170412_OSL_benchtop_test.csv"
 datatxt = np.genfromtxt(logFile , delimiter=',', names = True)
 
 #Actual trajectory obtained from log files
 actualTrajectory = {
     "ThighSagi": datatxt["ThighSagi"],
-    "PV": datatxt['PV'],
+    #"PV": datatxt['PV'],
     "AnkleAngle": datatxt["ankJoiPos"],
     "KneeAngle": datatxt["kneJoiPos"]
 }
@@ -42,7 +42,7 @@ xindex = datatxt["Time"]
 fig, axs = plt.subplots(3, 1)
 axs[0].set_xlabel('Time(s)')
 axs[0].set_ylabel('Phase Variable')
-axs[0].plot(xindex, actualTrajectory['PV'][ranA:ranB]/998)
+#axs[0].plot(xindex, actualTrajectory['PV'][ranA:ranB]/998)
 axs[0].plot(xindex, ekfEstimates['phase'][ranA:ranB])
 axs[0].legend(["PV/998","EKF Phase"])
 

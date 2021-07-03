@@ -708,6 +708,8 @@ def test_motion(fxs, ankID, kneID, IMU):
     moveJoint(kneAngle = -5,  ankAngle = 0)
     moveJoint(kneAngle = -45,  ankAngle = 19)
     moveJoint(kneAngle = -90,  ankAngle = -10)
+    moveJoint(kneAngle = -45,  ankAngle = 19)
+    moveJoint(kneAngle = -90,  ankAngle = -10)
     # moveJoint(kneAngle = -5,  ankAngle = 0)
     # moveJoint(kneAngle = -5,  ankAngle = 10)
     # moveJoint(kneAngle = -5,  ankAngle = 0)
