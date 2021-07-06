@@ -1,6 +1,5 @@
 import numpy as np
 from model_framework import *
-#from continuous_data import *
 from model_fit import *
 import time
 

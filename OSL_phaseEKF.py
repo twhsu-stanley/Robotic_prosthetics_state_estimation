@@ -16,18 +16,8 @@ import mscl as msl                               # Module from Microstrain
 sys.path.append(r'/home/pi/prosthetic_phase_estimation/')
 from EKF import *
 from model_framework import *
-#from data_generators import *
-#from continuous_data import *
 from scipy.signal import butter, lfilter, lfilter_zi
 import sender_test as sender   # for real-time plotting
-
-# Process model for the EKF
-def A(dt):
-    return np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
-
-def process_model(x, dt):
-    #dt = 0.01 # data sampling rate: 100 Hz
-    return A(dt) @ x
 
 # -----------------TODO: change these constants to match your setup ----------------------
 ANK_PORT = r'/dev/ttyACM1'
