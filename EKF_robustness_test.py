@@ -3,14 +3,12 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from matplotlib.ticker import StrMethodFormatter
-from mpl_toolkits import mplot3d
 import time
-from ekf import *
+from EKF import *
 from model_framework import *
 from data_generators import *
 from continuous_data import *
-from model_fit import *
+#from model_fit import *
 import csv
 
 # [0123] tuning for normal case: Q=[0, 1e-7, 1e-7, 5e-3]
@@ -23,6 +21,7 @@ import csv
 # 4: global_thigh_angVel_5hz; 5: global_thigh_angVel_2x5hz; 6: global_thigh_angVel_2hz;
 # 7: atan2
 sensors = [0, 6, 7] # [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1] looks good
+sensor_keys = ['global_thigh_angle', 'global_thigh_angle_vel', 'atan2']
 arctan2 = False
 if sensors[-1] == 7:
     arctan2 = True
@@ -67,13 +66,6 @@ def loadTrajectory(trajectory = 'walking'):
 
     return trajectory
 
-def A(dt):
-    return np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
-
-def process_model(x, dt):
-    #dt = 0.01 # data sampling rate: 100 Hz
-    return A(dt) @ x
-
 def ekf_test(subject, trial, side, kidnap = False, plot = False):
     dt = 1/100
     # load ground truth
@@ -102,7 +94,8 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     z = np.squeeze(z)
     z = z[sensors, :]
 
-    Psi = load_Psi('Generic')[sensors]  # use generic model
+    Psi = np.array([load_Psi('Generic')[key] for key in sensor_keys], dtype = object)
+    #Psi = load_Psi('Generic')[sensors]  # use generic model
     saturation_range = Conti_maxmin(subject, plot = False)
 
     # build the system

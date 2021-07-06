@@ -178,7 +178,7 @@ def model_fit(model, mode):
 
     return PSI
 
-#def load_Psi():
+"""
 def load_Psi(subject = 'Generic'):
     if subject == 'Generic':
         with open('Psi/PikPsi_thigh_Y_G.pickle', 'rb') as file:
@@ -212,42 +212,14 @@ def load_Psi(subject = 'Generic'):
         with open('Psi/PikPsi_atan2.pickle', 'rb') as file:
             p = pickle.load(file)
             Psi_atan2 = p[subject]
-    #with open('Psi/Psi_thigh_Y.npz', 'rb') as file:
-    #    p = np.load(file, allow_pickle = True)
-    #    Psi_thigh_Y = p['arr_0'].item()[subject]
-    #with open('Psi/Psi_force_Z.npz', 'rb') as file:
-    #    p = np.load(file, allow_pickle = True)
-    #    Psi_force_Z = p['arr_0'].item()[subject]
-    #with open('Psi/Psi_force_X.npz', 'rb') as file:
-    #    p = np.load(file, allow_pickle = True)
-    #    Psi_force_X = p['arr_0'].item()[subject]
-    #with open('Psi/Psi_moment_Y.npz', 'rb') as file:
-    #    p = np.load(file, allow_pickle = True)
-    #    Psi_moment_Y = p['arr_0'].item()[subject]
     
-    #### probably not using this anymore, should be deleted eventually ####
-    subject = 'AB10'
-    with open('Psi_npz/Psi_thighVel_5hz.npz', 'rb') as file:
-        p = np.load(file, allow_pickle = True)
-        Psi_thighVel_5hz = p['arr_0'].item()[subject]
-    
-    with open('Psi_npz/Psi_thighVel_2x5hz.npz', 'rb') as file:
-        p = np.load(file, allow_pickle = True)
-        Psi_thighVel_2x5hz = p['arr_0'].item()[subject]
-    #######################################################################
-    
-    #with open('Psi/Psi_thighVel_2hz_p.npz', 'rb') as file:
-    #    p = np.load(file, allow_pickle = True)
-    #    Psi_thighVel_2hz = p['arr_0'].item()[subject]
-    
-    
-    #with open('Psi/Psi_atan2_s_p.npz', 'rb') as file:
-    #   p = np.load(file, allow_pickle = True)
-    #    Psi_atan2 = p['arr_0'].item()[subject]
-    
-    Psi = np.array([Psi_thigh_Y, Psi_force_Z, Psi_force_X, Psi_moment_Y,\
-                    Psi_thighVel_5hz, Psi_thighVel_2x5hz, Psi_thighVel_2hz, Psi_atan2], dtype = object)
+    #Psi = np.array([Psi_thigh_Y, Psi_force_Z, Psi_force_X, Psi_moment_Y,\
+    #                Psi_thighVel_5hz, Psi_thighVel_2x5hz, Psi_thighVel_2hz, Psi_atan2], dtype = object)
+               
+    Psi = {'global_thigh_angle': Psi_thigh_Y, 'force_Z': Psi_force_Z, 'force_X': Psi_force_X, 'moment_Y': Psi_moment_Y,
+           'global_thigh_angle_vel': Psi_thighVel_2hz, 'atan2': Psi_atan2}
     return Psi
+"""
 
 def measurement_error_cov(subject):
     with open('Gait_cycle_data/Global_thigh_angle.npz', 'rb') as file:

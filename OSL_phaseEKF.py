@@ -14,11 +14,10 @@ import locoOSL as loco                           # Module from Locolab
 import mscl as msl                               # Module from Microstrain
 
 sys.path.append(r'/home/pi/prosthetic_phase_estimation/')
-from ekf import *
+from EKF import *
 from model_framework import *
 #from data_generators import *
 #from continuous_data import *
-from model_fit import load_Psi
 from scipy.signal import butter, lfilter, lfilter_zi
 import sender_test as sender   # for real-time plotting
 
@@ -94,7 +93,8 @@ try:
     logger = loco.ini_log({**dataOSL, **cmd_log, **ekf_log}, sensors = "all_sensors", trialName = "OSL_benchtop_test")
 
     ### Intitialize EKF
-    sensors = [0, 6, 7] # [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1] looks good
+    sensors = [0, 6, 7]
+    sensor_keys = ['global_thigh_angle', 'global_thigh_angle_vel', 'atan2']
     arctan2 = False
     if sensors[-1] == 7:
         arctan2 = True
@@ -102,7 +102,7 @@ try:
         R = pickle.load(file)
 
     m_model = model_loader('Measurement_model_' + str(len(sensors)) +'_sp.pickle')
-    Psi = load_Psi('Generic')[sensors]
+    Psi = np.array([load_Psi('Generic')[key] for key in sensor_keys], dtype = object)
     saturation_range = [1, 0, 2, 0.8] 
     
     ## build the system

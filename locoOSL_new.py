@@ -4,16 +4,16 @@ The locoOSL is the default OSL plus a thigh-IMU.
 Python 3.7.3, rpi4, Dephy Actuator Package v0.2(B) (Firmware v5-20210121-ActPack-rigid0.2) 
 Vamsi, Ross, and Edgar - March 2021
 '''
-import sys, time, os, csv
+import sys, time, os, csv,math
 import numpy as np
 sys.path.append(r'/usr/share/python3-mscl/')                # Path of the MSCL - API for the IMU
 sys.path.append(r'/home/pi/OSL/Reference_Trajectories')     # Path to reference trajectories
-
-
 import mscl as ms
+import peakutils
 from flexsea import flexsea as flex
 from flexsea import fxEnums as fxe
-
+from scipy import interpolate
+from scipy import fftpack
 
 # TODO
 # Check loadcell scale. It is reading about 140N when Edgar is stading only in the OSL. (We should be able to measure something close to 700N)
@@ -37,6 +37,66 @@ T_motor = {
     'k_mot'     : 0.146/np.sqrt(3./2.*186e-3),
     }
 
+OSL_units = {
+    'Time': 's',
+    'kneMotPos': 'rad',
+    'kneMotTic': 'Ticks',
+    'kneMotVel': 'rad/s',
+    'kneMotAcc': 'rad/s^2',
+    'kneMotCur': 'A',
+    'kneBatVol': 'V',
+    'kneBatCur': 'A',
+    'kneGyrXax': 'rad/s',
+    'kneGyrYax': 'rad/s',
+    'kneGyrZax': 'rad/s',
+    'kneAccXax': 'rad/s^2',
+    'kneAccYax': 'rad/s^2',
+    'kneAccZax': 'rad/s^2',
+    'kneJoiPos': 'rad',
+    'kneJoiVel': 'rad/s',
+    'kneTimeSta':'s',
+    'kneMotTor': 'Nm',
+    'kneJoiTor': 'Nm',
+    'ankMotPos': 'rad',
+    'ankMotTic': 'Ticks',
+    'ankMotVel': 'rad/s',
+    'ankMotAcc': 'rad/s^2',
+    'ankMotCur': 'A',
+    'ankBatVol': 'V',
+    'ankBatCur': 'A',
+    'ankGyrXax': 'rad/s',
+    'ankGyrYax': 'rad/s',
+    'ankGyrZax': 'rad/s',
+    'ankAccXax': 'rad/s^2',
+    'ankAccYax': 'rad/s^2',
+    'ankAccZax': 'rad/s^2',
+    'ankJoiPos': 'rad',
+    'ankJoiVel': 'rad/s',
+    'ankTimeSta':'s',
+    'ankMotTor': 'Nm',
+    'ankJoiTor': 'Nm',
+    'loadCelFx': 'N',
+    'loadCelFy': 'N',
+    'loadCelFz': 'N',
+    'loadCelMx': 'Nm',
+    'loadCelMy': 'Nm',
+    'loadCelMz': 'Nm',
+    'IMURolXax': 'rad',
+    'IMUPitYax': 'rad',
+    'IMUYawZax': 'rad',
+    'IMUGyrXax': 'rad/s',
+    'IMUGyrYax': 'rad/s',
+    'IMUGyrZax': 'rad/s',
+    'IMUAccXax': 'rad/s^2',
+    'IMUAccYax': 'rad/s^2',
+    'IMUAccZax': 'rad/s^2',
+    'IMUTimSta': 's',
+    'IMUDelTim': 's',
+    'ThighSagi': 'rad',
+    'ThighCoro': 'rad',
+    'ThighTran': 'rad'
+}
+
 # UPDATED
 def state2Dict(actPackState, prefix = '', iniJoint = 0, biasJoint = 0):
     """
@@ -47,28 +107,29 @@ def state2Dict(actPackState, prefix = '', iniJoint = 0, biasJoint = 0):
     bits2rps = lambda x: x/32.8*(2*np.pi)/(360)     #Gyro bits to radians per second
     bit2mps2 = lambda x: x/8192*9.80665             #Accelerometer bits to m/s**2
 
-    sensorOSL = dict([(prefix+'MotPos',( tick2rad(actPackState.mot_ang), 'rad'))])
-    sensorOSL[prefix+'MotTic'] = (actPackState.mot_ang, 'Ticks')
-    sensorOSL[prefix+'MotVel'] = (tick2rad(actPackState.mot_vel)*1e3, 'rad/s')
-    sensorOSL[prefix+'MotAcc'] = (actPackState.mot_acc, 'rad/s^2')
-    sensorOSL[prefix+'MotCur'] = (actPackState.mot_cur*1e-3, 'A')                        
-    sensorOSL[prefix+'BatVol'] = (actPackState.batt_volt*1e-3, 'V')
-    sensorOSL[prefix+'BatCur'] = (actPackState.batt_curr*1e-3, 'A')
-    sensorOSL[prefix+'GyrXax'] = (bits2rps(actPackState.gyrox), 'rad/s')
-    sensorOSL[prefix+'GyrYax'] = (bits2rps(actPackState.gyroy), 'rad/s')
-    sensorOSL[prefix+'GyrZax'] = (bits2rps(actPackState.gyroz), 'rad/s')
-    sensorOSL[prefix+'AccXax'] = (bit2mps2(actPackState.accelx), 'rad/s^2')
-    sensorOSL[prefix+'AccYax'] = (bit2mps2(actPackState.accely), 'rad/s^2')
-    sensorOSL[prefix+'AccZax'] = (bit2mps2(actPackState.accelz), 'rad/s^2')
-    sensorOSL[prefix+'JoiPos'] = (- (tick2rad(actPackState.ank_ang) + iniJoint) \
-                                    + biasJoint , 'rad')       
-    sensorOSL[prefix+'JoiVel'] = (- actPackState.ank_vel,'rad/s')
-    sensorOSL[prefix+'TimSta'] = (actPackState.SystemTime/1000, 's')
+    sensorOSL = dict([(prefix+'MotPos', tick2rad(actPackState.mot_ang))])
+    sensorOSL[prefix+'MotTic'] = actPackState.mot_ang
+    sensorOSL[prefix+'MotVel'] = tick2rad(actPackState.mot_vel)*1e3
+    sensorOSL[prefix+'MotAcc'] = actPackState.mot_acc
+    sensorOSL[prefix+'MotCur'] = actPackState.mot_cur*1e-3                        
+    sensorOSL[prefix+'BatVol'] = actPackState.batt_volt*1e-3
+    sensorOSL[prefix+'BatCur'] = actPackState.batt_curr*1e-3
+    sensorOSL[prefix+'GyrXax'] = bits2rps(actPackState.gyrox)
+    sensorOSL[prefix+'GyrYax'] = bits2rps(actPackState.gyroy)
+    sensorOSL[prefix+'GyrZax'] = bits2rps(actPackState.gyroz)
+    sensorOSL[prefix+'AccXax'] = bit2mps2(actPackState.accelx)
+    sensorOSL[prefix+'AccYax'] = bit2mps2(actPackState.accely)
+    sensorOSL[prefix+'AccZax'] = bit2mps2(actPackState.accelz)
+    sensorOSL[prefix+'JoiPos'] = -(tick2rad(actPackState.ank_ang) + iniJoint) \
+                                    + biasJoint 
+    
+    sensorOSL[prefix+'JoiVel'] = -actPackState.ank_vel
+    sensorOSL[prefix+'TimSta'] = actPackState.SystemTime/1000
     # Estimated signals
-    sensorOSL[prefix+'MotTor'] = (sensorOSL[prefix+'MotCur'][0]*T_motor['k_tau'],'Nm')
-    sensorOSL[prefix+'JoiTor'] = (sensorOSL[prefix+'MotTor'][0]\
-                                -sensorOSL[prefix+'MotAcc'][0]*T_motor['jm']\
-                                -sensorOSL[prefix+'MotVel'][0]*T_motor['bm'], 'Nm')
+    sensorOSL[prefix+'MotTor'] = sensorOSL[prefix+'MotCur']*T_motor['k_tau']
+    sensorOSL[prefix+'JoiTor'] = sensorOSL[prefix+'MotTor']\
+                                -sensorOSL[prefix+'MotAcc']*T_motor['jm']\
+                                -sensorOSL[prefix+'MotVel']*T_motor['bm']
     return sensorOSL
 
 def state2LoCe(actPackState):
@@ -79,9 +140,9 @@ def state2LoCe(actPackState):
     EXC = 5
     offset = (2**12)/2
     rangeADC = 2**12 - 1    # Range from 0-4095 (12 bit ADC)
-    rawLoadCell = np.array([actPackState.genvar_1, actPackState.genvar_2,
-                            actPackState.genvar_3, actPackState.genvar_4, 
-                            actPackState.genvar_5, actPackState.genvar_6])
+    rawLoadCell = np.array([actPackState.genvar_0, actPackState.genvar_1,
+                            actPackState.genvar_2, actPackState.genvar_3, 
+                            actPackState.genvar_4, actPackState.genvar_5])
     scaledLoadCell = (rawLoadCell- offset)/rangeADC*EXC
     scaledLoadCell = scaledLoadCell*1000/(EXC*ampGain)      #[mv]    
     # Decoupling matrix for LoadCell SN: 3675        
@@ -134,12 +195,12 @@ def state2LoCe(actPackState):
     MY  - Mean: -0.0394     Standard dev.: 0.0242
     MZ  - Mean: -2.0320     Standard dev.: 0.0318
     """
-    sensorOSL = {'loadCelFx': (loadCellDecoupled[0]+meanVector[0],'N')}
-    sensorOSL['loadCelFy'] = (loadCellDecoupled[1]+meanVector[1],'N')
-    sensorOSL['loadCelFz'] = (loadCellDecoupled[2]+meanVector[2],'N')
-    sensorOSL['loadCelMx'] = (loadCellDecoupled[3]+meanVector[3],'Nm')
-    sensorOSL['loadCelMy'] = (loadCellDecoupled[4]+meanVector[4],'Nm')
-    sensorOSL['loadCelMz'] = (loadCellDecoupled[5]+meanVector[5],'Nm')
+    sensorOSL = {'loadCelFx': int(loadCellDecoupled[0]+meanVector[0])}
+    sensorOSL['loadCelFy'] = int(loadCellDecoupled[1]+meanVector[1])
+    sensorOSL['loadCelFz'] = int(loadCellDecoupled[2]+meanVector[2])
+    sensorOSL['loadCelMx'] = loadCellDecoupled[3]+meanVector[3]
+    sensorOSL['loadCelMy'] = loadCellDecoupled[4]+meanVector[4]
+    sensorOSL['loadCelMz'] = loadCellDecoupled[5]+meanVector[5]
     return sensorOSL
 
 def IMUPa2Dict(IMU_packets):
@@ -154,21 +215,22 @@ def IMUPa2Dict(IMU_packets):
 
     d2r = lambda x: x*np.pi/180                     #degrees to radians
     #Parsing information from IMU
+    #print(microstrainData['estRoll'])
     OSLSensors = {
-    'IMURolXax': (microstrainData['estRoll'], 'rad'),
-    'IMUPitYax': (microstrainData['estPitch'], 'rad'),
-    'IMUYawZax': (microstrainData['estYaw'], 'rad'),
-    'IMUGyrXax': (microstrainData['estAngularRateX'], 'rad/sec'),
-    'IMUGyrYax': (microstrainData['estAngularRateY'], 'rad/sec'),
-    'IMUGyrZax': (microstrainData['estAngularRateZ'], 'rad/sec'),
-    'IMUAccXax': (microstrainData['estLinearAccelX'], 'rad/sec^2'),
-    'IMUAccYax': (microstrainData['estLinearAccelY'], 'rad/sec^2'),
-    'IMUAccZax': (microstrainData['estLinearAccelZ'], 'rad/sec^2'),
-    'IMUTimSta': (microstrainData['estFilterGpsTimeTow'], 'sec'),
-    'IMUDelTim': (microstrainData['estFilterGpsTimeTow'], 'sec'),
-    'ThighSagi': (microstrainData['estRoll'] + d2r( 39.38 ), 'rad'),    # Adding offset rotation from IMU mount
-    'ThighCoro': (microstrainData['estPitch'], 'rad'),
-    'ThighTran': (microstrainData['estYaw'], 'rad'),
+    'IMURolXax': microstrainData['estRoll'],
+    'IMUPitYax': microstrainData['estPitch'],
+    'IMUYawZax': microstrainData['estYaw'],
+    'IMUGyrXax': microstrainData['estAngularRateX'],
+    'IMUGyrYax': microstrainData['estAngularRateY'],
+    'IMUGyrZax': microstrainData['estAngularRateZ'],
+    'IMUAccXax': microstrainData['estLinearAccelX'],
+    'IMUAccYax': microstrainData['estLinearAccelY'],
+    'IMUAccZax': microstrainData['estLinearAccelZ'],
+    'IMUTimSta': microstrainData['estFilterGpsTimeTow'],
+    'IMUDelTim': microstrainData['estFilterGpsTimeTow'],
+    'ThighSagi': microstrainData['estRoll'] + d2r( 39.38 ),    # Adding offset rotation from IMU mount
+    'ThighCoro': microstrainData['estPitch'],
+    'ThighTran': microstrainData['estYaw'],
     }
     return OSLSensors
 
@@ -183,9 +245,10 @@ def read_OSL(kneeState, ankleState, IMUPackets, initime = 0, encoderMap = None):
     else:
         iniAnk, biasAnk = encoderMap['ankJoiIni'], encoderMap['ankJoiBia']
         iniKne, biasKne = encoderMap['kneJoiIni'], encoderMap['kneJoiBia']
-    timeDic = {'Time': (time.perf_counter()-initime,'sec')}
+    timeDic = {'Time': time.perf_counter()-initime}
     kneDic = state2Dict(kneeState, 'kne', iniKne, biasKne)
     ankDic = state2Dict(ankleState,'ank', iniAnk, biasAnk)
+    # print("IniJoint: {:>10.4f} [rad]|BiasJoint: {:>10.4f} [rad]|".format(iniAnk,biasAnk)) 
     loaDic = state2LoCe(kneeState)        # State of the ActPack connected to the loadcell    
     IMUDic = IMUPa2Dict(IMUPackets)
     return {**timeDic, **kneDic, **loaDic, **ankDic, **IMUDic}
@@ -227,10 +290,10 @@ def read_enc_map( OSLdic):
     kneJoiPosMap_flex2ext = kneJoiPosMap_flex2ext[ kneindx ]
 
     # Get the offset of the motor encoders - Read values in radians
-    ankJoiEnc = OSLdic['ankJoiPos'][0]      # Joint encode in radians
-    ankMotEnc = OSLdic['ankMotTic'][0]      # Motor encoder in ticks
-    kneJoiEnc = OSLdic['kneJoiPos'][0]
-    kneMotEnc = OSLdic['kneMotTic'][0]
+    ankJoiEnc = OSLdic['ankJoiPos']      # Joint encode in radians
+    ankMotEnc = OSLdic['ankMotTic']      # Motor encoder in ticks
+    kneJoiEnc = OSLdic['kneJoiPos']
+    kneMotEnc = OSLdic['kneMotTic']
 
     # Use old encoder map to obtain old motor position - Ankle negative b/c increasing
     motAnkOldMap = -np.interp(-ankJoiEnc, -ankJoiPosMap_plan2dor, -ankMotPosMap_plan2dor) 
@@ -282,8 +345,17 @@ def joi2motTic(encoderMap, kneeAngle, anklAngle, anglesInDegrees = True):
     
     # Angular position of motor in ticks
     # Negative because the x-coordinate sequence is expected to be increasing
-    ankMotTick = -np.interp(-anklAngle, -encoderMap['ankJoi'], -encoderMap['ankMot']) 
-    kneMotTick = np.interp(kneeAngle, encoderMap['kneJoi'], encoderMap['kneMot'])
+
+    
+    # ankMotTick = -np.interp(-anklAngle, -encoderMap['ankJoi'], -encoderMap['ankMot']) 
+    # kneMotTick = np.interp(kneeAngle, encoderMap['kneJoi'], encoderMap['kneMot'])
+
+    ankInterp = interpolate.interp1d(-encoderMap['ankJoi'], -encoderMap['ankMot'],kind = 'linear')
+    kneInterp = interpolate.interp1d(encoderMap['kneJoi'], encoderMap['kneMot'],kind = 'linear')
+
+    ankMotTick = -ankInterp(-anklAngle)
+    kneMotTick = kneInterp(kneeAngle)
+
     # Angular position of the motor in encoder ticks
     ankMotCou = int( ankMotTick )
     kneMotCou = int( kneMotTick )   
@@ -305,6 +377,25 @@ def loadTrajectory(trajectory = 'walking'):
         kneOffs = 0
         hipGain = 1
         hipOffs = 0
+
+    elif trajectory.lower() == 'stair_ascent':
+        pathFile = r'/home/pi/OSL/Reference_Trajectories/stairAscentReznick_deg.csv'
+        # Gains to scale angles to OSL convention
+        ankGain = -1
+        ankOffs = -0.15 # [deg] Small offset to take into accoun that ankle ROM is -10 deg< ankle < 19.65 deg
+        kneGain = -1
+        kneOffs = 0
+        hipGain = 1
+        hipOffs = 0
+    elif trajectory.lower() == 'stair_descent':
+        pathFile = r'/home/pi/OSL/Reference_Trajectories/stairAscentReznick_deg.csv'
+        # Gains to scale angles to OSL convention
+        ankGain = -1
+        ankOffs = -0.15 # [deg] Small offset to take into accoun that ankle ROM is -10 deg< ankle < 19.65 deg
+        kneGain = -1
+        kneOffs = 0
+        hipGain = 1
+        hipOffs = 0
     else:
         raise ValueError('Please select a suported trajectory type')
 
@@ -313,22 +404,166 @@ def loadTrajectory(trajectory = 'walking'):
         datasetReader = csv.reader(f, quoting = csv.QUOTE_NONNUMERIC)
         data = np.transpose( np.array([row for row in datasetReader ]) )
 
-    # Parse data to knee-ankle trajectories using OSL angle convention (+ ankle = plantarflexion. + knee = flexion)
-    trajectory = dict(ankl = ankGain*data[0] + ankOffs)
-    trajectory["ankd"] = ankGain*data[1]
-    trajectory["andd"] = ankGain*data[2]
-    trajectory["knee"] = kneGain*data[3] + kneOffs
-    trajectory["kned"] = kneGain*data[4]
-    trajectory["kndd"] = kneGain*data[5]
-    trajectory["hip_"] = hipGain*data[6] + hipOffs
-    trajectory["hipd"] = hipGain*data[7]
-    trajectory["hidd"] = hipGain*data[8]
-    trajectory["phas"] = data[9]
-    trajectory["time"] = data[10]
+    if trajectory.lower() == 'walking':
+        
+        # Parse data to knee-ankle trajectories using OSL angle convention (+ ankle = plantarflexion. + knee = flexion)
+        trajectory = dict(ankl = ankGain*data[0] + ankOffs)
+        trajectory["ankd"] = ankGain*data[1]
+        trajectory["andd"] = ankGain*data[2]
+        trajectory["knee"] = kneGain*data[3] + kneOffs
+        trajectory["kned"] = kneGain*data[4]
+        trajectory["kndd"] = kneGain*data[5]
+        trajectory["hip_"] = hipGain*data[6] + hipOffs
+        trajectory["hipd"] = hipGain*data[7]
+        trajectory["hidd"] = hipGain*data[8]
+        trajectory["phas"] = data[9]
+        trajectory["time"] = data[10]
+    elif trajectory.lower() == 'stair_ascent':
+        
+        # Parse data to knee-ankle trajectories using OSL angle convention (+ ankle = plantarflexion. + knee = flexion)
+        
+        #Pose
+        trajectory = dict(ank20 = ankGain*data[0] + ankOffs)
+        trajectory["ank25"] = ankGain*data[1]
+        trajectory["ank30"] = ankGain*data[2]
+        trajectory["ank35"] = ankGain*data[3]
 
+        trajectory["kne20"] = kneGain*data[4] + kneOffs
+        trajectory["kne25"] = kneGain*data[5] + kneOffs
+        trajectory["kne30"] = kneGain*data[6] + kneOffs
+        trajectory["kne35"] = kneGain*data[7] + kneOffs
+
+        trajectory["hip20"] = hipGain*data[8] + hipOffs
+        trajectory["hip25"] = hipGain*data[9] + hipOffs
+        trajectory["hip30"] = hipGain*data[10] + hipOffs
+        trajectory["hip35"] = hipGain*data[11] + hipOffs
+
+        #Velocity
+        trajectory["ankd20"] = ankGain*data[12]
+        trajectory["ankd25"] = ankGain*data[13]
+        trajectory["ankd30"] = ankGain*data[14]
+        trajectory["ankd35"] = ankGain*data[15]
+
+        trajectory["kned20"] = kneGain*data[16]
+        trajectory["kned25"] = kneGain*data[17]
+        trajectory["kned30"] = kneGain*data[18]
+        trajectory["kned35"] = kneGain*data[19]
+
+        trajectory["hipd20"] = hipGain*data[20]
+        trajectory["hipd25"] = hipGain*data[21]
+        trajectory["hipd30"] = hipGain*data[22]
+        trajectory["hipd35"] = hipGain*data[23]
+
+        #Acceleration
+        trajectory["ankdd20"] = ankGain*data[24]
+        trajectory["ankdd25"] = ankGain*data[25]
+        trajectory["ankdd30"] = ankGain*data[26]
+        trajectory["ankdd35"] = ankGain*data[27]
+
+        trajectory["knedd20"] = kneGain*data[28]
+        trajectory["knedd25"] = kneGain*data[29]
+        trajectory["knedd30"] = kneGain*data[30]
+        trajectory["knedd35"] = kneGain*data[31]
+
+        trajectory["hipdd20"] = hipGain*data[32]
+        trajectory["hipdd25"] = hipGain*data[33]
+        trajectory["hipdd30"] = hipGain*data[34]
+        trajectory["hipdd35"] = hipGain*data[35]
+
+        trajectory["phase20"] = data[36]
+        trajectory["phase25"] = data[37]
+        trajectory["phase30"] = data[38]
+        trajectory["phase35"] = data[39]
+
+        trajectory["time"] = data[40]
+        
+    elif trajectory.lower() == 'stair_descent':
+            
+            # Parse data to knee-ankle trajectories using OSL angle convention (+ ankle = plantarflexion. + knee = flexion)
+            
+            #Pose
+            trajectory = dict(ank20 = ankGain*data[0] + ankOffs)
+            trajectory["ank25"] = ankGain*data[1]
+            trajectory["ank30"] = ankGain*data[2]
+            trajectory["ank35"] = ankGain*data[3]
+
+            trajectory["kne20"] = kneGain*data[4] + kneOffs
+            trajectory["kne25"] = kneGain*data[5] + kneOffs
+            trajectory["kne30"] = kneGain*data[6] + kneOffs
+            trajectory["kne35"] = kneGain*data[7] + kneOffs
+
+            trajectory["hip20"] = hipGain*data[8] + hipOffs
+            trajectory["hip25"] = hipGain*data[9] + hipOffs
+            trajectory["hip30"] = hipGain*data[10] + hipOffs
+            trajectory["hip35"] = hipGain*data[11] + hipOffs
+
+            #Velocity
+            trajectory["ankd20"] = ankGain*data[12]
+            trajectory["ankd25"] = ankGain*data[13]
+            trajectory["ankd30"] = ankGain*data[14]
+            trajectory["ankd35"] = ankGain*data[15]
+
+            trajectory["kned20"] = kneGain*data[16]
+            trajectory["kned25"] = kneGain*data[17]
+            trajectory["kned30"] = kneGain*data[18]
+            trajectory["kned35"] = kneGain*data[19]
+
+            trajectory["hipd20"] = hipGain*data[20]
+            trajectory["hipd25"] = hipGain*data[21]
+            trajectory["hipd30"] = hipGain*data[22]
+            trajectory["hipd35"] = hipGain*data[23]
+
+            #Acceleration
+            trajectory["ankdd20"] = ankGain*data[24]
+            trajectory["ankdd25"] = ankGain*data[25]
+            trajectory["ankdd30"] = ankGain*data[26]
+            trajectory["ankdd35"] = ankGain*data[27]
+
+            trajectory["knedd20"] = kneGain*data[28]
+            trajectory["knedd25"] = kneGain*data[29]
+            trajectory["knedd30"] = kneGain*data[30]
+            trajectory["knedd35"] = kneGain*data[31]
+
+            trajectory["hipdd20"] = hipGain*data[32]
+            trajectory["hipdd25"] = hipGain*data[33]
+            trajectory["hipdd30"] = hipGain*data[34]
+            trajectory["hipdd35"] = hipGain*data[35]
+
+            trajectory["phase20"] = data[36]
+            trajectory["phase25"] = data[37]
+            trajectory["phase30"] = data[38]
+            trajectory["phase35"] = data[39]
+
+            trajectory["time"] = data[40]
     return trajectory
 
-def getPhaseVariable_vTwoStates(OSLdic, FCThr = 10):
+def getVirtualConstraints(refKnee,refAnkle, pv, N):
+    L = len(refKnee)
+
+    #Calculate DFT
+    X_k = fftpack.fft(refKnee)/L
+    X_a = fftpack.fft(refAnkle)/L
+
+    #Real One sided DFT Coefficients
+    pk_real = np.real(X_k[range(L/2)])
+    pa_real = np.real(X_a[range(L/2)])
+
+    #Imaginary One sided DFT Coefficients
+    pk_imag = np.imag(X_k[range(L/2)])
+    pa_imag = np.imag(X_a[range(L/2)])
+
+    # Calculating VC
+    knee_traj =  .5*pk_real(0) + .5*pk_real(N/2)*math.cos(math.pi*N*pv);   
+    ankle_traj =  .5*pa_real(0) + .5*pa_real(N/2)*math.cos(math.pi*N*pv);   
+    for i in int(range(N)/2):
+        knee_traj += pk_real(i+1)*math.cos(2*math.pi*(i)*pv)-pk_imag(i+1)*math.sin(2*math.pi*(i)*pv)
+        ankle_traj += pa_real(i+1)*math.cos(2*math.pi*(i)*pv)-pa_imag(i+1)*math.sin(2*math.pi*(i)*pv)
+
+
+    return knee_traj,ankle_traj
+
+
+def getPhaseVariable_vTwoStates(OSLdic,maxHip, minHip, load_z, FCThr = 10):
     """
     Compute the walking phase variable using the thigh angle during only two monotonic regions: stance and swing.
     Note: With this phase variable the subject may need to modify the gait pattern to obtain better results. 
@@ -340,17 +575,19 @@ def getPhaseVariable_vTwoStates(OSLdic, FCThr = 10):
     r2d = lambda x: x*180/np.pi
 
     # Load walking trajectory and min. max. hip values for interpolation
-    wlkTrj = loadTrajectory(trajectory = 'walking')
-    maxHip = np.amax(wlkTrj['hip_'])        # Close to hip at HS
-    minHip = np.amin(wlkTrj['hip_'])        # Max. hip extension
+    # wlkTrj = loadTrajectory(trajectory = 'walking')
+    # maxHip = 30
+    # minHip = -10
+    # maxHip = np.amax(wlkTrj['hip_'])        # Close to hip at HS
+    # minHip = np.amin(wlkTrj['hip_'])        # Max. hip extension
 
     # Read data from sensors
-    thigh = r2d( OSLdic['ThighSagi'][0] )     # Sagittal-plane thigh angle [degrees]
+    thigh = r2d( OSLdic['ThighSagi'] )     # Sagittal-plane thigh angle [degrees]
 
     s = 0.57
 
     # Interpolate phase variable depending on loading condition (add + 0.5 to phase variable during swing)
-    if OSLdic['loadCelFz'][0] >= FCThr:
+    if load_z >= FCThr:
         pv = ((thigh - minHip) / (maxHip - minHip))*(1-s) + s
         if pv > 1:
             pv = 1
@@ -365,7 +602,7 @@ def getPhaseVariable_vTwoStates(OSLdic, FCThr = 10):
     
     return pv
 
-def getPhaseVariable_vSiavash(dataOSL, prevState, prevPV, sm, qhm, c = 0.53, qPo = -8.4, FCThres = -50):
+def getPhaseVariable_vSiavash(dataOSL, prevState, prevPV, sm, qhm, maxHip,minHip,HS_Hip,load_z,c = 0.53, qPo = -8.4, FCThres = 0):
     """
     Compute the walking phase variable using the thigh angle during only two monotonic regions: stance and swing.
     Note: The version of this phase variable corresponds to the definition in Section II-B of 
@@ -376,16 +613,16 @@ def getPhaseVariable_vSiavash(dataOSL, prevState, prevPV, sm, qhm, c = 0.53, qPo
     r2d = lambda x: x*180/np.pi
 
     # Load walking trajectory and min. max. hip values for interpolation
-    wlkTrj = loadTrajectory(trajectory = 'walking')
-    maxHip = np.amax(wlkTrj['hip_'])
-    minHip = np.amin(wlkTrj['hip_'])
-    HS_Hip = wlkTrj['hip_'][0]
+    # wlkTrj = loadTrajectory(trajectory = 'walking')
+    # maxHip = np.amax(wlkTrj['hip_'])
+    # minHip = np.amin(wlkTrj['hip_'])
+    # HS_Hip = wlkTrj['hip_'][0]
 
     # Read thigh angle in Sagittal plane [degrees]
-    thigh  = r2d( dataOSL['ThighSagi'][0] )    
-    thighd = r2d( dataOSL['IMUGyrXax'][0] )
+    thigh  = r2d( dataOSL['ThighSagi'])    
+    thighd = r2d( dataOSL['IMUGyrXax'])
     # Define if Foot contact is True or False
-    if (dataOSL['loadCelFz'][0] > FCThres):
+    if (load_z > FCThres):
         FC = False
     else:
         FC = True
@@ -420,8 +657,80 @@ def getPhaseVariable_vSiavash(dataOSL, prevState, prevPV, sm, qhm, c = 0.53, qPo
     elif currPV < 0:
         currPV = 0
 
-    return currPV, prevState, sm, qhm
+    return currPV, prevState, sm, qhm, FC
 
+def getPhaseVariable_Stairs(dataOSL, prevState, prevPV, sm, qhm, maxHip, minHip, mhf, load_z, c = 0.61, qPo = 10.0, FCThres = 24):
+    
+    r2d = lambda x: x*180/np.pi
+
+    # Load walking trajectory and min. max. hip values for interpolation
+    # stairTrj = loadTrajectory(trajectory = 'stair_ascent')
+    # maxHip = np.amax(stairTrj['hip_'])
+    # minHip = np.amin(stairTrj['hip_'])
+    
+
+    # Read thigh angle in Sagittal plane [degrees]
+    thigh  = r2d( dataOSL['ThighSagi'])    
+    thighd = r2d( dataOSL['IMUGyrXax'])
+    # Define if Foot contact is True or False
+    if (load_z > FCThres):
+        FC = False
+    else:
+        FC = True
+
+    # Transition conditions. Check Fig. 2 of RQDRGG_IEEEAccess2019 to evaluate conditions.
+    if (prevState == 1 and (thigh < qPo and FC) ):
+        currState = 2        
+    elif (prevState == 2 and thighd > 0):
+        currState = 3
+        sm = prevPV
+        qhm = thigh
+    elif (prevState == 4 and (mhf or FC)):
+        currState = 1
+        mhf = False
+    elif (not FC):      # Regardless of the state, if there is no foot contact go to state 4.
+        currState = 4
+    else:               # There is not transition
+        currState = prevState
+    
+    # Compute phase variable
+    if ( currState == 1 or currState == 2 ):
+        currPV = (maxHip - thigh) / (maxHip - minHip)*c
+    elif ( currState == 3 or currState == 4 ):
+        currPV = 1 + (1 - sm)/(maxHip - qhm)*(thigh - maxHip)
+
+    # Compute unidirectional filter for state 3
+    if ( currState == 3 and (prevPV > currPV) ):
+        currPV = prevPV         # Enforce s(k-1) <= s(k)
+
+    # Saturate phase variable as a safety feature
+    if currPV > 1:
+        currPV = 1
+    elif currPV < 0:
+        currPV = 0
+
+    return currPV, prevState, sm, qhm, mhf
+
+def maximumHipFlexionDetection(dataOSL,mhf, maxHip, temp_traj, minHipThresh = .3, maxHipThresh = 1.3, hipSwingThresh = .16, peakThresh = .8,minPeakDist = 100, FCThres = -50):
+    thigh = dataOSL['ThighSagi'][0]
+
+    if (dataOSL['loadCelFz'][0] < FCThres):
+        if thigh > hipSwingThresh:
+            if(not mhf or temp_traj != []):
+                temp_traj.append(thigh)
+
+            #Start Peak Search Algorithm
+            if len(temp_traj) > 0:
+                indexes = peakutils.indexes(np.array(temp_traj), thres = peakThresh,min_dist = minPeakDist)
+                #print(indexes)
+                if len(indexes) > 0:
+                    if indexes[-1] == (len(temp_traj)-2):
+                        if temp_traj[len(temp_traj)-2] > minHipThresh and temp_traj[len(temp_traj)-2] < maxHipThresh:
+                            mhf = True
+                            maxHip = temp_traj[len(temp_traj)-2]
+
+    return mhf, maxHip, temp_traj
+    
 def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
     """ 
     Move joint until sensing a toque/current limit. Record data in a csv.  
@@ -441,13 +750,13 @@ def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
             # Read IMU to control sample time
             joiDict = state2Dict( fxs.read_device(actPackID) )
             IMUDict = IMUPa2Dict( IMU.getDataPackets(TIMEOUT) )      
-            print('Calculated motor torque: %3.3f [%s]'%joiDict['MotTor'])  
+            print('Calculated motor torque: %3.3f'%joiDict['MotTor'])  
 
-            if ( np.abs( joiDict['MotTor'][0] ) >= motTorThr ):
+            if ( np.abs( joiDict['MotTor'] ) >= motTorThr ):
                 keepGoing = False
                 fxs.send_motor_command(actPackID, fxe.FX_VOLTAGE, 0)
                 IMU.getDataPackets(TIMEOUT)     # Wait one sample so that torque goes to 0
-            elif (i > 2000):
+            elif (i > 6000):
                 fxs.send_motor_command(actPackID, fxe.FX_VOLTAGE, 0)
                 raise Exception(f'Stopping homing routine after {i} samples')
             i += 1           
@@ -465,9 +774,9 @@ def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
         joiDict = state2Dict( fxs.read_device(actPackID) ) 
         IMUDict = IMUPa2Dict( IMU.getDataPackets(TIMEOUT) )
 
-        torqueArray = np.append( torqueArray, joiDict['MotTor'][0] )
-        motPosArray = np.append( motPosArray, joiDict['MotTic'][0] )
-        joiPosArray = np.append( joiPosArray, joiDict['JoiPos'][0] )
+        torqueArray = np.append( torqueArray, joiDict['MotTor'])
+        motPosArray = np.append( motPosArray, joiDict['MotTic'])
+        joiPosArray = np.append( joiPosArray, joiDict['JoiPos'])
 
         while keepGoing:
             #Initial time to estimate the sample time per cycle            
@@ -477,21 +786,21 @@ def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
             # Read and append data
             joiDict = state2Dict( fxs.read_device(actPackID) )
             IMUDict = IMUPa2Dict( IMU.getDataPackets(TIMEOUT) )
-            torqueArray = np.append( torqueArray, joiDict['MotTor'][0] )
-            motPosArray = np.append( motPosArray, joiDict['MotTic'][0] )
-            joiPosArray = np.append( joiPosArray, joiDict['JoiPos'][0] )           
+            torqueArray = np.append( torqueArray, joiDict['MotTor'])
+            motPosArray = np.append( motPosArray, joiDict['MotTic'])
+            joiPosArray = np.append( joiPosArray, joiDict['JoiPos'])           
             
-            print('Calculated motor torque: %3.3f [%s]'%joiDict['MotTor'])
+            print('Calculated motor torque: %3.3f'%joiDict['MotTor'])
 
-            if ( np.abs( joiDict['MotTor'][0] ) >= motTorThr ):
+            if ( np.abs( joiDict['MotTor'] ) >= motTorThr ):
                 keepGoing = False
                 fxs.send_motor_command(actPackID, fxe.FX_VOLTAGE, 0)
                 # Read and append data
                 joiDict = state2Dict( fxs.read_device(actPackID) )
                 IMUDict = IMUPa2Dict( IMU.getDataPackets(TIMEOUT) )
-                torqueArray = np.append( torqueArray, joiDict['MotTor'][0] )
-                motPosArray = np.append( motPosArray, joiDict['MotTic'][0] )
-                joiPosArray = np.append( joiPosArray, joiDict['JoiPos'][0] )   
+                torqueArray = np.append( torqueArray, joiDict['MotTor'])
+                motPosArray = np.append( motPosArray, joiDict['MotTic'])
+                joiPosArray = np.append( joiPosArray, joiDict['JoiPos'])   
             elif (i > 2000):
                 raise Exception(f'Stopping homing routine after {i} samples')
             print('Delta of time in the cycle: %4.4f [ms]'%deltaTime) 
@@ -518,7 +827,7 @@ def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
         print('\n***Homing routine stopped by user***\n')
 # OUTDATED
 
-def log_OSL(dataOSL, logger, degrees=True):
+def log_OSL(dataOSL, logger,degrees=True):
     """
     Log the OSL sensor information and its corresponding units.
     Parameters
@@ -555,10 +864,10 @@ def log_OSL(dataOSL, logger, degrees=True):
         if degrees and ( k.endswith('MotPos') or k.endswith('MotVel') or k.endswith('MotAcc') or \
                          k.endswith('JoiPos') or k.endswith('JoiVel') ):
 
-            val_list.append(dataOSL[k][0]*180/np.pi)
+            val_list.append(dataOSL[k]*180/np.pi)
              
         else:
-            val_list.append(dataOSL[k][0])
+            val_list.append(dataOSL[k])
             
 
     #Logs data into .csv file
@@ -656,16 +965,16 @@ def example_read(fxs, ankID, kneID, IMU):
     """
     Example function to read the loadcell
     """
-    for i in range(2000):
+    for i in range(10000):
         iniTime         = time.perf_counter_ns() 
         state           = fxs.read_device(kneID)
         loadCellDict    = state2LoCe(state)
         IMUState        = IMU.getDataPackets(TIMEOUT)
         print("Fx: {:>10.4f} [N] ||   Fy: {:>10.4f} [N] ||   Fz: {:10.4f} [N] ||   "
               "Mx: {:10.4f} [Nm] ||   My: {:10.4f} [Nm] ||   Mz: {:10.4f} [Nm]".format(
-                loadCellDict['loadCelFx'][0], loadCellDict['loadCelFy'][0],
-                loadCellDict['loadCelFz'][0], loadCellDict['loadCelMx'][0], 
-                loadCellDict['loadCelMy'][0], loadCellDict['loadCelMz'][0] ) )
+                loadCellDict['loadCelFx'], loadCellDict['loadCelFy'],
+                loadCellDict['loadCelFz'], loadCellDict['loadCelMx'], 
+                loadCellDict['loadCelMy'], loadCellDict['loadCelMz'] ) )
         deltaTime       = time.perf_counter_ns() - iniTime
     return
 
@@ -702,13 +1011,10 @@ def test_motion(fxs, ankID, kneID, IMU):
         ankSta  = fxs.read_device(ankID)
         IMUPac  = IMU.getDataPackets(TIMEOUT)
         dataOSL = read_OSL(kneSta, ankSta, IMUPac, logger['ini_time'],encMap)
-        
         log_OSL(dataOSL, logger)
         
     # moveJoint(kneAngle = -5,  ankAngle = 0)
     moveJoint(kneAngle = -5,  ankAngle = 0)
-    moveJoint(kneAngle = -45,  ankAngle = 19)
-    moveJoint(kneAngle = -90,  ankAngle = -10)
     moveJoint(kneAngle = -45,  ankAngle = 19)
     moveJoint(kneAngle = -90,  ankAngle = -10)
     # moveJoint(kneAngle = -5,  ankAngle = 0)
@@ -736,6 +1042,7 @@ if __name__ == "__main__":
 
     # Initialize IMU - The sample rate (SR) of the IMU controls the SR of the OS
     connection = ms.Connection.Serial(IMU_PORT, 921600)
+    #connection = ms.Connection.Serial(IMU_PORT, 230400)
     IMU = ms.InertialNode(connection)
     IMU.setToIdle()
     packets = IMU.getDataPackets(TIMEOUT)       # Clean the internal circular buffer.
@@ -761,6 +1068,7 @@ if __name__ == "__main__":
         fxs.send_motor_command(ankID, fxe.FX_NONE, 0)
         fxs.send_motor_command(kneID, fxe.FX_NONE, 0)
         IMU.setToIdle()
+        time.sleep(0.02)
         fxs.close(ankID)
         fxs.close(kneID)    
-        print('Communication with ActPacks closed and IMU set to idle')
+        print('Communication with ActPacks closed and IMU set to idle')    

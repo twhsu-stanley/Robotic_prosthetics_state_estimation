@@ -4,14 +4,62 @@ from model_framework import *
 from model_fit import *
 import time
 
-###### load control model & coefficients (for OSL implementation) ######
-c_model = model_loader('Control_model.pickle')
+# Process model for the EKF
+def A(dt):
+    return np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
 
+def process_model(x, dt):
+    #dt = 0.01 # data sampling rate: 100 Hz
+    return A(dt) @ x
+
+## Load control model & coefficients (for OSL implementation)
+c_model = model_loader('Control_model.pickle')
 with open('Psi/PikPsi_knee_G.pickle', 'rb') as file:
     Psi_knee = pickle.load(file)
 with open('Psi/PikPsi_ankle_G.pickle', 'rb') as file:
     Psi_ankle = pickle.load(file)
-########################################################################
+
+## Load model coefficients
+def load_Psi(subject = 'Generic'):
+    if subject == 'Generic':
+        with open('Psi/PikPsi_thigh_Y_G.pickle', 'rb') as file:
+            Psi_thigh_Y = pickle.load(file)
+        with open('Psi/PikPsi_force_Z_G.pickle', 'rb') as file:
+            Psi_force_Z = pickle.load(file)
+        with open('Psi/PikPsi_force_X_G.pickle', 'rb') as file:
+            Psi_force_X = pickle.load(file)
+        with open('Psi/PikPsi_moment_Y_G.pickle', 'rb') as file:
+            Psi_moment_Y = pickle.load(file)
+        with open('Psi/PikPsi_thighVel_2hz_G.pickle', 'rb') as file:
+            Psi_thighVel_2hz = pickle.load(file)
+        with open('Psi/PikPsi_atan2_G.pickle', 'rb') as file:
+            Psi_atan2 = pickle.load(file)
+    else:
+        with open('Psi/PikPsi_thigh_Y.pickle', 'rb') as file:
+            p = pickle.load(file)
+            Psi_thigh_Y = p[subject]
+        with open('Psi/PikPsi_force_Z.pickle', 'rb') as file:
+            p = pickle.load(file)
+            Psi_force_Z = p[subject]
+        with open('Psi/PikPsi_force_X.pickle', 'rb') as file:
+            p = pickle.load(file)
+            Psi_force_X = p[subject]
+        with open('Psi/PikPsi_moment_Y.pickle', 'rb') as file:
+            p = pickle.load(file)
+            Psi_moment_Y = p[subject]
+        with open('Psi/PikPsi_thighVel_2hz.pickle', 'rb') as file:
+            p = pickle.load(file)
+            Psi_thighVel_2hz = p[subject]
+        with open('Psi/PikPsi_atan2.pickle', 'rb') as file:
+            p = pickle.load(file)
+            Psi_atan2 = p[subject]
+    
+    #Psi = np.array([Psi_thigh_Y, Psi_force_Z, Psi_force_X, Psi_moment_Y,\
+    #                Psi_thighVel_5hz, Psi_thighVel_2x5hz, Psi_thighVel_2hz, Psi_atan2], dtype = object)
+               
+    Psi = {'global_thigh_angle': Psi_thigh_Y, 'force_Z': Psi_force_Z, 'force_X': Psi_force_X, 'moment_Y': Psi_moment_Y,
+           'global_thigh_angle_vel': Psi_thighVel_2hz, 'atan2': Psi_atan2}
+    return Psi
 
 def warpToOne(phase):
     phase_wrap = np.remainder(phase, 1)
@@ -96,7 +144,7 @@ class extended_kalman_filter:
         
         # Detect kidnapping event
         #lost = False
-        #self.MD = np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) # Mahalanobis distance
+        self.MD = np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) # Mahalanobis distance
         #if self.MD > np.sqrt(22.458): # 6-DOF Chi-square test np.sqrt(22.458)
             #lost = True
             # scale R of thigh angle vel

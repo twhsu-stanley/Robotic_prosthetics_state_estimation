@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import csv
 
-from ekf import *
+from EKF import *
 from model_framework import *
 from model_fit import load_Psi
 from scipy.signal import butter, lfilter, lfilter_zi
