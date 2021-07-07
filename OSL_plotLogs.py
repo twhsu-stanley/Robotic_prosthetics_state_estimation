@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import csv
-logFile = r"210702_170412_OSL_benchtop_test.csv"
+logFile = r"OSL_walking_data/210702_170412_OSL_benchtop_test.csv"
 datatxt = np.genfromtxt(logFile , delimiter=',', names = True)
 
 #Actual trajectory obtained from log files
@@ -51,7 +51,6 @@ axs[1].set_ylabel('Ankle Angle (Deg) (+Plantar.)')
 axs[1].plot(xindex, referenceTrajectory['AnkleRef'][ranA:ranB])
 axs[1].plot(xindex, actualTrajectory['AnkleAngle'][ranA:ranB])
 axs[1].set_ylim([-30,20])
-axs[1].set_title(logFile)
 axs[1].legend(["Commanded Value","Measured Value"])
 
 axs[2].set_xlabel('Time(s)')

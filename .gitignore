@@ -9,3 +9,6 @@ utils/__pycache__/
 *.pickle
 *.log
 *.csv
+*.png
+*.mat
+*.db

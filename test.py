@@ -1,32 +1,21 @@
-from pickle import FALSE
 import numpy as np
-import math
+import scipy.io
+import matplotlib.pyplot as plt
+import numpy as np
 
-print("0^0=", math.comb(0, 0))
+mat = scipy.io.loadmat('OSL_walking_data/Treadmill_speed1_incline0_file1.mat')
+thighY = mat['ThighIMU'][0, 0]['ThetaY']
 
-R = np.ones((8,8)) * 2
-print(R)
-U = np.diag([1, 1, 1, 1, 1/2, 1/2, 1/2, 1])
-R = U @ R @ U.T
-print(R)
+plt.figure()
+plt.plot(mat['ThighIMU'][0, 0]['ThetaY'])
+plt.plot(mat['ThighIMU'][0, 0]['ThetaX'])
+plt.plot(mat['ThighIMU'][0, 0]['ThetaZ'])
+plt.legend(('Y', 'X', 'Z'))
 
-R = np.ones((8,8)) * 1
-R = R * 4
-R1 = U @ R @ U.T
-print(R)
-R = np.ones((8,8)) * 1
-U = np.diag([2, 2, 2, 2, 1, 1, 1, 2])
-R2 = U @ R @ U.T
-print(R2-R1)
+plt.figure()
+tt = np.cumsum(mat['ControllerOutputs'][0, 0]['dt']).reshape(-1)
 
-ang = 10000
-print(ang % (2*np.pi))
+plt.plot(np.diff(tt))
+plt.plot(mat['ControllerOutputs'][0, 0]['dt'])
+plt.show()
 
-while ang > 2*np.pi:
-    ang -= 2*np.pi
-while ang < 0:
-    ang += 2*np.pi
-print(ang)
-
-k = [0,2,3]
-print(k != FALSE)
