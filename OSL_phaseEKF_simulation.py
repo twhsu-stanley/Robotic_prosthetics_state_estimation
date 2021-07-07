@@ -13,7 +13,7 @@ import scipy.io
 import sender_test as sender   # for real-time plotting
 
 ### A. Load Ross's pre-recorded walking data 
-""""
+#""""
 logFile = r"OSL_walking_data/210617_122334_PV_Siavash_walk_500_2500.csv"
 # 1) 210617_113644_PV_Siavash_walk_oscillations in phase
 # 2) 210617_121732_PV_Siavash_walk_300_1600
@@ -28,11 +28,11 @@ dataOSL = {
     'KneeAngle': datatxt["kneJoiPos"],
     'KneeAngleRef': datatxt["refKnee"],
 }
-"""
+#"""
 
 ### B. Load Kevin's bypass-adapter walking data
-#"""
-mat = scipy.io.loadmat('OSL_walking_data/Treadmill_speed1_incline0_file2.mat')
+"""
+mat = scipy.io.loadmat('OSL_walking_data/Treadmill_speed1_incline0_file1.mat')
 # Treadmill_speed1_incline0_file2
 # Treadmill_speed1_incline0_file1
 dataOSL = {
@@ -44,7 +44,10 @@ dataOSL = {
     'KneeAngle': -mat['KneeEncoder'][0, 0]['FilteredJointAngle'].reshape(-1),
     'KneeAngleRef': -mat['ControllerOutputs'][0, 0]['knee_des'].reshape(-1),
 }
-#"""
+"""
+
+### C. Benchtop test
+
 ## From loco_OSL.py: Load referenced trajectories
 def loadTrajectory(trajectory = 'walking'):
     # Create path to the reference csv trajectory
@@ -121,14 +124,14 @@ try:
     fs = 1 / (dataOSL["Time"][1] - dataOSL["Time"][0])          # sampling rate = 100 Hz (actual: ~77 Hz)
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
     ## configure low-pass filter (1-order)
-    normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
+    normal_cutoff = 1 / nyq   #cut-off frequency = 2Hz
     b_lp, a_lp = butter(1, normal_cutoff, btype = 'low', analog = False)
     z_lp_1 = lfilter_zi(b_lp,  a_lp)
     z_lp_2 = lfilter_zi(b_lp,  a_lp)
     
     ## configure band-pass filter (2-order)
-    normal_lowcut = 0.5 / nyq    #lower cut-off frequency = 0.5Hz 
-    normal_highcut = 2 / nyq     #upper cut-off frequency = 2Hz
+    normal_lowcut = 0.1 / nyq    #lower cut-off frequency = 0.5Hz 
+    normal_highcut = 1 / nyq     #upper cut-off frequency = 2Hz
     b_bp, a_bp = butter(2, [normal_lowcut, normal_highcut], btype = 'band', analog = False)
     z_bp = lfilter_zi(b_bp,  a_bp)
 
@@ -249,11 +252,11 @@ try:
         simulation_log['step_length_est'][indx] = ekf.x[2, 0]
         simulation_log['ramp_est'][indx] = ekf.x[3, 0]
 
-        simulation_log["global_thigh_angle_pred"][indx] = ekf.z_hat[0]
+        simulation_log["global_thigh_angle_pred"][indx] = ekf.z_hat[0,0]
         simulation_log["global_thigh_angle"][indx] = global_thigh_angle
-        simulation_log["global_thigh_angle_vel_pred"][indx] = ekf.z_hat[1]
+        simulation_log["global_thigh_angle_vel_pred"][indx] = ekf.z_hat[1,0]
         simulation_log["global_thigh_angle_vel"][indx] = global_thigh_angle_vel_lp
-        simulation_log["Atan2_pred"][indx] = ekf.z_hat[2]
+        simulation_log["Atan2_pred"][indx] = ekf.z_hat[2,0]
         simulation_log["Atan2"][indx] = Atan2
 
         simulation_log["ankle_angle_model"][indx] = ankle_angle_model
@@ -292,8 +295,8 @@ except KeyboardInterrupt:
 
 finally:
     ## Plot the results
-    t_lower = 4
-    t_upper = 15
+    t_lower = 35
+    t_upper = 60
     plt.figure("Gait Phase")
     plt.subplot(411)
     plt.title("EKF Gait State Estimate")

@@ -7,9 +7,9 @@ utils/__pycache__/
 *.npz
 *.npy
 *.pickle
-*/*.log
-*/*.csv
-*/*.png
-*/*.mat
-*/*.db
-./OSL_walking_data/**
+**/*.log
+**/*.csv
+**/*.png
+**/*.mat
+**/*.db
+OSL_walking_data/**

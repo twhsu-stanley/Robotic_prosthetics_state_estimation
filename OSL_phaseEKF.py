@@ -224,9 +224,9 @@ try:
         ekf_log['phase_dot'][0] = ekf.x[1, 0]
         ekf_log['stride_length'][0] = ekf.x[2, 0]
         ekf_log['ramp'][0] = ekf.x[3, 0]
-        ekf_log['thigh_angle_pred'][0] = ekf.z_hat[0]
-        ekf_log['thigh_angle_vel_pred'][0] = ekf.z_hat[1]
-        ekf_log['atan2_pred'][0] = ekf.z_hat[2]
+        ekf_log['thigh_angle_pred'][0] = ekf.z_hat[0][0]
+        ekf_log['thigh_angle_vel_pred'][0] = ekf.z_hat[1][0]
+        ekf_log['atan2_pred'][0] = ekf.z_hat[2][0]
         ekf_log['thigh_angle_vel'][0] = global_thigh_angle_vel_lp
         ekf_log['atan2'][0] = Atan2
         loco.log_OSL({**dataOSL,**cmd_log, **ekf_log}, logger)

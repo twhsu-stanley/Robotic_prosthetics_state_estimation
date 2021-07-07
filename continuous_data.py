@@ -423,12 +423,12 @@ def plot_Conti_joints_angles(subject, trial, side):
     end = 2000
     plt.subplot(211)
     plt.plot(knee_angle[start:end], 'k-')
-    plt.plot(knee_angle_pred[start:end], 'b--')
+    #plt.plot(knee_angle_pred[start:end], 'b--')
     plt.ylabel('knee angle')
     plt.legend(('actual', 'least squares'))
     plt.subplot(212)
     plt.plot(ankle_angle[start:end], 'k-')
-    plt.plot(-ankle_angle_pred[start:end], 'b--')
+    #plt.plot(-ankle_angle_pred[start:end], 'b--')
     plt.ylabel('ankle angle')
     plt.show()
 
@@ -537,9 +537,9 @@ if __name__ == '__main__':
     """
     ##################################################################
     
-    subject = 'AB10'
-    trial = 's1i0'
-    side = 'left'
+    subject = 'AB01'
+    trial = 's0x8i0'
+    side = 'right'
     #jointangles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]
     #k_Y = -jointangles['knee'][0, :]
     #k_X = -jointangles['knee'][1, :]
