@@ -12,4 +12,4 @@ utils/__pycache__/
 */*.png
 */*.mat
 */*.db
-/OSL_walking_data/**
+./OSL_walking_data/**
