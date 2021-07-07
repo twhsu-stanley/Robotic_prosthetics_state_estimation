@@ -341,7 +341,7 @@ def Psi_to_pickle():
 
 if __name__ == '__main__':
     """
-    with open('R_s.pickle', 'rb') as file:
+    with open('R.pickle', 'rb') as file:
         R = pickle.load(file)
     R_sum = np.zeros((8,8))
     for subject in subject_names:
@@ -448,7 +448,7 @@ if __name__ == '__main__':
     #R = dict()
     #for subject in subject_names:
     #    R[subject] = measurement_error_cov(subject)
-    #with open('R_s.pickle', 'wb') as file:
+    #with open('R.pickle', 'wb') as file:
     #	pickle.dump(R, file)
 
     

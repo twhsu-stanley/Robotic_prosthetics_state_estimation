@@ -106,7 +106,7 @@ def Conti_state_vars(subject, trial, side):
     return phase, phase_dot, step_length, ramp
 
 def load_Conti_measurement_data(subject, trial, side):
-    with open('Continuous_measurement_data_new_s.pickle', 'rb') as file:
+    with open('Continuous_measurement_data.pickle', 'rb') as file:
         Continuous_measurement_data = pickle.load(file)
 
     start_index, end_index = Conti_start_end(subject, trial, side)

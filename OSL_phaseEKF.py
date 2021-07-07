@@ -88,7 +88,7 @@ try:
     arctan2 = False
     if sensors[-1] == 7:
         arctan2 = True
-    with open('R_s.pickle', 'rb') as file:
+    with open('R.pickle', 'rb') as file:
         R = pickle.load(file)
 
     m_model = model_loader('Measurement_model_' + str(len(sensors)) +'_sp.pickle')
