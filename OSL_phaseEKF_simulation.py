@@ -98,7 +98,7 @@ try:
     with open('R.pickle', 'rb') as file:
         R = pickle.load(file)
 
-    m_model = model_loader('Measurement_model_' + str(len(sensors)) +'_sp.pickle')
+    m_model = model_loader('Measurement_model_' + str(len(sensors)) +'.pickle')
     Psi = np.array([load_Psi('Generic')[key] for key in sensor_keys], dtype = object)
     saturation_range = [2, 0, 2, 0.8]
 

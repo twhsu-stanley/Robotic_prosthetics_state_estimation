@@ -3,33 +3,29 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-import time
+#import time
 from EKF import *
 from model_framework import *
 from data_generators import *
 from continuous_data import *
-#from model_fit import *
 import csv
 
-# [0123] tuning for normal case: Q=[0, 1e-7, 1e-7, 5e-3]
-# [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1]
-# [01234567] w/ Q=[0, 3e-5, 1e-5, 1e-1][0, 4e-5, 1e-5, 1e-1]
+# Dictionary of the sensors
+sensors_dict = {'global_thigh_angle': 0, 'force_z_ankle': 1, 'force_x_ankle': 2,
+                'moment_y_ankle': 3, 'global_thigh_angle_vel': 4, 'atan2': 5}
 
-# determine which sensors to use
-# 0: global_thigh_angle_Y;
-# 1: force_z_ankle, 2: force_x_ankle; 3: moment_y_ankle;
-# 4: global_thigh_angVel_5hz; 5: global_thigh_angVel_2x5hz; 6: global_thigh_angVel_2hz;
-# 7: atan2
-sensors = [0, 6, 7] # [012456] w/ Q=[0, 3e-5, 1e-5, 1e-1] looks good
-sensor_keys = ['global_thigh_angle', 'global_thigh_angle_vel', 'atan2']
+# Determine which sensors to be used
+sensors = ['global_thigh_angle', 'global_thigh_angle_vel', 'atan2']
+sensor_id = [sensors_dict[key] for key in sensors]
+
 arctan2 = False
-if sensors[-1] == 7:
+if sensors[-1] == 'atan2':
     arctan2 = True
 
 with open('R.pickle', 'rb') as file:
     R = pickle.load(file)
 
-m_model = model_loader('Measurement_model_' + str(len(sensors)) +'_sp.pickle')
+m_model = model_loader('Measurement_model_' + str(len(sensors)) +'.pickle')
 
 ## From loco_OSL.py: Load referenced trajectories
 def loadTrajectory(trajectory = 'walking'):
@@ -71,8 +67,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     # load ground truth
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
     # load measurements
-    global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle,\
-                global_thigh_angVel_5hz, global_thigh_angVel_2x5hz, global_thigh_angVel_2hz, atan2\
+    global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle, global_thigh_angVel_2hz, atan2\
                                         = load_Conti_measurement_data(subject, trial, side)
 
     #### Joint Control ############################################################
@@ -83,19 +78,16 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     refKne = refTrajectory["knee"]
     ################################################################################
 
-    z = np.array([[global_thigh_angle_Y],\
-                  [force_z_ankle],\
-                  [force_x_ankle],\
-                  [moment_y_ankle],\
-                  [global_thigh_angVel_5hz],\
-                  [global_thigh_angVel_2x5hz],\
-                  [global_thigh_angVel_2hz],\
+    z = np.array([[global_thigh_angle_Y],
+                  [force_z_ankle],
+                  [force_x_ankle],
+                  [moment_y_ankle],
+                  [global_thigh_angVel_2hz],
                   [atan2]])
     z = np.squeeze(z)
-    z = z[sensors, :]
+    z = z[sensor_id, :]
 
-    Psi = np.array([load_Psi('Generic')[key] for key in sensor_keys], dtype = object)
-    #Psi = load_Psi('Generic')[sensors]  # use generic model
+    Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
     saturation_range = Conti_maxmin(subject, plot = False)
 
     # build the system
@@ -103,9 +95,9 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-7, 1e-7, 0]) #[0, 1e-5, 1e-5, 1e-1]
+    sys.Q = np.diag([0, 1e-5, 1e-5, 0])
     # measurement noise covariance
-    sys.R = R['Generic'][np.ix_(sensors, sensors)]
+    sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
     U = np.diag([2, 2, 2])
     sys.R = U @ sys.R @ U.T
 
@@ -138,14 +130,14 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     Sigma_norm = np.zeros((total_step, 1))
     Sigma_diag = np.zeros((total_step, 4))
     Mahal_dist = np.zeros((total_step, 1))
+    knee_angle_kmd = np.zeros((total_step, 1))
+    ankle_angle_kmd = np.zeros((total_step, 1))
     knee_angle_cmd = np.zeros((total_step, 1))
     ankle_angle_cmd = np.zeros((total_step, 1))
     #t_step_max = 0
     for i in range(total_step):
         Sigma_norm[i] = np.linalg.norm(ekf.Sigma)
         # kidnap
-        #if kidnap == True and i == kidnap_index:
-        #    ekf.x = state_kidnap
         if kidnap != False and i == kidnap_index:
             ekf.x[kidnap] = state_kidnap[kidnap]
         
@@ -155,8 +147,6 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         ekf.correction(z[:, i], Psi, arctan2)
         ekf.state_saturation(saturation_range)
         
-        #if t_step[i] > t_step_max:
-        #    t_step_max = t_step[i]
 
         x[i,:] = ekf.x.T
         z_pred[i,:] = ekf.z_hat.T
@@ -164,16 +154,15 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         Sigma_diag[i,:] = np.diag(ekf.Sigma)
         Mahal_dist[i] = ekf.MD
 
-        # control commands
-        #joint_angles = joints_control(x[i,0], x[i,1], x[i,2], x[i,3])
-        #knee_angle_cmd[i] = joint_angles[0]
-        #ankle_angle_cmd[i] = joint_angles[1]
+        ## Joints control commands 
+        # 1) generated by the kinematic model
+        joint_angles = joints_control(x[i,0], x[i,1], x[i,2], x[i,3])
+        knee_angle_kmd[i] = joint_angles[0]
+        ankle_angle_kmd[i] = joint_angles[1]
+        # 2) generated by Edgar's prescribed trajectories
         pv = int(ekf.x[0, 0] * 998)  # phase variable conversion (scaling)
         ankle_angle_cmd[i] = refAnk[pv]
         knee_angle_cmd[i] = refKne[pv]
-
-    #print("longest time step = ", t_step_max)
-    #print("mean time step = ", np.mean(t_step))
 
     # evaluate robustness
     # compare x and ground truth:
@@ -267,18 +256,22 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         plt.title("Control Commands: Joint Angles")
         plt.subplot(211)
         plt.plot(tt, knee_angle[0:total_step], 'k-')
-        plt.plot(tt, knee_angle_cmd, 'r--')
-        plt.ylabel('knee angle')
+        plt.plot(tt, knee_angle_cmd, 'r-')
+        plt.plot(tt, knee_angle_kmd, 'm-')
+        plt.legend(('actual', 'Edgar\'s trajectory', 'kinematic model'))
+        plt.ylabel('knee angle (deg)')
         plt.subplot(212)
         plt.plot(tt, ankle_angle[0:total_step], 'k-')
-        plt.plot(tt, ankle_angle_cmd, 'r--')
-        plt.ylabel('ankle angle')
+        plt.plot(tt, ankle_angle_cmd, 'r-')
+        plt.plot(tt, ankle_angle_kmd, 'm-')
+        plt.legend(('actual', 'Edgar\'s trajectory', 'kinematic model'))
+        plt.ylabel('ankle angle (deg)')
         plt.xlabel('time (s)')
 
         
-        plt.figure("Original Measurements")
+        plt.figure("Measurements")
         plt.subplot(411)
-        plt.title("Original Measurements")
+        plt.title("Measurements")
         plt.plot(tt, z[0, 0:total_step], 'k-')
         plt.plot(tt, z_pred[:, 0], 'r--')
         plt.legend(('actual', 'predicted'))
@@ -307,7 +300,6 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         plt.xlabel("time (s)")
         
         plt.figure("Auxiliary Measurements")
-        
         plt.subplot(411)
         plt.title("Original Measurements")
         plt.plot(tt, z[4, 0:total_step], 'k-')
@@ -346,22 +338,19 @@ def ekf_bank_test(subject, trial, side, N = 30, kidnap = [0,1,2,3], plot = True)
     # load ground truth
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
     # load measurements
-    global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle,\
-                global_thigh_angVel_5hz, global_thigh_angVel_2x5hz, global_thigh_angVel_2hz, atan2\
+    global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle, global_thigh_angVel_2hz, atan2\
                                         = load_Conti_measurement_data(subject, trial, side)
 
-    z = np.array([[global_thigh_angle_Y],\
-                  [force_z_ankle],\
-                  [force_x_ankle],\
-                  [moment_y_ankle],\
-                  [global_thigh_angVel_5hz],\
-                  [global_thigh_angVel_2x5hz],\
-                  [global_thigh_angVel_2hz],\
+    z = np.array([[global_thigh_angle_Y],
+                  [force_z_ankle],
+                  [force_x_ankle],
+                  [moment_y_ankle],
+                  [global_thigh_angVel_2hz],
                   [atan2]])
     z = np.squeeze(z)
-    z = z[sensors, :]
+    z = z[sensor_id, :]
 
-    Psi = load_Psi('Generic')[sensors]
+    Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
     saturation_range = Conti_maxmin(subject, plot = False)
 
     # build the system
@@ -369,9 +358,9 @@ def ekf_bank_test(subject, trial, side, N = 30, kidnap = [0,1,2,3], plot = True)
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-5, 1e-5, 1e-1]) #[0, 6e-5, 1e-6, 1e-1] #process model noise covariance [0, 3e-5, 1e-5, 1e-1]=70%
+    sys.Q = np.diag([0, 1e-5, 1e-5, 1e-1])
     # measurement noise covariance
-    sys.R = R['Generic'][np.ix_(sensors, sensors)]
+    sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
     U = np.diag([2, 2, 2])
     sys.R = U @ sys.R @ U.T
     
@@ -561,7 +550,7 @@ def ekf_robustness(kidnap = True):
 
     robustness = 0
 
-    with open('Measurements_with_Nan.pickle', 'rb') as file:
+    with open('Continuous_data/Measurements_with_Nan.pickle', 'rb') as file:
         nan_dict = pickle.load(file)
 
     #for subject in Conti_subject_names():
@@ -614,7 +603,7 @@ def ekf_robustness(kidnap = True):
 
 if __name__ == '__main__':
     subject = 'AB02'
-    trial = 's1i10'
+    trial = 's1i0'
     side = 'left'
 
     ekf_test(subject, trial, side, kidnap = False, plot = True)

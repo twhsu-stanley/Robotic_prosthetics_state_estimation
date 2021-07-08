@@ -54,7 +54,7 @@ def get_time_step(subject):
 #====================================== Generator functions ===============================================#
 def joint_angle_generator(subject, joint, direction = 'x', left=True, right=True):
     #Note: coords of the dataset are different from coords of the world frame
-    with open('KneeAngles_with_Nan.pickle', 'rb') as file:
+    with open('Continuous_data/KneeAngles_with_Nan.pickle', 'rb') as file:
         nan_dict = pickle.load(file)
     
     for trial in raw_walking_data['Gaitcycle'][subject].keys():

@@ -106,39 +106,37 @@ def Conti_state_vars(subject, trial, side):
     return phase, phase_dot, step_length, ramp
 
 def load_Conti_measurement_data(subject, trial, side):
-    with open('Continuous_measurement_data.pickle', 'rb') as file:
+    with open('Continuous_data/Continuous_measurement_data.pickle', 'rb') as file:
         Continuous_measurement_data = pickle.load(file)
 
     start_index, end_index = Conti_start_end(subject, trial, side)
     global_thigh_angle_Y = Continuous_measurement_data[subject][trial][side]['global_thigh_angle_Y'][0, start_index:end_index]
-    #global_thigh_angle_bp = Continuous_measurement_data[subject][trial][side]['global_thigh_angle_bp'][start_index:end_index] # bp
     force_z_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_z'][0, start_index:end_index]
     force_x_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_x'][0, start_index:end_index]
     moment_y_ankle = Continuous_measurement_data[subject][trial][side]['moment_ankle_y'][0, start_index:end_index]
-    global_thigh_angVel_5hz = Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_5hz'][start_index:end_index]
-    global_thigh_angVel_2x5hz = Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_2x5hz'][start_index:end_index]
+    #global_thigh_angVel_5hz = Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_5hz'][start_index:end_index]
+    #global_thigh_angVel_2x5hz = Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_2x5hz'][start_index:end_index]
     global_thigh_angVel_2hz = Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_2hz'][start_index:end_index]
     atan2 = Continuous_measurement_data[subject][trial][side]['atan2_s'][start_index:end_index]
 
     return global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle,\
-           global_thigh_angVel_5hz, global_thigh_angVel_2x5hz, global_thigh_angVel_2hz, atan2
+           global_thigh_angVel_2hz, atan2
 
 def plot_Conti_measurement_data(subject, trial, side):
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
-    global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle,\
-                                         global_thigh_angVel_5hz, global_thigh_angVel_2x5hz, global_thigh_angVel_2hz, atan2\
+    global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle, global_thigh_angVel_2hz, atan2\
                                          = load_Conti_measurement_data(subject, trial, side)
-    m_model = model_loader('Measurement_model_6_sp.pickle') # load new model w/ linear phase_dot
+    m_model = model_loader('Measurement_model_6.pickle') # load new model w/ linear phase_dot
     Psi = load_Psi('Generic')
 
-    global_thigh_angle_Y_pred = model_prediction(m_model.models[0], Psi[0], phases, phase_dots, step_lengths, ramps)
-    force_z_ankle_pred = model_prediction(m_model.models[1], Psi[1], phases, phase_dots, step_lengths, ramps)
-    force_x_ankle_pred = model_prediction(m_model.models[2], Psi[2], phases, phase_dots, step_lengths, ramps)
-    moment_y_ankle_pred = model_prediction(m_model.models[3],Psi[3], phases, phase_dots, step_lengths, ramps)
+    global_thigh_angle_Y_pred = model_prediction(m_model.models[0], Psi['global_thigh_angle'], phases, phase_dots, step_lengths, ramps)
+    force_z_ankle_pred = model_prediction(m_model.models[1], Psi['force_Z'], phases, phase_dots, step_lengths, ramps)
+    force_x_ankle_pred = model_prediction(m_model.models[2], Psi['force_X'], phases, phase_dots, step_lengths, ramps)
+    moment_y_ankle_pred = model_prediction(m_model.models[3],Psi['moment_Y'], phases, phase_dots, step_lengths, ramps)
     #global_thigh_angVel_5hz_pred = model_prediction(m_model.models[4], Psi[4], phases, phase_dots, step_lengths, ramps)
     #global_thigh_angVel_2x5hz_pred = model_prediction(m_model.models[5], Psi[5], phases, phase_dots, step_lengths, ramps)
-    global_thigh_angVel_2hz_pred = model_prediction(m_model.models[4], Psi[6], phases, phase_dots, step_lengths, ramps)
-    atan2_pred = model_prediction(m_model.models[5], Psi[7], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
+    global_thigh_angVel_2hz_pred = model_prediction(m_model.models[4], Psi['global_thigh_angle_vel'], phases, phase_dots, step_lengths, ramps)
+    atan2_pred = model_prediction(m_model.models[5], Psi['atan2'], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
  
     # compute rmse
     print("subject: ",  subject)
@@ -251,29 +249,13 @@ def plot_Conti_measurement_data(subject, trial, side):
     plt.plot(ramps)
     plt.ylabel('ramp')
     
-    plt.figure('Fictitious Sensors: thigh angle vel')
-    plt.subplot(311)
-    plt.plot(tt, global_thigh_angVel_5hz[0:total_step],'k-')
-    #plt.plot(tt, global_thigh_angVel_5hz_pred[0:total_step], 'b--')
-    plt.ylabel('$\dot{\\theta}_{Y_{5Hz}} ~(deg/s)$')
-    plt.ylim([-200, 400])
-    #plt.xlim([0, 13.6])
-    plt.legend(('actual', 'least squares'))
-    #plt.legend(('actual', 'least squares'), bbox_to_anchor=(1, 1.05))
-    plt.subplot(312)
-    plt.plot(tt, global_thigh_angVel_2x5hz[0:total_step],'k-')
-    #plt.plot(tt, global_thigh_angVel_2x5hz_pred[0:total_step], 'b--')
-    plt.ylabel('$\dot{\\theta}_{Y_{2.5Hz}} ~(deg/s)$')
-    #plt.xlim([0, 13.6])
-    plt.subplot(313)
-    
+    plt.figure('Fictitious Sensors')
+    plt.subplot(211)
     plt.plot(tt, global_thigh_angVel_2hz[0:total_step],'k-')
     plt.plot(tt, global_thigh_angVel_2hz_pred[0:total_step], 'b--')
     plt.ylabel('$\dot{\\theta}_{Y_{2Hz}} ~(deg/s)$')
     #plt.xlim([0, 13.6])
-    plt.xlabel('time (s)')
-    
-    plt.figure('Fictitious Sensors: atan2')
+    plt.subplot(212)
     plt.plot(tt, atan2[0:total_step],'k-')
     plt.plot(tt, at2[0:total_step], 'b--')
     plt.ylabel('$atan2~(rad)$')
@@ -373,7 +355,7 @@ def Conti_maxmin(subject, plot = True):
     
     return saturation_range
 
-def detect_nan():
+def detect_nan_in_measurements():
     nan_dict = dict()
     for subject in Conti_subject_names():
     #for subject in ['AB03']:
@@ -391,11 +373,11 @@ def detect_nan():
                         nan_dict[subject][trial][side] = False
                         print(subject + "/"+ trial + "/"+ side)
                         break    
-    with open('Measurements_with_Nan.pickle', 'wb') as file:
+    with open('Continuous_data/Measurements_with_Nan.pickle', 'wb') as file:
     	pickle.dump(nan_dict, file)
 
 def load_Conti_joints_angles(subject, trial, side):
-    with open('Continuous_joint_data.pickle', 'rb') as file:
+    with open('Continuous_data/Continuous_joint_data.pickle', 'rb') as file:
         Continuous_joint_data = pickle.load(file)
 
     start_index, end_index = Conti_start_end(subject, trial, side)
@@ -410,9 +392,9 @@ def plot_Conti_joints_angles(subject, trial, side):
     
     c_model = model_loader('Control_model.pickle')
 
-    with open('Psi/PikPsi_knee_G.pickle', 'rb') as file:
+    with open('Psi/Psi_knee_G.pickle', 'rb') as file:
         Psi_knee = pickle.load(file)
-    with open('Psi/PikPsi_ankle_G.pickle', 'rb') as file:
+    with open('Psi/Psi_ankle_G.pickle', 'rb') as file:
         Psi_ankle = pickle.load(file)
     
     knee_angle_pred = model_prediction(c_model.models[0], Psi_knee, phases, phase_dots, step_lengths, ramps)
@@ -434,9 +416,9 @@ def plot_Conti_joints_angles(subject, trial, side):
 
 def detect_knee_over_extention():
     c_model = model_loader('Control_model.pickle')
-    with open('Psi/PikPsi_knee_G.pickle', 'rb') as file:
+    with open('Psi/Psi_knee_G.pickle', 'rb') as file:
         Psi_knee = pickle.load(file)
-    with open('Psi/PikPsi_ankle_G.pickle', 'rb') as file:
+    with open('Psi/Psi_ankle_G.pickle', 'rb') as file:
         Psi_ankle = pickle.load(file)
     n = 0
     for subject in Conti_subject_names():
@@ -453,13 +435,13 @@ def detect_knee_over_extention():
                     print(subject +' / '+ trial +' / '+ side)
                     #print(np.count_nonzero(knee_angle_pred >= 0))
                     #print(np.max(knee_angle))
-                    plt.plot(knee_angle_pred)
-                    plt.plot(knee_angle)
-                    plt.legend(('pred', 'actual'))
-                    plt.show()
+                    #plt.plot(knee_angle_pred)
+                    #plt.plot(knee_angle)
+                    #plt.legend(('pred', 'actual'))
+                    #plt.show()
     print(n)
 
-def detect_nan_joints():
+def detect_nan_in_joints():
     nan_dict = dict()
     
     n_a = 0
@@ -504,7 +486,7 @@ def detect_nan_joints():
     print("Numbers of trials with nan in the ankle angles: ", n_a)
     print("Numbers of trials with nan in both knee and ankle angles: ", n_b)
 
-    with open('KneeAngles_with_Nan.pickle', 'wb') as file:
+    with open('Continuous_data/KneeAngles_with_Nan.pickle', 'wb') as file:
     	pickle.dump(nan_dict, file)
 
 if __name__ == '__main__':
@@ -554,7 +536,7 @@ if __name__ == '__main__':
     
     # APPEND NEW DATA
     """
-    with open('Continuous_measurement_data_new.pickle', 'rb') as file:
+    with open('Continuous_measurement_data_unscaled.pickle', 'rb') as file:
     	Continuous_measurement_data = pickle.load(file)
 
     dt = 1/100
@@ -585,11 +567,10 @@ if __name__ == '__main__':
                 #Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_2hz'] = global_thigh_angVel_2hz
                 Continuous_measurement_data[subject][trial][side]['atan2_s'] = atan2
     
-    with open('Continuous_measurement_data_new_s.pickle', 'wb') as file:
+    with open('Continuous_measurement_data.pickle', 'wb') as file:
     	pickle.dump(Continuous_measurement_data, file)
-
     """
-
+    
     ##### Find the saturation range for all subjects ###############
     """
     phase_dots_max = np.zeros((10,1))
@@ -612,12 +593,13 @@ if __name__ == '__main__':
     """
     ##################################################################
     
-    subject = 'AB10'
-    trial = 's1x2i5'
+    subject = 'AB02'
+    trial = 's1i0'
     side = 'left'
 
     #detect_knee_over_extention()
-    detect_nan_joints()
+    #detect_nan_in_measurements()
+    #detect_nan_in_joints()
 
     #jointangles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]
     #k_Y = -jointangles['knee'][0, :]
@@ -631,10 +613,9 @@ if __name__ == '__main__':
     #plt.show()
 
     #plot_Conti_joints_angles(subject, trial, side)
-    #detect_nan()
     #Conti_global_thigh_angle_Y(subject, trial, side)
     #plt.show()
-    #plot_Conti_measurement_data(subject, trial, side)
+    plot_Conti_measurement_data(subject, trial, side)
     #Conti_maxmin('AB01', plot = True)
 
     ######## test real0time filters #############

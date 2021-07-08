@@ -1013,8 +1013,14 @@ def test_motion(fxs, ankID, kneID, IMU):
         dataOSL = read_OSL(kneSta, ankSta, IMUPac, logger['ini_time'],encMap)
         log_OSL(dataOSL, logger)
         
+        ankAngle_actual = dataOSL['ankJoiPos'][0] * 180 / np.pi
+        kneAngle_actual = dataOSL['kneJoiPos'][0] * 180 / np.pi
+        print(f"Moved the knee to {kneAngle_actual} deg and ankle to {ankAngle_actual} deg")
+        
     # moveJoint(kneAngle = -5,  ankAngle = 0)
     moveJoint(kneAngle = -5,  ankAngle = 0)
+    moveJoint(kneAngle = -45,  ankAngle = 19)
+    moveJoint(kneAngle = -90,  ankAngle = -10)
     moveJoint(kneAngle = -45,  ankAngle = 19)
     moveJoint(kneAngle = -90,  ankAngle = -10)
     # moveJoint(kneAngle = -5,  ankAngle = 0)
@@ -1071,4 +1077,4 @@ if __name__ == "__main__":
         time.sleep(0.02)
         fxs.close(ankID)
         fxs.close(kneID)    
-        print('Communication with ActPacks closed and IMU set to idle')    
+        print('Communication with ActPacks closed and IMU set to idle')
