@@ -1,7 +1,7 @@
 import numpy as numpy
 import h5py as hp
 import pickle
-#import math
+from EKF import load_Psi
 from incline_experiment_utils import *
 from model_framework import *
 from model_fit import *
@@ -419,18 +419,93 @@ def plot_Conti_joints_angles(subject, trial, side):
     ankle_angle_pred = model_prediction(c_model.models[1], Psi_ankle, phases, phase_dots, step_lengths, ramps)
 
     plt.figure("Joint Angle Control")
-    start = 1000
-    end = 2000
+    start = 500
+    end = 2500
     plt.subplot(211)
     plt.plot(knee_angle[start:end], 'k-')
-    #plt.plot(knee_angle_pred[start:end], 'b--')
+    plt.plot(knee_angle_pred[start:end], 'b-')
     plt.ylabel('knee angle')
     plt.legend(('actual', 'least squares'))
     plt.subplot(212)
     plt.plot(ankle_angle[start:end], 'k-')
-    #plt.plot(-ankle_angle_pred[start:end], 'b--')
+    plt.plot(ankle_angle_pred[start:end], 'b-') 
     plt.ylabel('ankle angle')
     plt.show()
+
+def detect_knee_over_extention():
+    c_model = model_loader('Control_model.pickle')
+    with open('Psi/PikPsi_knee_G.pickle', 'rb') as file:
+        Psi_knee = pickle.load(file)
+    with open('Psi/PikPsi_ankle_G.pickle', 'rb') as file:
+        Psi_ankle = pickle.load(file)
+    n = 0
+    for subject in Conti_subject_names():
+        for trial in Conti_trial_names(subject):
+            if trial == 'subjectdetails':
+                continue
+            for side in ['left', 'right']:
+                knee_angle, ankle_angle = load_Conti_joints_angles(subject, trial, side)
+                phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
+                knee_angle_pred = model_prediction(c_model.models[0], Psi_knee, phases, phase_dots, step_lengths, ramps)
+                #ankle_angle_pred = model_prediction(c_model.models[1], Psi_ankle, phases, phase_dots, step_lengths, ramps)
+                if np.count_nonzero(knee_angle_pred >= 0) > 0:
+                    n += 1
+                    print(subject +' / '+ trial +' / '+ side)
+                    #print(np.count_nonzero(knee_angle_pred >= 0))
+                    #print(np.max(knee_angle))
+                    plt.plot(knee_angle_pred)
+                    plt.plot(knee_angle)
+                    plt.legend(('pred', 'actual'))
+                    plt.show()
+    print(n)
+
+def detect_nan_joints():
+    nan_dict = dict()
+    
+    n_a = 0
+    n_k = 0
+    n_b = 0
+
+    for subject in Conti_subject_names():
+        nan_dict[subject] = dict()
+        for trial in Conti_trial_names(subject):
+            if trial == 'subjectdetails':
+                continue
+            nan_dict[subject][trial] = dict()
+            for side in ['left', 'right']:
+                
+                flag_k = True
+                flag_a = True
+
+                nan_dict[subject][trial][side] = True
+                knee_angle, ankle_angle = load_Conti_joints_angles(subject, trial, side)
+                for i in range(3, len(knee_angle)):
+                    if knee_angle[i] == 0 and knee_angle[i-1] == 0 and knee_angle[i-2] == 0\
+                        and knee_angle[i-3] == 0:
+                        nan_dict[subject][trial][side] = False
+                        n_k += 1
+                        flag_k = False 
+                        #print("Nan in knee angle: " + subject + "/"+ trial + "/"+ side)
+                        break
+
+                for i in range(3, len(ankle_angle)):
+                    if ankle_angle[i] == 0 and ankle_angle[i-1] == 0 and ankle_angle[i-2] == 0\
+                        and ankle_angle[i-3] == 0:
+                        nan_dict[subject][trial][side] = False
+                        n_a += 1
+                        flag_a = False 
+                        #print("Nan in ankle angle: " + subject + "/"+ trial + "/"+ side)
+                        break
+                
+                if flag_k == False and flag_a == False:
+                    n_b += 1
+                
+    print("Numbers of trials with nan in the knee angles: ", n_k)    
+    print("Numbers of trials with nan in the ankle angles: ", n_a)
+    print("Numbers of trials with nan in both knee and ankle angles: ", n_b)
+
+    with open('KneeAngles_with_Nan.pickle', 'wb') as file:
+    	pickle.dump(nan_dict, file)
 
 if __name__ == '__main__':
     """
@@ -537,9 +612,13 @@ if __name__ == '__main__':
     """
     ##################################################################
     
-    subject = 'AB01'
-    trial = 's0x8i0'
-    side = 'right'
+    subject = 'AB10'
+    trial = 's1x2i5'
+    side = 'left'
+
+    #detect_knee_over_extention()
+    detect_nan_joints()
+
     #jointangles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]
     #k_Y = -jointangles['knee'][0, :]
     #k_X = -jointangles['knee'][1, :]
@@ -551,7 +630,7 @@ if __name__ == '__main__':
     #plt.ylabel('knee angle')
     #plt.show()
 
-    plot_Conti_joints_angles(subject, trial, side)
+    #plot_Conti_joints_angles(subject, trial, side)
     #detect_nan()
     #Conti_global_thigh_angle_Y(subject, trial, side)
     #plt.show()

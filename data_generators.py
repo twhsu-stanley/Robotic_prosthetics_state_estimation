@@ -1,4 +1,5 @@
 import h5py
+import pickle
 import numpy as np
 from incline_experiment_utils import *
 
@@ -53,16 +54,25 @@ def get_time_step(subject):
 #====================================== Generator functions ===============================================#
 def joint_angle_generator(subject, joint, direction = 'x', left=True, right=True):
     #Note: coords of the dataset are different from coords of the world frame
+    with open('KneeAngles_with_Nan.pickle', 'rb') as file:
+        nan_dict = pickle.load(file)
+    
     for trial in raw_walking_data['Gaitcycle'][subject].keys():
         if trial == 'subjectdetails':
             continue
         if(left == True):
+            if nan_dict[subject][trial]['left'] == False:
+                #print(subject + "/"+ trial + "/"+ 'left' + ": Trial skipped!")
+                continue
             yield raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['left'][joint][direction][:]
      
     for trial in  raw_walking_data['Gaitcycle'][subject].keys():
         if trial == 'subjectdetails':
             continue
         if(right == True):
+            if nan_dict[subject][trial]['right'] == False:
+                #print(subject + "/"+ trial + "/"+ 'right' + ": Trial skipped!")
+                continue
             yield raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['right'][joint][direction][:]
 
 def reaction_wrench_generator(subject, left=True, right=True):
@@ -315,7 +325,7 @@ if __name__ == '__main__':
     
     dict_ankle = dict()
     for subject in subject_names:
-        dict_ankle[subject] = get_joint_angle(subject, 'ankle', 'x')
+        dict_ankle[subject] = -get_joint_angle(subject, 'ankle', 'x')
     with open('Gait_cycle_data/ankle_angle.npz', 'wb') as file:
         np.savez(file, **dict_ankle)
     
