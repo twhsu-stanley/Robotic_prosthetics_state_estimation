@@ -83,16 +83,23 @@ try:
     logger = loco.ini_log({**dataOSL, **cmd_log, **ekf_log}, sensors = "all_sensors", trialName = "OSL_benchtop_test")
 
     ### Intitialize EKF
-    sensors = [0, 6, 7]
-    sensor_keys = ['global_thigh_angle', 'global_thigh_angle_vel', 'atan2']
+    # Dictionary of the sensors
+    sensors_dict = {'global_thigh_angle': 0, 'force_z_ankle': 1, 'force_x_ankle': 2,
+                    'moment_y_ankle': 3, 'global_thigh_angle_vel': 4, 'atan2': 5}
+
+    # Determine which sensors to be used
+    sensors = ['global_thigh_angle', 'global_thigh_angle_vel', 'atan2']
+    sensor_id = [sensors_dict[key] for key in sensors]
+
     arctan2 = False
-    if sensors[-1] == 7:
+    if sensors[-1] == 'atan2':
         arctan2 = True
+
     with open('R.pickle', 'rb') as file:
         R = pickle.load(file)
 
-    m_model = model_loader('Measurement_model_' + str(len(sensors)) +'_sp.pickle')
-    Psi = np.array([load_Psi('Generic')[key] for key in sensor_keys], dtype = object)
+    m_model = model_loader('Measurement_model_' + str(len(sensors)) +'.pickle')
+    Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
     saturation_range = [1, 0, 2, 0.8] 
     
     ## build the system
@@ -102,7 +109,7 @@ try:
     sys.h = m_model
     sys.Q = np.diag([0, 1e-7, 1e-7, 0])
     # measurement noise covariance
-    sys.R = R['Generic'][np.ix_(sensors, sensors)]
+    sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
     U = np.diag([2, 2, 2])
     sys.R = U @ sys.R @ U.T
 
@@ -197,7 +204,8 @@ try:
         """
         joint_angles = joints_control(ekf.x[0, 0], ekf.x[1, 0], ekf.x[2, 0], ekf.x[3, 0])
         knee_angle_model = joint_angles[0]
-        ankle_angle_model = -joint_angles[1] # negative sign
+        ankle_angle_model = -joint_angles[1]
+
         # saturate commands to actuators
         if knee_angle_model > -5: 
             knee_angle_model = -5
