@@ -1,6 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from EKF import joints_control
+from model_framework import *
 import csv
+
 logFile = r"OSL_walking_data/210702_170412_OSL_benchtop_test.csv"
 datatxt = np.genfromtxt(logFile , delimiter=',', names = True)
 
@@ -26,13 +29,22 @@ ekfEstimates = {
     "ramp": datatxt["ramp"],
     
     # NOTICE: "_bf" here is for correcting the error in the csv file
-    "thigh_angle_pred": datatxt["thigh_angle_pred_bf"], 
-    "thigh_angle_vel_pred": datatxt["thigh_angle_vel_pred_bf"],
-    "atan2_pred": datatxt["atan2_pred_bf"],
+    "thigh_angle_pred": datatxt["thigh_angle_pred"], 
+    "thigh_angle_vel_pred": datatxt["thigh_angle_vel_pred"],
+    "atan2_pred": datatxt["atan2_pred"],
     
     "thigh_angle_vel": datatxt["thigh_angle_vel"],
     "atan2": datatxt["atan2"]
 }
+
+## Generating joints angles using the kinematics model
+knee_angle_kmodel = np.zeros((len(ekfEstimates['phase']), 1))
+ankle_angle_kmodel = np.zeros((len(ekfEstimates['phase']), 1))
+for i in range(len(ekfEstimates['phase'])):
+    joint_angles = joints_control(ekfEstimates['phase'][i], ekfEstimates['phase_dot'][i],
+                                  ekfEstimates['stride_length'][i], ekfEstimates['ramp'][i])          
+    knee_angle_kmodel[i] = joint_angles[0]
+    ankle_angle_kmodel[i] = joint_angles[1]
 
 ############## Plotting and Saving #################
 ranA = 0
@@ -49,16 +61,18 @@ axs[0].plot(xindex, ekfEstimates['phase'][ranA:ranB], 'r-')
 
 axs[1].set_ylabel('Ankle angle command (Deg)')
 axs[1].plot(xindex, referenceTrajectory['AnkleRef'][ranA:ranB], 'r-')
+axs[1].plot(xindex, ankle_angle_kmodel[ranA:ranB], 'm-')
 #axs[1].plot(xindex, actualTrajectory['AnkleAngle'][ranA:ranB])
 #axs[1].set_ylim([-30,20])
-#axs[1].legend(["Commanded Value","Measured Value"])
+axs[1].legend(["Edgar\'s trajectory","kinematic model"])
 
 axs[2].set_xlabel('Time(s)')
 axs[2].set_ylabel('Knee angle command (Deg)')
 axs[2].plot(xindex, referenceTrajectory['KneeRef'][ranA:ranB], 'r-')
+axs[2].plot(xindex, knee_angle_kmodel[ranA:ranB], 'm-')
 #axs[2].plot(xindex, actualTrajectory['KneeAngle'][ranA:ranB])
 axs[2].set_ylim([-70,10])
-#axs[2].legend(["Commanded Value","Measured Value"])
+axs[2].legend(["Edgar\'s trajectory","kinematic model"])
 
 fig.set_size_inches(22, 13)
 plt.savefig(logFile + 'Joints_Commands.png', dpi=100)

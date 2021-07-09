@@ -6,6 +6,7 @@ import numpy as np
 import math
 import pickle
 import scipy
+from scipy.special import comb
 
 class Basis:
 	def __init__(self, n, var_name):
@@ -72,14 +73,14 @@ class Berstein_Basis(Basis):
 
 	#This function will evaluate the model at the given x value
 	def evaluate(self, x):
-		result = [scipy.special.comb(self.n, i) * x**i * (1-x)**(self.n-i) for i in range(0, self.n + 1)]
+		result = [comb(self.n, i) * x**i * (1-x)**(self.n-i) for i in range(0, self.n + 1)]
 		return np.array(result)
 
 	#This function will evaluate the derivative of the model at the given x value
 	def evaluate_derivative(self, x):
 		if self.n >= 2:
 			result = [-self.n * (1-x)**(self.n-1)]
-			result += [scipy.special.comb(self.n, i) * (i * x**(i-1) * (1-x)**(self.n-i) - x**i * (self.n-i) * (1-x)**(self.n-i-1)) for i in range(1, self.n)]
+			result += [comb(self.n, i) * (i * x**(i-1) * (1-x)**(self.n-i) - x**i * (self.n-i) * (1-x)**(self.n-i-1)) for i in range(1, self.n)]
 			result += [self.n * x**(self.n-1)]
 		elif self.n == 1:
 			result = [-1, 1]

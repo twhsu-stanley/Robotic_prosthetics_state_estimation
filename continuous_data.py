@@ -593,9 +593,9 @@ if __name__ == '__main__':
     """
     ##################################################################
     
-    subject = 'AB02'
-    trial = 's1i0'
-    side = 'left'
+    subject = 'AB10'
+    trial = 's0x8i0'
+    side = 'right'
 
     #detect_knee_over_extention()
     #detect_nan_in_measurements()
@@ -612,10 +612,10 @@ if __name__ == '__main__':
     #plt.ylabel('knee angle')
     #plt.show()
 
-    #plot_Conti_joints_angles(subject, trial, side)
+    plot_Conti_joints_angles(subject, trial, side)
     #Conti_global_thigh_angle_Y(subject, trial, side)
     #plt.show()
-    plot_Conti_measurement_data(subject, trial, side)
+    #plot_Conti_measurement_data(subject, trial, side)
     #Conti_maxmin('AB01', plot = True)
 
     ######## test real0time filters #############

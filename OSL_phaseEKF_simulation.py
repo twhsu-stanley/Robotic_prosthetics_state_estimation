@@ -101,7 +101,7 @@ try:
     arctan2 = False
     if sensors[-1] == 'atan2':
         arctan2 = True
-        
+
     with open('R.pickle', 'rb') as file:
         R = pickle.load(file)
 
@@ -131,14 +131,14 @@ try:
     fs = 1 / (dataOSL["Time"][1] - dataOSL["Time"][0])          # sampling rate = 100 Hz (actual: ~77 Hz)
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
     ## configure low-pass filter (1-order)
-    normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
+    normal_cutoff = 2.5 / nyq   #cut-off frequency = 2Hz
     b_lp, a_lp = butter(1, normal_cutoff, btype = 'low', analog = False)
     z_lp_1 = lfilter_zi(b_lp,  a_lp)
     z_lp_2 = lfilter_zi(b_lp,  a_lp)
     
     ## configure band-pass filter (2-order)
     normal_lowcut = 0.5 / nyq    #lower cut-off frequency = 0.5Hz 
-    normal_highcut = 2 / nyq     #upper cut-off frequency = 2Hz
+    normal_highcut = 2.5 / nyq     #upper cut-off frequency = 2Hz
     b_bp, a_bp = butter(2, [normal_lowcut, normal_highcut], btype = 'band', analog = False)
     z_bp = lfilter_zi(b_bp,  a_bp)
 
@@ -302,8 +302,8 @@ except KeyboardInterrupt:
 
 finally:
     ## Plot the results
-    t_lower = 0
-    t_upper = 300
+    t_lower = 10
+    t_upper = 40
     plt.figure("Gait Phase")
     plt.subplot(411)
     plt.title("EKF Gait State Estimate")
@@ -362,7 +362,7 @@ finally:
     plt.plot(dataOSL["Time"], simulation_log["ankle_angle_cmd"], 'r-')
     plt.plot(dataOSL["Time"], simulation_log["ankle_angle_model"], 'm-')
     #plt.plot(dataOSL["Time"], dataOSL['AnkleAngle'], 'b-')
-    plt.legend(('recorded', 'simulated', 'kinematic model'))
+    plt.legend(('recorded', 'Edgar\'s trajectories', 'kinematic model'))
     plt.ylabel("Ankle angle command(deg)")
     plt.xlim((t_lower, t_upper))
     plt.subplot(313)
@@ -370,7 +370,7 @@ finally:
     plt.plot(dataOSL["Time"], simulation_log["knee_angle_cmd"], 'r-')
     plt.plot(dataOSL["Time"], simulation_log["knee_angle_model"], 'm-')
     #plt.plot(dataOSL["Time"], dataOSL['KneeAngle'], 'b-')
-    plt.legend(('recorded', 'simulated', 'kinematic model'))
+    plt.legend(('recorded', 'Edgar\'s trajectories', 'kinematic model'))
     plt.ylabel("Knee angle command(deg)")
     plt.xlabel("Time (s)")
     plt.xlim((t_lower, t_upper))
