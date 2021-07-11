@@ -84,21 +84,53 @@ try:
     else:
         sys.exit("User stopped the execution")
 
-    ank_ref = []
-    ank_mea = []
-    kne_ref = []
-    kne_mea = []
+
+    ## Command settings
+    # Ankle angle limits (deg)
+    ankle_max = 18
+    ankle_min = -10
+    # Natural frequency of the sinewave (rad/s)
+    freq = 2 * np.pi * 0.2 # 0.2 Hz
+    # DC offset of the sinewave
+    dc_offset_initial = dataOSL['ankMotPos'] * 180 / np.pi  # current position
+    dc_offset_final = (ankle_max + ankle_min) / 2
+    # Amplitude of the sinewave
+    amplitude_initial = 0
+    amplitude_final = (ankle_max - ankle_min) / 2
+    # Fade-in time (sec)
+    fade_in_time = 3
+
+    ankle_ref = []
+    ankle_mea = []
+    knee_ref = []
+    knee_mea = []
     t_0 = time.perf_counter()
-    t_i = t_0
-    while(t_i - t_0 < 10):
-        t_i = time.perf_counter()
+    t = 0
+
+    while(t < 15):
+        t = time.perf_counter() - t_0
+
+        # Ankle command (deg)
+        if t < fade_in_time:
+            amplitude = amplitude_initial + (amplitude_final - amplitude_initial) * t / fade_in_time
+            dc_offset = dc_offset_initial + (dc_offset_final - dc_offset_initial) * t / fade_in_time
+        elif t >= fade_in_time:
+            amplitude = amplitude_final
+            dc_offset = dc_offset_final
+
+        ankle_cmd = amplitude * np.sin(freq * t) + dc_offset
         
-        # JOints commands (deg)
-        ank_i = dataOSL['ankMotPos'] * 180 / np.pi + np.sin(2 * np.pi * 0.3 * (t_i - t_0)) # 0.3 Hz
-        kne_i = -5 
+        # Saturation
+        if ankle_cmd > 18: 
+            ankle_cmd = 18
+        elif ankle_cmd < -10:
+            ankle_cmd = -10
         
-        # Sending commands
-        ankMotCou, kneMotCou = loco.joi2motTic(encMap, kne_i, ank_i)
+        # Knee command (deg)
+        knee_cmd = -5 
+        
+        # Sending commands  
+        ankMotCou, kneMotCou = loco.joi2motTic(encMap, knee_cmd, ankle_cmd)
         fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, ankMotCou)
         fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, kneMotCou)
         
@@ -109,30 +141,28 @@ try:
         dataOSL = loco.read_OSL(kneSta, ankSta, IMUPac, logger['ini_time'], encMap)
         loco.log_OSL(dataOSL, logger)
 
-        ank_ref.append(ank_i)
-        ank_mea.append(dataOSL['ankMotPos'] * 180 / np.pi)
-        kne_ref.append(kne_i)
-        kne_mea.append(dataOSL['kneMotPos'] * 180 / np.pi)        
-        
-        dt = time.perf_counter() - t_i
+        ankle_ref.append(ankle_cmd)
+        ankle_mea.append(dataOSL['ankMotPos'] * 180 / np.pi)
+        knee_ref.append(knee_cmd)
+        knee_mea.append(dataOSL['kneMotPos'] * 180 / np.pi)
 
     # RMSE of joints positions
-    ankle_rmse = np.sqrt(np.square(ank_ref - ank_mea).mean())
-    knee_rmse = np.sqrt(np.square(ank_ref - ank_mea).mean())
+    ankle_rmse = np.sqrt(np.square(ankle_ref - ankle_mea).mean())
+    knee_rmse = np.sqrt(np.square(ankle_ref - ankle_mea).mean())
     print("RMSE of ankle position: ", ankle_rmse)
     print("RMSE of knee position: ", knee_rmse)
 
     fig, ax = plt.subplots(2,1)
-    ax[0].plot(ank_ref, label = 'Ank. ref.')
-    ax[0].plot(ank_mea, label = 'Ank. mea.')
+    ax[0].plot(ankle_ref, label = 'Ank. ref.')
+    ax[0].plot(ankle_mea, label = 'Ank. mea.')
     # ax[0].set_xlabel('Sample')
     ax[0].set_ylabel('Ankle angle [deg]')
     ax[0].set_ylim([-30,20])
     ax[0].legend()
     ax[0].set_title('Ankle-knee Motion')
     
-    ax[1].plot(kne_ref, label = 'Kne. ref.')
-    ax[1].plot(kne_mea, label = 'Kne. mea.')
+    ax[1].plot(knee_ref, label = 'Kne. ref.')
+    ax[1].plot(knee_mea, label = 'Kne. mea.')
     ax[1].set_ylim([-70,10])
     ax[1].set_xlabel('Sample (10ms sample time)')
     ax[1].set_ylabel('Knee angle [deg]')
@@ -141,6 +171,9 @@ try:
 
     fxs.send_motor_command(ankID, fxe.FX_NONE, 0)
     fxs.send_motor_command(kneID, fxe.FX_NONE, 0)
+
+except KeyboardInterrupt:
+    print('\n*** OSL shutting down ***\n')
 
 finally:        
     # Do anything but turn off the motors at the end of the program

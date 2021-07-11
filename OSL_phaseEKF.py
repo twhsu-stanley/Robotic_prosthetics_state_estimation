@@ -264,7 +264,7 @@ try:
         ptr+=1
 
 except KeyboardInterrupt:
-        print('\n*** OSL shutting down ***\n')
+    print('\n*** OSL shutting down ***\n')
 
 finally:        
     # Do anything but turn off the motors at the end of the program
