@@ -131,14 +131,14 @@ try:
     fs = 1 / (dataOSL["Time"][1] - dataOSL["Time"][0])          # sampling rate = 100 Hz (actual: ~77 Hz)
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
     ## configure low-pass filter (1-order)
-    normal_cutoff = 2.5 / nyq   #cut-off frequency = 2Hz
+    normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
     b_lp, a_lp = butter(1, normal_cutoff, btype = 'low', analog = False)
     z_lp_1 = lfilter_zi(b_lp,  a_lp)
     z_lp_2 = lfilter_zi(b_lp,  a_lp)
     
     ## configure band-pass filter (2-order)
     normal_lowcut = 0.5 / nyq    #lower cut-off frequency = 0.5Hz 
-    normal_highcut = 2.5 / nyq     #upper cut-off frequency = 2Hz
+    normal_highcut = 2 / nyq     #upper cut-off frequency = 2Hz
     b_bp, a_bp = butter(2, [normal_lowcut, normal_highcut], btype = 'band', analog = False)
     z_bp = lfilter_zi(b_bp,  a_bp)
 
@@ -272,7 +272,7 @@ try:
         simulation_log["knee_angle_cmd"][indx] = knee_angle_cmd
 
         ### Live plotting
-        """
+        #"""
         elapsed_time = time.time() - start_time
         if ptr % 2 == 0:
             sender.graph(elapsed_time, 
@@ -291,7 +291,7 @@ try:
                          #ekf.x[2, 0], 'step_length', 'm',
                          #ekf.x[3, 0], 'ramp_angle', 'deg'
                          )
-        """
+        #"""
         ptr += 1
         indx += 1
         if (ptr >= len(dataOSL["Time"])-null-10):
@@ -361,7 +361,7 @@ finally:
     plt.plot(dataOSL["Time"], dataOSL["AnkleAngleRef"], 'k-')
     plt.plot(dataOSL["Time"], simulation_log["ankle_angle_cmd"], 'r-')
     plt.plot(dataOSL["Time"], simulation_log["ankle_angle_model"], 'm-')
-    #plt.plot(dataOSL["Time"], dataOSL['AnkleAngle'], 'b-')
+    plt.plot(dataOSL["Time"], dataOSL['AnkleAngle'], 'b-')
     plt.legend(('recorded', 'Edgar\'s trajectories', 'kinematic model'))
     plt.ylabel("Ankle angle command(deg)")
     plt.xlim((t_lower, t_upper))

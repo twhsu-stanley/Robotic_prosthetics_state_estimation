@@ -43,6 +43,7 @@ fxs.start_streaming(ankID, freq = 100, log_en = False)
 time.sleep(1)                           # Healthy pause before using ActPacks or IMU
 
 # Soft start
+"""
 G_K = {"kp": 40, "ki": 400, "K": 10, "B": 0, "FF": 128}  # Knee controller gains
 G_A = {"kp": 40, "ki": 400, "K": 10, "B": 0, "FF": 128}  # Ankle controller gains
 fxs.set_gains(ankID, G_A["kp"], G_A["ki"], 0, G_A["K"], G_A["B"], G_A["FF"])
@@ -50,12 +51,12 @@ fxs.set_gains(kneID, G_K["kp"], G_K["ki"], 0, G_K["K"], G_K["B"], G_K["FF"])
 fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, fxs.read_device(ankID).mot_ang)
 fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, fxs.read_device(kneID).mot_ang)
 time.sleep(2/100)
+"""
 
-# ------------------ MAIN LOOP -----------------------------------------------------------
 try:
     # For gain details check https://dephy.com/wiki/flexsea/doku.php?id=controlgains
-    G_K = {"kp": 40, "ki": 400, "K": 30, "B": 160, "FF": 128}  # Knee controller gains
-    G_A = {"kp": 40, "ki": 400, "K": 30, "B": 160, "FF": 128}  # Ankle controller gains
+    G_K = {"kp": 40, "ki": 400, "K": 300, "B": 1600, "FF": 128}  # Knee controller gains
+    G_A = {"kp": 40, "ki": 400, "K": 300, "B": 1600, "FF": 128}  # Ankle controller gains
 
     kneSta  = fxs.read_device(kneID)
     ankSta  = fxs.read_device(ankID)
@@ -124,14 +125,14 @@ try:
     fs = 100          # sampling rate = 100Hz (actual: ~77Hz)
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
     # configure low-pass filter (1-order)
-    normal_cutoff = 1 / nyq   #cut-off frequency = 2Hz
+    normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
     b_lp, a_lp = butter(1, normal_cutoff, btype = 'low', analog = False)
     z_lp_1 = lfilter_zi(b_lp,  a_lp)
     z_lp_2 = lfilter_zi(b_lp,  a_lp)
     
     # configure band-pass filter (2-order)
-    normal_lowcut = 0.1 / nyq    #lower cut-off frequency = 0.5Hz
-    normal_highcut = 1 / nyq     #upper cut-off frequency = 2Hz
+    normal_lowcut = 0.5 / nyq    #lower cut-off frequency = 0.5Hz
+    normal_highcut = 2 / nyq     #upper cut-off frequency = 2Hz
     b_bp, a_bp = butter(2, [normal_lowcut, normal_highcut], btype = 'band', analog = False)
     z_bp = lfilter_zi(b_bp,  a_bp)
 
@@ -153,8 +154,8 @@ try:
 
         ### measurement data
         global_thigh_angle = dataOSL['ThighSagi'][0] * 180 / np.pi
-        ankle_angle = dataOSL['ankJoiPos'][0] * 180 / np.pi
-        knee_angle = dataOSL['kneJoiPos'][0] * 180 / np.pi
+        ankle_angle = dataOSL['ankJoiPos'][0] #* 180 / np.pi
+        knee_angle = dataOSL['kneJoiPos'][0] #* 180 / np.pi
         
         # time
         t = time.time()

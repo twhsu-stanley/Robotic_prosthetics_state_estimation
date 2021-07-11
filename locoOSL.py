@@ -827,7 +827,7 @@ def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
         print('\n***Homing routine stopped by user***\n')
 # OUTDATED
 
-def log_OSL(dataOSL, logger,degrees=True):
+def log_OSL(dataOSL, logger, degrees = True):
     """
     Log the OSL sensor information and its corresponding units.
     Parameters
@@ -983,8 +983,10 @@ def test_motion(fxs, ankID, kneID, IMU):
     Move the knee and ankle to a know position and send it back to 0 configuration
     """
     # Set controller gains https://dephy.com/wiki/flexsea/doku.php?id=controlgains
-    G_K = {"kp": 40, "ki": 400, "K": 60, "B": 0, "FF": 1}  # Knee controller gains
-    G_A = {"kp": 40, "ki": 400, "K": 60, "B": 0, "FF": 1}  # Ankle controller gains
+    #G_K = {"kp": 40, "ki": 400, "K": 60, "B": 0, "FF": 1}  # Knee controller gains
+    #G_A = {"kp": 40, "ki": 400, "K": 60, "B": 0, "FF": 1}  # Ankle controller gains
+    G_K = {"kp": 40, "ki": 400, "K": 30, "B": 160, "FF": 128}  # Knee controller gains
+    G_A = {"kp": 40, "ki": 400, "K": 30, "B": 160, "FF": 128}  # Ankle controller gains
 
     # Initial data from the OSL
     kneSta  = fxs.read_device(kneID)
@@ -997,6 +999,7 @@ def test_motion(fxs, ankID, kneID, IMU):
 
     fxs.set_gains(ankID, G_A["kp"], G_A["ki"], 0, G_A["K"], G_A["B"], G_A["FF"])
     fxs.set_gains(kneID, G_K["kp"], G_K["ki"], 0, G_K["K"], G_K["B"], G_K["FF"])
+    
 
     print('\nCAUTION: Moving the OSL in 3 seconds')
     def moveJoint (kneAngle, ankAngle):
@@ -1013,22 +1016,16 @@ def test_motion(fxs, ankID, kneID, IMU):
         dataOSL = read_OSL(kneSta, ankSta, IMUPac, logger['ini_time'],encMap)
         log_OSL(dataOSL, logger)
         
-        ankAngle_actual = dataOSL['ankJoiPos'][0] * 180 / np.pi
-        kneAngle_actual = dataOSL['kneJoiPos'][0] * 180 / np.pi
+        ankAngle_actual = dataOSL['ankJoiPos'] * 180 / np.pi
+        kneAngle_actual = dataOSL['kneJoiPos'] * 180 / np.pi
         print(f"Moved the knee to {kneAngle_actual} deg and ankle to {ankAngle_actual} deg")
-        
-    # moveJoint(kneAngle = -5,  ankAngle = 0)
+
     moveJoint(kneAngle = -5,  ankAngle = 0)
-    moveJoint(kneAngle = -45,  ankAngle = 19)
-    moveJoint(kneAngle = -90,  ankAngle = -10)
-    moveJoint(kneAngle = -45,  ankAngle = 19)
-    moveJoint(kneAngle = -90,  ankAngle = -10)
-    # moveJoint(kneAngle = -5,  ankAngle = 0)
-    # moveJoint(kneAngle = -5,  ankAngle = 10)
-    # moveJoint(kneAngle = -5,  ankAngle = 0)
-    # moveJoint(kneAngle = -5,  ankAngle = -10)
-    # moveJoint(kneAngle = -5,  ankAngle = 9)    
-    moveJoint(kneAngle = -5,  ankAngle = 0)    
+    #moveJoint(kneAngle = -45,  ankAngle = 19)
+    #moveJoint(kneAngle = -90,  ankAngle = -10)
+    #moveJoint(kneAngle = -45,  ankAngle = 19)
+    #moveJoint(kneAngle = -90,  ankAngle = -10)
+    moveJoint(kneAngle = -5,  ankAngle = 0)
     return
 
 if __name__ == "__main__":
