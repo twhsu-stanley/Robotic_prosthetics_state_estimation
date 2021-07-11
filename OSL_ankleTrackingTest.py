@@ -121,10 +121,10 @@ try:
         ankle_cmd = amplitude * np.sin(freq * t) + dc_offset
         
         # Saturation
-        if ankle_cmd > 18: 
-            ankle_cmd = 18
-        elif ankle_cmd < -10:
-            ankle_cmd = -10
+        if ankle_cmd > ankle_max: 
+            ankle_cmd = ankle_max
+        elif ankle_cmd < ankle_min:
+            ankle_cmd = ankle_min
         
         # Knee command (deg)
         knee_cmd = -5 
