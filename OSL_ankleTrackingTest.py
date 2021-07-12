@@ -44,7 +44,7 @@ fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, fxs.read_device(ankID).mot_ang)
 fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, fxs.read_device(kneID).mot_ang)
 time.sleep(2/100)
 
-# ------------------ MAIN LOOP -----------------------------------------------------------
+## Set controller gains
 # For gain details check https://dephy.com/wiki/flexsea/doku.php?id=controlgains
 # 1) Small gians
 G_K = {"kp": 40, "ki": 400, "K": 60, "B": 0, "FF": 1}  # Knee controller gains
@@ -70,13 +70,6 @@ try:
     print('Log Initialized')
     fxs.set_gains(ankID, G_A["kp"], G_A["ki"], 0, G_A["K"], G_A["B"], G_A["FF"])
     fxs.set_gains(kneID, G_K["kp"], G_K["ki"], 0, G_K["K"], G_K["B"], G_K["FF"])
-    
-    """
-    if input('\n\nWould you like to continue? (y/n): ').lower() == 'y':
-        print('\nReady to walk!')
-    else:
-        sys.exit("User stopped the execution")
-    """
 
     # Read inital OSL data
     dataOSL = loco.read_OSL(kneSta, ankSta, IMUPac, logger['ini_time'], encMap)
@@ -103,7 +96,7 @@ try:
     # Fade-in time (sec)
     fade_in_time = 3
     
-    # Double check the values before proceeding
+    # Double check the values before starting the main loop
     print("Knee initial position: %.2f deg" % knee_fixed)
     print("Ankle initial position: %.2f deg" % dc_offset_initial)
 
@@ -112,6 +105,7 @@ try:
     else:
         sys.exit("User stopped the execution")
 
+    ## Main Loop #####################################################################################
     ankle_ref = []
     ankle_mea = []
     knee_ref = []
@@ -121,7 +115,7 @@ try:
     while(t < 10):
         t = time.perf_counter() - t_0
 
-        # 1) Sinusoidal ankle command (deg)
+        # 1) Sinusoidal ankle command with fade-in effect (deg)
         if t < fade_in_time:
             amplitude = amplitude_initial + (amplitude_final - amplitude_initial) * t / fade_in_time
             dc_offset = dc_offset_initial + (dc_offset_final - dc_offset_initial) * t / fade_in_time
@@ -163,6 +157,8 @@ try:
         knee_ref.append(knee_cmd)
         knee_mea.append(dataOSL['kneJoiPos'] * 180 / np.pi)
     
+    ##################################################################################################
+
     # Convert list to numpy array
     ankle_ref = np.array(ankle_ref)
     ankle_mea = np.array(ankle_mea)
@@ -175,6 +171,7 @@ try:
     print("RMSE of ankle position: ", ankle_rmse)
     print("RMSE of knee position: ", knee_rmse)
 
+    # Plotting and saving figures
     fig, ax = plt.subplots(2,1)
     ax[0].plot(ankle_ref, label = 'commanded')
     ax[0].plot(ankle_mea, label = 'measured')
