@@ -35,21 +35,21 @@ fxs.start_streaming(kneID, freq = 100, log_en = False)
 fxs.start_streaming(ankID, freq = 100, log_en = False)
 time.sleep(1)                           # Healthy pause before using ActPacks or IMU
 
-# # Soft start
-# G_K = {"kp": 40, "ki": 400, "K": 10, "B": 0, "FF": 128}  # Knee controller gains
-# G_A = {"kp": 40, "ki": 400, "K": 10, "B": 0, "FF": 128}  # Ankle controller gains
-# fxs.set_gains(ankID, G_A["kp"], G_A["ki"], 0, G_A["K"], G_A["B"], G_A["FF"])
-# fxs.set_gains(kneID, G_K["kp"], G_K["ki"], 0, G_K["K"], G_K["B"], G_K["FF"])
-# fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, fxs.read_device(ankID).mot_ang)
-# fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, fxs.read_device(kneID).mot_ang)
-# time.sleep(2/100)
+# Soft start
+G_K = {"kp": 40, "ki": 400, "K": 10, "B": 0, "FF": 128}  # Knee controller gains
+G_A = {"kp": 40, "ki": 400, "K": 10, "B": 0, "FF": 128}  # Ankle controller gains
+fxs.set_gains(ankID, G_A["kp"], G_A["ki"], 0, G_A["K"], G_A["B"], G_A["FF"])
+fxs.set_gains(kneID, G_K["kp"], G_K["ki"], 0, G_K["K"], G_K["B"], G_K["FF"])
+fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, fxs.read_device(ankID).mot_ang)
+fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, fxs.read_device(kneID).mot_ang)
+time.sleep(2/100)
 
 # ------------------ MAIN LOOP -----------------------------------------------------------
 # For gain details check https://dephy.com/wiki/flexsea/doku.php?id=controlgains
 # 1) Small gians
 G_K = {"kp": 40, "ki": 400, "K": 60, "B": 0, "FF": 1}  # Knee controller gains
 G_A = {"kp": 40, "ki": 400, "K": 60, "B": 0, "FF": 1}  # Ankle controller gains
-# 2) Large  gains (normal)
+# 2) Large  gains
 #G_K = {"kp": 40, "ki": 400, "K": 1000, "B": 3500, "FF": 1}  # Knee controller gains
 #G_A = {"kp": 40, "ki": 400, "K": 600, "B": 300, "FF": 128}  # Ankle controller gains
 
@@ -58,8 +58,7 @@ try:
     kneSta  = fxs.read_device(kneID)
     ankSta  = fxs.read_device(ankID)
     IMUPac  = IMU.getDataPackets(TIMEOUT)
-    dataOSL = loco.read_OSL(kneSta, ankSta, IMUPac)
-    encMap  = loco.read_enc_map( dataOSL ) 
+    encMap  = loco.read_enc_map(loco.read_OSL(kneSta, ankSta, IMUPac))
 
     # Initial data from the OSL
     kneSta  = fxs.read_device(kneID)
@@ -71,46 +70,58 @@ try:
     print('Log Initialized')
     fxs.set_gains(ankID, G_A["kp"], G_A["ki"], 0, G_A["K"], G_A["B"], G_A["FF"])
     fxs.set_gains(kneID, G_K["kp"], G_K["ki"], 0, G_K["K"], G_K["B"], G_K["FF"])
-
-    print('\nCAUTION: Moving the OSL to the initial configuration in 2 seconds')
-    time.sleep(2)
-    # Setting control mode and approaching initial position [Be careful fo high gains]
-    ankMotCou, kneMotCou = loco.joi2motTic(encMap, -5, 0)
-    fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, ankMotCou)
-    fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, kneMotCou)
     
+    """
+    if input('\n\nWould you like to continue? (y/n): ').lower() == 'y':
+        print('\nReady to walk!')
+    else:
+        sys.exit("User stopped the execution")
+    """
+
+    # Read inital OSL data
+    dataOSL = loco.read_OSL(kneSta, ankSta, IMUPac, logger['ini_time'], encMap)
+
+    ## Command settings
+    # Knee angle limits (deg)
+    knee_max = -5
+    knee_min = -55
+    # Knee initial position
+    knee_fixed = dataOSL['kneJoiPos'] * 180 / np.pi
+
+    # Ankle angle limits (deg)
+    ankle_max = 18
+    ankle_min = -10
+    # Natural frequency of the sine wave (rad/s)
+    freq = 2 * np.pi * 0.2 # 0.2 Hz
+    # DC offset of the sine wave
+    dc_offset_initial = dataOSL['ankJoiPos'] * 180 / np.pi
+    dc_offset_final = (ankle_max + ankle_min) / 2
+    # Amplitude of the sine wave
+    amplitude_initial = 0
+    amplitude_final = (ankle_max - ankle_min) / 2
+
+    # Fade-in time (sec)
+    fade_in_time = 3
+    
+    # Double check the values before proceeding
+    print("Knee initial position: %.2f deg" % knee_fixed)
+    print("Ankle initial position: %.2f deg" % dc_offset_initial)
+
     if input('\n\nWould you like to continue? (y/n): ').lower() == 'y':
         print('\nReady to walk!')
     else:
         sys.exit("User stopped the execution")
 
-
-    ## Command settings
-    # Ankle angle limits (deg)
-    ankle_max = 18
-    ankle_min = -10
-    # Natural frequency of the sinewave (rad/s)
-    freq = 2 * np.pi * 0.2 # 0.2 Hz
-    # DC offset of the sinewave
-    dc_offset_initial = dataOSL['ankMotPos'] * 180 / np.pi  # current position
-    dc_offset_final = (ankle_max + ankle_min) / 2
-    # Amplitude of the sinewave
-    amplitude_initial = 0
-    amplitude_final = (ankle_max - ankle_min) / 2
-    # Fade-in time (sec)
-    fade_in_time = 3
-
     ankle_ref = []
     ankle_mea = []
     knee_ref = []
     knee_mea = []
-    t_0 = time.perf_counter()
+    t_0 = time.perf_counter() # sec
     t = 0
-
-    while(t < 15):
+    while(t < 10):
         t = time.perf_counter() - t_0
 
-        # Ankle command (deg)
+        # 1) Sinusoidal ankle command (deg)
         if t < fade_in_time:
             amplitude = amplitude_initial + (amplitude_final - amplitude_initial) * t / fade_in_time
             dc_offset = dc_offset_initial + (dc_offset_final - dc_offset_initial) * t / fade_in_time
@@ -120,21 +131,27 @@ try:
 
         ankle_cmd = amplitude * np.sin(freq * t) + dc_offset
         
-        # Saturation
+        # Saturation for ankle command
         if ankle_cmd > ankle_max: 
             ankle_cmd = ankle_max
         elif ankle_cmd < ankle_min:
             ankle_cmd = ankle_min
         
-        # Knee command (deg)
-        knee_cmd = -5 
+        # 2) Constant knee command (deg)
+        knee_cmd = knee_fixed
+        
+        # Saturation for knee command
+        if knee_cmd > knee_max: 
+            knee_cmd = knee_max
+        elif knee_cmd < knee_min:
+            knee_cmd = knee_min
         
         # Sending commands  
         ankMotCou, kneMotCou = loco.joi2motTic(encMap, knee_cmd, ankle_cmd)
         fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, ankMotCou)
         fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, kneMotCou)
         
-        # Read and log OSL data        
+        # Read and log OSL data
         kneSta  = fxs.read_device(kneID)
         ankSta  = fxs.read_device(ankID)
         IMUPac  = IMU.getDataPackets(TIMEOUT)
@@ -142,32 +159,38 @@ try:
         loco.log_OSL(dataOSL, logger)
 
         ankle_ref.append(ankle_cmd)
-        ankle_mea.append(dataOSL['ankMotPos'] * 180 / np.pi)
+        ankle_mea.append(dataOSL['ankJoiPos'] * 180 / np.pi)
         knee_ref.append(knee_cmd)
-        knee_mea.append(dataOSL['kneMotPos'] * 180 / np.pi)
+        knee_mea.append(dataOSL['kneJoiPos'] * 180 / np.pi)
+    
+    # Convert list to numpy array
+    ankle_ref = np.array(ankle_ref)
+    ankle_mea = np.array(ankle_mea)
+    knee_ref = np.array(knee_ref)
+    knee_mea = np.array(knee_mea)
 
     # RMSE of joints positions
     ankle_rmse = np.sqrt(np.square(ankle_ref - ankle_mea).mean())
-    knee_rmse = np.sqrt(np.square(ankle_ref - ankle_mea).mean())
+    knee_rmse = np.sqrt(np.square(knee_ref - knee_mea).mean())
     print("RMSE of ankle position: ", ankle_rmse)
     print("RMSE of knee position: ", knee_rmse)
 
     fig, ax = plt.subplots(2,1)
-    ax[0].plot(ankle_ref, label = 'Ank. ref.')
-    ax[0].plot(ankle_mea, label = 'Ank. mea.')
+    ax[0].plot(ankle_ref, label = 'commanded')
+    ax[0].plot(ankle_mea, label = 'measured')
     # ax[0].set_xlabel('Sample')
-    ax[0].set_ylabel('Ankle angle [deg]')
+    ax[0].set_ylabel('Ankle angle (deg)')
     ax[0].set_ylim([-30,20])
     ax[0].legend()
     ax[0].set_title('Ankle-knee Motion')
     
-    ax[1].plot(knee_ref, label = 'Kne. ref.')
-    ax[1].plot(knee_mea, label = 'Kne. mea.')
+    ax[1].plot(knee_ref, label = 'commanded')
+    ax[1].plot(knee_mea, label = 'measured')
     ax[1].set_ylim([-70,10])
     ax[1].set_xlabel('Sample (10ms sample time)')
-    ax[1].set_ylabel('Knee angle [deg]')
+    ax[1].set_ylabel('Knee angle (deg)')
     ax[1].legend()
-    plt.savefig('ankle-knee_position.png')
+    plt.savefig('ankleTrackingTest.png')
 
     fxs.send_motor_command(ankID, fxe.FX_NONE, 0)
     fxs.send_motor_command(kneID, fxe.FX_NONE, 0)
@@ -180,7 +203,7 @@ finally:
     fxs.send_motor_command(ankID, fxe.FX_NONE, 0)
     fxs.send_motor_command(kneID, fxe.FX_NONE, 0)
     IMU.setToIdle()
-    time.sleep(0.5) 
+    time.sleep(0.5)
     fxs.close(ankID)
-    fxs.close(kneID)  
+    fxs.close(kneID)
     print('Communication with ActPacks closed and IMU set to idle')

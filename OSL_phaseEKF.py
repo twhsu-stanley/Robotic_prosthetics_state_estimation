@@ -43,7 +43,6 @@ fxs.start_streaming(ankID, freq = 100, log_en = False)
 time.sleep(1)                           # Healthy pause before using ActPacks or IMU
 
 # Soft start
-"""
 G_K = {"kp": 40, "ki": 400, "K": 10, "B": 0, "FF": 128}  # Knee controller gains
 G_A = {"kp": 40, "ki": 400, "K": 10, "B": 0, "FF": 128}  # Ankle controller gains
 fxs.set_gains(ankID, G_A["kp"], G_A["ki"], 0, G_A["K"], G_A["B"], G_A["FF"])
@@ -51,7 +50,6 @@ fxs.set_gains(kneID, G_K["kp"], G_K["ki"], 0, G_K["K"], G_K["B"], G_K["FF"])
 fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, fxs.read_device(ankID).mot_ang)
 fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, fxs.read_device(kneID).mot_ang)
 time.sleep(2/100)
-"""
 
 try:
     # For gain details check https://dephy.com/wiki/flexsea/doku.php?id=controlgains
@@ -67,8 +65,8 @@ try:
 
     # Load trajectory
     refTrajectory  = loco.loadTrajectory(trajectory = 'walking')
-    refAnk = refTrajectory ["ankl"]
-    refKne = refTrajectory ["knee"]
+    refAnk = refTrajectory["ankl"]
+    refKne = refTrajectory["knee"]
 
     # Create encoder map
     kneSta  = fxs.read_device(kneID)
@@ -154,8 +152,8 @@ try:
 
         ### measurement data
         global_thigh_angle = dataOSL['ThighSagi'][0] * 180 / np.pi
-        ankle_angle = dataOSL['ankJoiPos'][0] #* 180 / np.pi
-        knee_angle = dataOSL['kneJoiPos'][0] #* 180 / np.pi
+        ankle_angle = dataOSL['ankJoiPos'][0] * 180 / np.pi
+        knee_angle = dataOSL['kneJoiPos'][0] * 180 / np.pi
         
         # time
         t = time.time()

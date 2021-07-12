@@ -102,7 +102,6 @@ try:
     # print(kneMotCou)
     # print(kneSta.mot_ang)
     
-
     if input('\n\nAbout to walk. Would you like to continue? (y/n): ').lower() == 'y':
         print("\n Let's walk!")
     else:

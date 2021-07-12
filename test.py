@@ -2,6 +2,27 @@ import numpy as np
 import scipy.io
 import matplotlib.pyplot as plt
 import numpy as np
+import time
+
+print("Knee initial position: %.2f deg" % -5)
+
+a = []
+b = []
+
+for i in range(10):
+    a.append(1)
+    b.append(0)
+a = np.array(a)
+b = np.array(b)
+rmse = np.sqrt(np.square(a - b).mean())
+print(rmse)
+
+t_0 = time.perf_counter() # sec
+t = 0
+while(t < 7):
+    t = time.perf_counter() - t_0
+    print(t)
+    time.sleep(1)
 
 dict1  = {"a": 1, 'b':2}
 
