@@ -4,6 +4,57 @@ import matplotlib.pyplot as plt
 import numpy as np
 import time
 
+
+# Ankle angle limits (deg)
+ankle_max = 18
+ankle_min = -10
+# Natural frequency of the sine wave (rad/s)
+freq = 2 * np.pi * 0.2 # 0.2 Hz
+# DC offset of the sine wave
+dc_offset_initial = 10
+dc_offset_final = (ankle_max + ankle_min) / 2
+# Amplitude of the sine wave
+amplitude_initial = 0
+amplitude_final = (ankle_max - ankle_min) / 2
+
+# Fade-in time (sec)
+fade_in_time = 3
+
+## Main Loop #####################################################################################
+ankle_ref = []
+t_0 = time.perf_counter() # sec
+t = 0
+while(t < 15):
+    t = time.perf_counter() - t_0
+
+    # 1) Sinusoidal ankle command with fade-in effect (deg)
+    if t < fade_in_time:
+        amplitude = amplitude_initial + (amplitude_final - amplitude_initial) * t / fade_in_time
+        dc_offset = dc_offset_initial + (dc_offset_final - dc_offset_initial) * t / fade_in_time
+    elif t >= fade_in_time:
+        amplitude = amplitude_final
+        dc_offset = dc_offset_final
+
+    ankle_cmd = amplitude * np.sin(freq * t) + dc_offset
+        
+    # Saturation for ankle command
+    if ankle_cmd > ankle_max: 
+        ankle_cmd = ankle_max
+    elif ankle_cmd < ankle_min:
+        ankle_cmd = ankle_min
+
+    ankle_ref.append(ankle_cmd)
+
+ankle_ref = np.array(ankle_ref)
+plt.figure()
+plt.plot(ankle_ref)
+plt.show()
+
+
+
+
+
+
 print("Knee initial position: %.2f deg" % -5)
 
 a = []

@@ -47,11 +47,16 @@ time.sleep(2/100)
 ## Set controller gains
 # For gain details check https://dephy.com/wiki/flexsea/doku.php?id=controlgains
 # 1) Small gians
-G_K = {"kp": 40, "ki": 400, "K": 60, "B": 0, "FF": 1}  # Knee controller gains
-G_A = {"kp": 40, "ki": 400, "K": 60, "B": 0, "FF": 1}  # Ankle controller gains
-# 2) Large  gains
-#G_K = {"kp": 40, "ki": 400, "K": 1000, "B": 3500, "FF": 1}  # Knee controller gains
-#G_A = {"kp": 40, "ki": 400, "K": 600, "B": 300, "FF": 128}  # Ankle controller gains
+#G_K = {"kp": 40, "ki": 400, "K": 60, "B": 0, "FF": 1}  # Knee controller gains
+#G_A = {"kp": 40, "ki": 400, "K": 60, "B": 0, "FF": 1}  # Ankle controller gains
+
+# 2) Medium gains
+#G_K = {"kp": 40, "ki": 400, "K": 300, "B": 150, "FF": 60}  # Knee controller gains
+#G_A = {"kp": 40, "ki": 400, "K": 300, "B": 150, "FF": 60}  # Ankle controller gains
+
+# 3) Large  gains
+G_K = {"kp": 40, "ki": 400, "K": 1000, "B": 3500, "FF": 1}  # Knee controller gains
+G_A = {"kp": 40, "ki": 400, "K": 600, "B": 300, "FF": 128}  # Ankle controller gains
 
 try:
     # Get encoder map
@@ -72,14 +77,21 @@ try:
     fxs.set_gains(kneID, G_K["kp"], G_K["ki"], 0, G_K["K"], G_K["B"], G_K["FF"])
 
     # Read inital OSL data
-    dataOSL = loco.read_OSL(kneSta, ankSta, IMUPac, logger['ini_time'], encMap)
+    #dataOSL = loco.read_OSL(kneSta, ankSta, IMUPac, logger['ini_time'], encMap)
+    # Use buffers to avoid spikes in the initial measuremts
+    kne_buffer = []
+    ank_buffer = []
+    for i in range(3):
+        dataOSL = loco.read_OSL(kneSta, ankSta, IMUPac, logger['ini_time'], encMap)
+        kne_buffer.append(dataOSL['kneJoiPos'] * 180 / np.pi)
+        ank_buffer.append(dataOSL['ankJoiPos'] * 180 / np.pi)
 
-    ## Command settings
+    ## Commands settings
     # Knee angle limits (deg)
     knee_max = -5
     knee_min = -55
     # Knee initial position
-    knee_fixed = dataOSL['kneJoiPos'] * 180 / np.pi
+    knee_fixed = np.median(kne_buffer) # dataOSL['kneJoiPos'] * 180 / np.pi # 
 
     # Ankle angle limits (deg)
     ankle_max = 18
@@ -87,7 +99,7 @@ try:
     # Natural frequency of the sine wave (rad/s)
     freq = 2 * np.pi * 0.2 # 0.2 Hz
     # DC offset of the sine wave
-    dc_offset_initial = dataOSL['ankJoiPos'] * 180 / np.pi
+    dc_offset_initial = np.median(ank_buffer) # dataOSL['ankJoiPos'] * 180 / np.pi # 
     dc_offset_final = (ankle_max + ankle_min) / 2
     # Amplitude of the sine wave
     amplitude_initial = 0
@@ -157,7 +169,7 @@ try:
         knee_ref.append(knee_cmd)
         knee_mea.append(dataOSL['kneJoiPos'] * 180 / np.pi)
     
-    ##################################################################################################
+    #=======================================================================================================#
 
     # Convert list to numpy array
     ankle_ref = np.array(ankle_ref)
@@ -165,13 +177,26 @@ try:
     knee_ref = np.array(knee_ref)
     knee_mea = np.array(knee_mea)
 
+except KeyboardInterrupt:
+    print('\n*** OSL shutting down ***\n')
+
+finally:        
+    # Do anything but turn off the motors at the end of the program
+    fxs.send_motor_command(ankID, fxe.FX_NONE, 0)
+    fxs.send_motor_command(kneID, fxe.FX_NONE, 0)
+    IMU.setToIdle()
+    time.sleep(0.5)
+    fxs.close(ankID)
+    fxs.close(kneID)
+    print('Communication with ActPacks closed and IMU set to idle')
+
     # RMSE of joints positions
     ankle_rmse = np.sqrt(np.square(ankle_ref - ankle_mea).mean())
     knee_rmse = np.sqrt(np.square(knee_ref - knee_mea).mean())
     print("RMSE of ankle position: ", ankle_rmse)
     print("RMSE of knee position: ", knee_rmse)
 
-    # Plotting and saving figures
+    # Plot and save figures
     fig, ax = plt.subplots(2,1)
     ax[0].plot(ankle_ref, label = 'commanded')
     ax[0].plot(ankle_mea, label = 'measured')
@@ -188,19 +213,3 @@ try:
     ax[1].set_ylabel('Knee angle (deg)')
     ax[1].legend()
     plt.savefig('ankleTrackingTest.png')
-
-    fxs.send_motor_command(ankID, fxe.FX_NONE, 0)
-    fxs.send_motor_command(kneID, fxe.FX_NONE, 0)
-
-except KeyboardInterrupt:
-    print('\n*** OSL shutting down ***\n')
-
-finally:        
-    # Do anything but turn off the motors at the end of the program
-    fxs.send_motor_command(ankID, fxe.FX_NONE, 0)
-    fxs.send_motor_command(kneID, fxe.FX_NONE, 0)
-    IMU.setToIdle()
-    time.sleep(0.5)
-    fxs.close(ankID)
-    fxs.close(kneID)
-    print('Communication with ActPacks closed and IMU set to idle')
