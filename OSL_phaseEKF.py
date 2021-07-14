@@ -195,10 +195,11 @@ try:
 
         ## Calculate knee and ankle angles ========================================================================
         # 1) Without buffers
-        #knee_angle = dataOSL['kneJoiPos'] * 180 / np.pi
-        #ankle_angle = dataOSL['ankJoiPos'] * 180 / np.pi
+        knee_angle = dataOSL['kneJoiPos'] * 180 / np.pi
+        ankle_angle = dataOSL['ankJoiPos'] * 180 / np.pi
 
         # 2) Use the buffers
+        """
         knee_buffer = [dataOSL['kneJoiPos'], knee_buffer[0], knee_buffer[1]]
         ankle_buffer = [dataOSL['ankJoiPos'], ankle_buffer[0], ankle_buffer[1]]
 
@@ -207,6 +208,7 @@ try:
 
         knee_angle = dataOSL['kneJoiPos'] * 180 / np.pi # deg
         ankle_angle = dataOSL['ankJoiPos'] * 180 / np.pi
+        """
         #==========================================================================================================
         
         ## Time and dt ============================================================================================
@@ -323,7 +325,7 @@ try:
                          knee_angle, knee_angle_cmd, 'Knee Angle', 'deg',
                          ankle_angle, ankle_angle_cmd, 'Ankle Angle', 'deg'
                          )
-        print('Elapsed time:', elapsed_time, ptr)
+        #print('Elapsed time:', elapsed_time, ptr)
         #==========================================================================================================
         
         ptr+=1

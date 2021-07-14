@@ -61,16 +61,16 @@ axs[0].plot(xindex, ekfEstimates['phase'][ranA:ranB], 'r-')
 
 axs[1].set_ylabel('Ankle angle command (Deg)')
 axs[1].plot(xindex, referenceTrajectory['AnkleRef'][ranA:ranB], 'r-')
-#axs[1].plot(xindex, ankle_angle_kmodel[ranA:ranB], 'm-')
 axs[1].plot(xindex, actualTrajectory['AnkleAngle'][ranA:ranB])
+#axs[1].plot(xindex, ankle_angle_kmodel[ranA:ranB], 'm-')
 #axs[1].set_ylim([-30,20])
 axs[1].legend(["Edgar\'s trajectory", "measured", "kinematic model"])
 
 axs[2].set_xlabel('Time(s)')
 axs[2].set_ylabel('Knee angle command (Deg)')
 axs[2].plot(xindex, referenceTrajectory['KneeRef'][ranA:ranB], 'r-')
-#axs[2].plot(xindex, knee_angle_kmodel[ranA:ranB], 'm-')
 axs[2].plot(xindex, actualTrajectory['KneeAngle'][ranA:ranB])
+#axs[2].plot(xindex, knee_angle_kmodel[ranA:ranB], 'm-')
 axs[2].set_ylim([-70,10])
 axs[2].legend(["Edgar\'s trajectory","measured", "kinematic model"])
 

@@ -13,4 +13,3 @@ utils/__pycache__/
 **/*.mat
 **/*.db
 OSL_walking_data/**
-test.py
