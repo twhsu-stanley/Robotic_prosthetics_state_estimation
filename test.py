@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import time
 
-
+listA = [1.24, 3.98, 5.33]
+print("ers %.2f, %.2f, and %.2f" % (listA[0], listA[1], listA[2]))
 # Ankle angle limits (deg)
 ankle_max = 18
 ankle_min = -10
