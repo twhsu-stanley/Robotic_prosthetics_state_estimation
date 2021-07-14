@@ -11,11 +11,11 @@ ankle_min = -10
 # Natural frequency of the sine wave (rad/s)
 freq = 2 * np.pi * 0.2 # 0.2 Hz
 # DC offset of the sine wave
-dc_offset_initial = 10
-dc_offset_final = (ankle_max + ankle_min) / 2
+ankle_offset_initial = 10
+ankle_offset_final = (ankle_max + ankle_min) / 2
 # Amplitude of the sine wave
-amplitude_initial = 0
-amplitude_final = (ankle_max - ankle_min) / 2
+ankle_amplitude_initial = 0
+ankle_amplitude_final = (ankle_max - ankle_min) / 2
 
 # Fade-in time (sec)
 fade_in_time = 3
@@ -29,13 +29,13 @@ while(t < 15):
 
     # 1) Sinusoidal ankle command with fade-in effect (deg)
     if t < fade_in_time:
-        amplitude = amplitude_initial + (amplitude_final - amplitude_initial) * t / fade_in_time
-        dc_offset = dc_offset_initial + (dc_offset_final - dc_offset_initial) * t / fade_in_time
+        amplitude = ankle_amplitude_initial + (ankle_amplitude_final - ankle_amplitude_initial) * t / fade_in_time
+        ankle_offset = ankle_offset_initial + (ankle_offset_final - ankle_offset_initial) * t / fade_in_time
     elif t >= fade_in_time:
-        amplitude = amplitude_final
-        dc_offset = dc_offset_final
+        amplitude = ankle_amplitude_final
+        ankle_offset = ankle_offset_final
 
-    ankle_cmd = amplitude * np.sin(freq * t) + dc_offset
+    ankle_cmd = amplitude * np.sin(freq * t) + ankle_offset
         
     # Saturation for ankle command
     if ankle_cmd > ankle_max: 
