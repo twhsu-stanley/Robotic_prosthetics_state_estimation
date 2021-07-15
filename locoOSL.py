@@ -808,14 +808,18 @@ def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
             deltaTime = (time.perf_counter_ns() - iniTime)/1e6
         time.sleep(0.1)     # Healthy pause before finishing
         return motPosArray, joiPosArray
+    
     try:
         fxs.send_motor_command(actPackID, fxe.FX_NONE, 0)
         # Execute homing task               
-        motPosArray, joiPosArray = moveUntilTorqueLimit( jointVolt ) 
+        motPosArray, joiPosArray = moveUntilTorqueLimit( jointVolt )
+        joiPosRange = abs(joiPosArray[0] - joiPosArray[len(joiPosArray)-1]) * 180 / np.pi # deg
         if joint == 'ankle':
             strFile = 'joint2motorAnkle.csv'
+            print("Ankle angles range: %.2f" % joiPosRange)
         elif joint == 'knee':
             strFile = 'joint2motorKnee.csv'
+            print("Knee angles range: %.2f" % joiPosRange)
         else:
             raise Exception('Provide valid string for "joint" in homing routine')
 
@@ -1066,6 +1070,8 @@ if __name__ == "__main__":
         else:
             example_read(fxs, ankID, kneID, IMU)
             # test_motion(fxs, ankID, kneID, IMU)
+
+
     finally:        
         # Do anything but turn off the motors at the end of the program
         fxs.send_motor_command(ankID, fxe.FX_NONE, 0)

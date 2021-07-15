@@ -13,7 +13,7 @@ def process_model(x, dt):
 
 ## Load control model & coefficients (for OSL implementation)
 c_model = model_loader('Control_model.pickle')
-with open('Psi/Psi_knee_G.pickle', 'rb') as file:
+with open('Psi/Psi_knee_G.pickle', 'rb') as file:#_withoutNan
     Psi_knee = pickle.load(file)
 with open('Psi/Psi_ankle_G.pickle', 'rb') as file:
     Psi_ankle = pickle.load(file)
@@ -23,6 +23,10 @@ def load_Psi(subject = 'Generic'):
     if subject == 'Generic':
         with open('Psi/Psi_thigh_Y_G.pickle', 'rb') as file:
             Psi_thigh_Y = pickle.load(file)
+        
+        with open('Psi/Psi_thigh_Y_G_withoutNan.pickle', 'rb') as file:
+            Psi_thigh_Y_withoutNan = pickle.load(file)
+        
         with open('Psi/Psi_force_Z_G.pickle', 'rb') as file:
             Psi_force_Z = pickle.load(file)
         with open('Psi/Psi_force_X_G.pickle', 'rb') as file:
@@ -31,8 +35,15 @@ def load_Psi(subject = 'Generic'):
             Psi_moment_Y = pickle.load(file)
         with open('Psi/Psi_thighVel_2hz_G.pickle', 'rb') as file:
             Psi_thighVel_2hz = pickle.load(file)
+        
+        with open('Psi/Psi_thighVel_2hz_G_withoutNan.pickle', 'rb') as file:
+            Psi_thighVel_2hz_withoutNan = pickle.load(file)
+
         with open('Psi/Psi_atan2_G.pickle', 'rb') as file:
             Psi_atan2 = pickle.load(file)
+        
+        with open('Psi/Psi_atan2_G_withoutNan.pickle', 'rb') as file:
+            Psi_atan2_withoutNan = pickle.load(file)
     else:
         with open('Psi/Psi_thigh_Y.pickle', 'rb') as file:
             p = pickle.load(file)
@@ -54,7 +65,10 @@ def load_Psi(subject = 'Generic'):
             Psi_atan2 = p[subject]
            
     Psi = {'global_thigh_angle': Psi_thigh_Y, 'force_Z': Psi_force_Z, 'force_X': Psi_force_X, 'moment_Y': Psi_moment_Y,
-           'global_thigh_angle_vel': Psi_thighVel_2hz, 'atan2': Psi_atan2}
+           'global_thigh_angle_vel': Psi_thighVel_2hz, 'atan2': Psi_atan2,
+           'global_thigh_angle_withoutNan': Psi_thigh_Y_withoutNan,
+           'global_thigh_angle_vel_withoutNan': Psi_thighVel_2hz_withoutNan,
+           'atan2_withoutNan': Psi_atan2_withoutNan}
     return Psi
 
 def warpToOne(phase):

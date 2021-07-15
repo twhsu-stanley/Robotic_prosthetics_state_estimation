@@ -13,8 +13,8 @@ import scipy.io
 import sender_test as sender   # for real-time plotting
 
 ### A. Load Ross's pre-recorded walking data 
-#""""
-logFile = r"OSL_walking_data/210617_121732_PV_Siavash_walk_300_1600.csv"
+#"""
+logFile = r"OSL_walking_data/210714_113523_OSL_benchtop_test.csv"
 # 1) 210617_113644_PV_Siavash_walk_oscillations in phase
 # 2) 210617_121732_PV_Siavash_walk_300_1600
 # 3) 210617_122334_PV_Siavash_walk_500_2500
@@ -22,7 +22,7 @@ datatxt = np.genfromtxt(logFile , delimiter=',', names = True)
 dataOSL = {
     "Time": datatxt["Time"],
     "ThighSagi": datatxt["ThighSagi"],
-    "PV": datatxt['PV'],
+    #"PV": datatxt['PV'],
     'AnkleAngle': datatxt["ankJoiPos"],
     'AnkleAngleRef': datatxt["refAnk"],
     'KneeAngle': datatxt["kneJoiPos"],
@@ -32,7 +32,7 @@ dataOSL = {
 
 ### B. Load Kevin's bypass-adapter walking data
 """
-mat = scipy.io.loadmat('OSL_walking_data/Treadmill_speed1_incline0_file1.mat')
+mat = scipy.io.loadmat('OSL_walking_data/Treadmill_speed1_incline0_file2.mat')
 # Treadmill_speed1_incline0_file2
 # Treadmill_speed1_incline0_file1
 dataOSL = {
@@ -46,7 +46,6 @@ dataOSL = {
 }
 """
 
-### C. Benchtop test
 
 ## From loco_OSL.py: Load referenced trajectories
 def loadTrajectory(trajectory = 'walking'):
@@ -142,17 +141,16 @@ try:
     b_bp, a_bp = butter(2, [normal_lowcut, normal_highcut], btype = 'band', analog = False)
     z_bp = lfilter_zi(b_bp,  a_bp)
 
-    if input('\n\nAbout to walk. Would you like to continue? (y/n): ').lower() == 'y':
-        print("\n Let's walk!")
-    else:
-        sys.exit("User stopped the execution")
-    
 
     ptr = 0    # for reading sensor data
     indx = 0   # for logging data
     null = 0   # number of null data points
-    t_0 = dataOSL["Time"][ptr]     # for EKF
+    t_0 = dataOSL["Time"][ptr]   # for EKF
     start_time = t_0             # for live plotting
+    fade_in_time = 3             # sec
+
+    knee_angle_initial = dataOSL['KneeAngle'][0]
+    ankle_angle_initial = dataOSL['AnkleAngle'][0]
     
     simulation_log = {
         # state estimates
@@ -252,6 +250,13 @@ try:
         pv = int(ekf.x[0, 0] * 998)  # phase variable conversion (scaling)
         ankle_angle_cmd = refAnk[pv]
         knee_angle_cmd = refKne[pv]
+
+        # Fade-in effect
+        elapsed_time = t - start_time
+        if (elapsed_time < fade_in_time):
+            alpha = elapsed_time / fade_in_time 
+            ankle_angle_cmd = ankle_angle_cmd * alpha + ankle_angle_initial * (1 - alpha)
+            knee_angle_cmd = knee_angle_cmd * alpha + knee_angle_initial * (1 - alpha)
         
         ## Loggging simulation results
         simulation_log['phase_est'][indx] = ekf.x[0, 0]
@@ -272,8 +277,8 @@ try:
         simulation_log["knee_angle_cmd"][indx] = knee_angle_cmd
 
         ### Live plotting
-        #"""
-        elapsed_time = time.time() - start_time
+        """
+        elapsed_time = t - start_time
         if ptr % 2 == 0:
             sender.graph(elapsed_time, 
                          dataOSL["PV"][ptr] / 998, ekf.x[0, 0], 'Phase', '-',
@@ -291,7 +296,7 @@ try:
                          #ekf.x[2, 0], 'step_length', 'm',
                          #ekf.x[3, 0], 'ramp_angle', 'deg'
                          )
-        #"""
+        """
         ptr += 1
         indx += 1
         if (ptr >= len(dataOSL["Time"])-null-10):
@@ -302,13 +307,13 @@ except KeyboardInterrupt:
 
 finally:
     ## Plot the results
-    t_lower = 10
-    t_upper = 40
+    t_lower = 0
+    t_upper = 20
     plt.figure("Gait Phase")
     plt.subplot(411)
     plt.title("EKF Gait State Estimate")
     plt.plot(dataOSL["Time"], simulation_log['phase_est'], 'r-')
-    plt.plot(dataOSL["Time"], dataOSL['PV'] / 998, 'k-')
+    #plt.plot(dataOSL["Time"], dataOSL['PV'] / 998, 'k-')
     plt.ylabel("Phase")
     plt.xlim((t_lower, t_upper))
     plt.legend(('EKF phase', 'phase variable'))
@@ -353,7 +358,7 @@ finally:
     plt.subplot(311)
     plt.title("Joints Angles Commands")
     plt.plot(dataOSL["Time"], simulation_log['phase_est'], 'r-')
-    plt.plot(dataOSL["Time"], dataOSL['PV'] / 998, 'k-')
+    #plt.plot(dataOSL["Time"], dataOSL['PV'] / 998, 'k-')
     plt.ylabel("Phase")
     plt.xlim((t_lower, t_upper))
     plt.legend(('EKF phase', 'phase variable'))
@@ -361,7 +366,7 @@ finally:
     plt.plot(dataOSL["Time"], dataOSL["AnkleAngleRef"], 'k-')
     plt.plot(dataOSL["Time"], simulation_log["ankle_angle_cmd"], 'r-')
     plt.plot(dataOSL["Time"], simulation_log["ankle_angle_model"], 'm-')
-    plt.plot(dataOSL["Time"], dataOSL['AnkleAngle'], 'b-')
+    #plt.plot(dataOSL["Time"], dataOSL['AnkleAngle'], 'b-')
     plt.legend(('recorded', 'Edgar\'s trajectories', 'kinematic model'))
     plt.ylabel("Ankle angle command(deg)")
     plt.xlim((t_lower, t_upper))

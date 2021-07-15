@@ -37,18 +37,18 @@ def get_global_thigh_angle(subject):
 def get_phase(array):
     return np.concatenate(list(phase_generator(array.shape[0], 150)), axis = 0)
 
-def get_phase_dot(subject):
-    return np.concatenate(list(phase_dot_generator(subject)), axis = 0)
+def get_phase_dot(subject, mode):
+    return np.concatenate(list(phase_dot_generator(subject, mode)), axis = 0)
 
 #This will return the step lengths for every trial
-def get_step_length(subject):
-    return np.concatenate(list(step_length_generator(subject)), axis = 0)
+def get_step_length(subject, mode):
+    return np.concatenate(list(step_length_generator(subject, mode)), axis = 0)
 
-def get_ramp(subject):
-    return np.concatenate(list(ramp_generator(subject)), axis = 0)
+def get_ramp(subject, mode):
+    return np.concatenate(list(ramp_generator(subject, mode)), axis = 0)
 
-def get_time_step(subject):
-    return np.concatenate(list(time_step_generator(subject)), axis = 0)
+def get_time_step(subject, mode):
+    return np.concatenate(list(time_step_generator(subject, mode)), axis = 0)
 
 
 #====================================== Generator functions ===============================================#
@@ -102,10 +102,16 @@ def reaction_wrench_generator(subject, left=True, right=True):
             yield np.array([force_ankle_x, force_ankle_y, force_ankle_z, moment_ankle_x, moment_ankle_y, moment_ankle_z])
             
 def global_thigh_angle_generator(subject, left=True, right=True):
+    with open('Continuous_data/GlobalThighAngles_with_Nan.pickle', 'rb') as file:
+        nan_dict = pickle.load(file)
+    
     for trial in raw_walking_data['Gaitcycle'][subject].keys():
         if trial == 'subjectdetails':
             continue
         if(left == True):
+            if nan_dict[subject][trial]['left'] == False:
+                continue
+
             jointangles = raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles'] #deg
             data_shape = np.shape(jointangles['left']['pelvis']['x'][:])
             Y_th = np.zeros(data_shape)
@@ -124,6 +130,9 @@ def global_thigh_angle_generator(subject, left=True, right=True):
         if trial == 'subjectdetails':
             continue
         if(right == True):
+            if nan_dict[subject][trial]['right'] == False:
+                continue
+
             jointangles = raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles'] #deg
             data_shape = np.shape(jointangles['right']['pelvis']['x'][:])
             Y_th = np.zeros(data_shape)
@@ -143,7 +152,15 @@ def phase_generator(n, length):
     for i in range(n):
         yield np.linspace(0,1,length).reshape(1,length)
 
-def phase_dot_generator(subject):
+def phase_dot_generator(subject, mode):
+    if mode == 'global_thigh_angle_Y' or mode == 'global_thigh_angVel_2hz' or mode == 'atan2':
+        dir = 'Continuous_data/GlobalThighAngles_with_Nan.pickle'
+    elif mode == 'knee_angle' or mode == 'ankle_angle':
+        dir = 'Continuous_data/KneeAngles_with_Nan.pickle'
+    
+    with open(dir, 'rb') as file:
+        nan_dict = pickle.load(file)
+
     for trial in raw_walking_data['Gaitcycle'][subject].keys():
         if trial == 'subjectdetails':
             continue
@@ -153,34 +170,45 @@ def phase_dot_generator(subject):
         time_info_right = raw_walking_data['Gaitcycle'][subject][trial]['cycles']['right']['time']
         phase_step = 1/150
 
-        for step_left in time_info_left:        
+        for step_left in time_info_left:
+            if nan_dict[subject][trial]['left'] == False:
+                continue   
             #Calculate the step length for the given walking config
             #Get delta time of step
             delta_time_left = step_left[1] - step_left[0]
             #Set the steplength for the 
             yield np.full((1,150), phase_step / delta_time_left)
 
-        for step_right in time_info_right:        
+        for step_right in time_info_right:
+            if nan_dict[subject][trial]['right'] == False:
+                continue     
             #Get delta time of step
             delta_time_right = step_right[1] - step_right[0]
             #Set the steplength for the 
             yield np.full((1,150), phase_step / delta_time_right)
 
-def step_length_generator(subject):
+def step_length_generator(subject, mode):
+    if mode == 'global_thigh_angle_Y' or mode == 'global_thigh_angVel_2hz' or mode == 'atan2':
+        dir = 'Continuous_data/GlobalThighAngles_with_Nan.pickle'
+    elif mode == 'knee_angle' or mode == 'ankle_angle':
+        dir = 'Continuous_data/KneeAngles_with_Nan.pickle'
+    
+    with open(dir, 'rb') as file:
+        nan_dict = pickle.load(file)
+
     for trial in raw_walking_data['Gaitcycle'][subject].keys():
         if trial == 'subjectdetails':
             continue
         
         #Get the h5py object pointer for the walking speed
         ptr = raw_walking_data['Gaitcycle'][subject][trial]['description'][1][0]
-
         walking_speed = raw_walking_data[ptr]
-        
         time_info_left = raw_walking_data['Gaitcycle'][subject][trial]['cycles']['left']['time']
-        
         time_info_right = raw_walking_data['Gaitcycle'][subject][trial]['cycles']['right']['time']
 
         for step_left in time_info_left:
+            if nan_dict[subject][trial]['left'] == False:
+                continue
             #Calculate the step length for the given walking config
             #Get delta time of step
             delta_time_left = step_left[149] - step_left[0]
@@ -188,15 +216,27 @@ def step_length_generator(subject):
             yield np.full((1,150), walking_speed * delta_time_left)
 
         for step_right in time_info_right:
+            if nan_dict[subject][trial]['right'] == False:
+                continue
             #Get delta time of step
             delta_time_right = step_right[149] - step_right[0]
             #Set the steplength for the 
             yield np.full((1,150), walking_speed * delta_time_right)
 
-def ramp_generator(subject):       
+def ramp_generator(subject, mode):
+    if mode == 'global_thigh_angle_Y' or mode == 'global_thigh_angVel_2hz' or mode == 'atan2':
+        dir = 'Continuous_data/GlobalThighAngles_with_Nan.pickle'
+    elif mode == 'knee_angle' or mode == 'ankle_angle':
+        dir = 'Continuous_data/KneeAngles_with_Nan.pickle'
+    
+    with open(dir, 'rb') as file:
+        nan_dict = pickle.load(file)
+
     #Generate for the left leg
     for trial in raw_walking_data['Gaitcycle'][subject].keys():
         if trial == 'subjectdetails':
+            continue
+        if nan_dict[subject][trial]['left'] == False:
             continue
         
         #Get the h5py object pointer for the walking speed
@@ -213,6 +253,8 @@ def ramp_generator(subject):
     for trial in raw_walking_data['Gaitcycle'][subject].keys():
         if trial == 'subjectdetails':
             continue
+        if nan_dict[subject][trial]['right'] == False:
+            continue
         
         #Get the h5py object pointer for the walking speed
         ptr = raw_walking_data['Gaitcycle'][subject][trial]['description'][1][1]
@@ -224,7 +266,16 @@ def ramp_generator(subject):
         for step in time_info:        
             yield np.full((1,150), ramp)
 
-def time_step_generator(subject):
+def time_step_generator(subject, mode):
+    if mode == 'global_thigh_angle_Y' or mode == 'global_thigh_angVel_2hz' or mode == 'atan2':
+        dir = 'Continuous_data/GlobalThighAngles_with_Nan.pickle'
+    
+    elif mode == 'knee_angle' or mode == 'ankle_angle':
+        dir = 'Continuous_data/KneeAngles_with_Nan.pickle'
+    
+    with open(dir, 'rb') as file:
+        nan_dict = pickle.load(file)
+    
     for trial in raw_walking_data['Gaitcycle'][subject].keys():
         if trial == 'subjectdetails':
             continue
@@ -232,54 +283,61 @@ def time_step_generator(subject):
         time_info_left = raw_walking_data['Gaitcycle'][subject][trial]['cycles']['left']['time']
         time_info_right = raw_walking_data['Gaitcycle'][subject][trial]['cycles']['right']['time']
 
-        for step_left in time_info_left:        
+        for step_left in time_info_left:
+            if nan_dict[subject][trial]['left'] == False:
+                continue
             delta_time_left = step_left[1] - step_left[0]
             yield np.full((1,150), delta_time_left)
 
-        for step_right in time_info_right:        
+        for step_right in time_info_right:
+            if nan_dict[subject][trial]['right'] == False:
+                continue   
             delta_time_right = step_right[1] - step_right[0]
             yield np.full((1,150), delta_time_right)
 
 if __name__ == '__main__':
     subject_names = get_subject_names()
+    
+    # Global thigh angle
     """
     dict_gt = dict()
     for subject in subject_names:
         dict_gt[subject] = get_global_thigh_angle(subject)
-    with open('Global_thigh_angle.npz', 'wb') as file:
+    with open('Gait_cycle_data/Global_thigh_angle_withoutNan.npz', 'wb') as file:
         np.savez(file, **dict_gt)
     """
-
-    """
+    
+    # Global thigh angle velocities and atan2
+    #"""
     #dict_gt_bp = dict()
     #dict_gtv_5hz = dict()
     #dict_gtv_2x5hz = dict()
-    #dict_gtv_2hz = dict()
+    dict_gtv_2hz = dict()
     #dict_atan2 = dict()
     dict_atan2_s = dict()
 
-    with open('Gait_cycle_data/Global_thigh_angle.npz', 'rb') as file:
+    with open('Gait_cycle_data/Global_thigh_angle_withoutNan.npz', 'rb') as file:
         gt_Y = np.load(file)
         for subject in subject_names:
-            dt = get_time_step(subject)
+            dt = get_time_step(subject, mode = 'global_thigh_angle_Y')
             #gt_bp = np.zeros(np.shape(gt_Y[subject][0]))
             #gtv_5hz = np.zeros(np.shape(gt_Y[subject][0]))
             #gtv_2x5hz = np.zeros(np.shape(gt_Y[subject][0]))
-            #gtv_2hz = np.zeros(np.shape(gt_Y[subject][0]))
+            gtv_2hz = np.zeros(np.shape(gt_Y[subject][0]))
             #atan2 = np.zeros(np.shape(gt_Y[subject][0]))
             atan2_s = np.zeros(np.shape(gt_Y[subject][0]))
             for i in range(np.shape(gt_Y[subject][0])[0]):
                 # compute angular velocities w/ LP filters w/ different cutoff frequencies
-                #v = np.diff(gt_Y[subject][0][i, :]) / dt[i, 0]
-                #gtv = np.insert(v, 0, 0)
-                #gtv_stack = np.array([gtv, gtv, gtv, gtv, gtv]).reshape(-1)
+                v = np.diff(gt_Y[subject][0][i, :]) / dt[i, 0]
+                gtv = np.insert(v, 0, 0)
+                gtv_stack = np.array([gtv, gtv, gtv, gtv, gtv]).reshape(-1)
                 #gtv_5hz_stack = butter_lowpass_filter(gtv_stack, 5, 1/dt[i, 0], order = 1)
                 #gtv_2x5hz_stack = butter_lowpass_filter(gtv_stack, 2.5, 1/dt[i, 0], order = 1)
-                #gtv_2hz_stack = butter_lowpass_filter(gtv_stack, 2, 1/dt[i, 0], order = 1)
+                gtv_2hz_stack = butter_lowpass_filter(gtv_stack, 2, 1/dt[i, 0], order = 1)
 
                 #gtv_5hz[i, :] = gtv_5hz_stack[2 * len(gt_Y[subject][0][i, :]): 3 * len(gt_Y[subject][0][i, :])]
                 #gtv_2x5hz[i, :] = gtv_2x5hz_stack[2 * len(gt_Y[subject][0][i, :]): 3 * len(gt_Y[subject][0][i, :])]
-                #gtv_2hz[i, :] = gtv_2hz_stack[2 * len(gt_Y[subject][0][i, :]): 3 * len(gt_Y[subject][0][i, :])]
+                gtv_2hz[i, :] = gtv_2hz_stack[2 * len(gt_Y[subject][0][i, :]): 3 * len(gt_Y[subject][0][i, :])]
 
                 # compute atan2 w/ a band-pass filter
                 gt_stack = np.array([gt_Y[subject][0][i, :], gt_Y[subject][0][i, :], gt_Y[subject][0][i, :],\
@@ -289,7 +347,7 @@ if __name__ == '__main__':
 
                 #gt_bp = butter_bandpass_filter(gt_Y[subject][0][i, :], 0.5, 2, 1/dt[i, 0], order = 1)
                 v_bp = np.diff(gt_bp) / dt[i, 0]
-                # gtv_bp = butter_lowpass_filter(np.insert(v_bp, 0, 0), 2, 1/dt[i, 0], order = 1)
+                #gtv_bp = butter_lowpass_filter(np.insert(v_bp, 0, 0), 2, 1/dt[i, 0], order = 1)
                 gtv_bp = np.insert(v_bp, 0, 0)
                 gtv_bp_stack = np.array([gtv_bp, gtv_bp, gtv_bp, gtv_bp, gtv_bp]).reshape(-1)
                 gtv_blp_stack = butter_lowpass_filter(gtv_bp_stack, 2, 1/dt[i, 0], order = 1)
@@ -302,7 +360,7 @@ if __name__ == '__main__':
             #dict_gt_bp[subject] = gt_bp
             #dict_gtv_5hz[subject] = gtv_5hz
             #dict_gtv_2x5hz[subject] = gtv_2x5hz
-            #dict_gtv_2hz[subject] = gtv_2hz
+            dict_gtv_2hz[subject] = gtv_2hz
             dict_atan2_s[subject] = atan2_s
 
     #with open('Gait_cycle_data/Global_thigh_angle_bp.npz', 'wb') as file:
@@ -311,12 +369,14 @@ if __name__ == '__main__':
     #    np.savez(file, **dict_gtv_5hz)
     #with open('Gait_cycle_data/Global_thigh_angVel_2x5hz.npz', 'wb') as file:
     #    np.savez(file, **dict_gtv_2x5hz)
-    #with open('Gait_cycle_data/Global_thigh_angVel_2hz.npz', 'wb') as file:
-    #    np.savez(file, **dict_gtv_2hz)
-    with open('Gait_cycle_data/atan2_s.npz', 'wb') as file:
+    with open('Gait_cycle_data/Global_thigh_angVel_2hz_withoutNan.npz', 'wb') as file:
+        np.savez(file, **dict_gtv_2hz)
+    with open('Gait_cycle_data/atan2_s_withoutNan.npz', 'wb') as file:
         np.savez(file, **dict_atan2_s)
-    """
+    #"""
 
+    # Knee and ankle 
+    """
     dict_knee = dict()
     for subject in subject_names:
         dict_knee[subject] = -get_joint_angle(subject, 'knee', 'x')
@@ -328,6 +388,8 @@ if __name__ == '__main__':
         dict_ankle[subject] = -get_joint_angle(subject, 'ankle', 'x')
     with open('Gait_cycle_data/ankle_angle.npz', 'wb') as file:
         np.savez(file, **dict_ankle)
+    """
+
     
     """
     dict_rw = dict()

@@ -550,7 +550,7 @@ def ekf_robustness(kidnap = True):
 
     robustness = 0
 
-    with open('Continuous_data/Measurements_with_Nan.pickle', 'rb') as file:
+    with open('Continuous_data/GlobalThighAngles_with_Nan.pickle', 'rb') as file:
         nan_dict = pickle.load(file)
 
     #for subject in Conti_subject_names():

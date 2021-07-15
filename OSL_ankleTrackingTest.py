@@ -172,10 +172,10 @@ try:
     #=======================================================================================================#
 
     # Convert list to numpy array
-    ankle_ref = np.array(ankle_ref)
-    ankle_mea = np.array(ankle_mea)
-    knee_ref = np.array(knee_ref)
-    knee_mea = np.array(knee_mea)
+    #ankle_ref = np.array(ankle_ref).reshape(-1)
+    #ankle_mea = np.array(ankle_mea).reshape(-1)
+    #knee_ref = np.array(knee_ref).reshape(-1)
+    #knee_mea = np.array(knee_mea).reshape(-1)
 
 except KeyboardInterrupt:
     print('\n*** OSL shutting down ***\n')
@@ -191,10 +191,10 @@ finally:
     print('Communication with ActPacks closed and IMU set to idle')
 
     # RMSE of joints positions
-    ankle_rmse = np.sqrt(np.square(ankle_ref - ankle_mea).mean())
-    knee_rmse = np.sqrt(np.square(knee_ref - knee_mea).mean())
-    print("RMSE of ankle position: ", ankle_rmse)
-    print("RMSE of knee position: ", knee_rmse)
+    #ankle_rmse = np.sqrt(np.square(ankle_ref - ankle_mea).mean())
+    #knee_rmse = np.sqrt(np.square(knee_ref - knee_mea).mean())
+    #print("RMSE of ankle position: ", ankle_rmse)
+    #print("RMSE of knee position: ", knee_rmse)
 
     # Plot and save figures
     fig, ax = plt.subplots(2,1)

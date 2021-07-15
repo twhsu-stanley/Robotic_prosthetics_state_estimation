@@ -3,97 +3,24 @@ import scipy.io
 import matplotlib.pyplot as plt
 import numpy as np
 import time
+import pickle
+from continuous_data import *
 
-listA = [1.24, 3.98, 5.33]
-print("ers %.2f, %.2f, and %.2f" % (listA[0], listA[1], listA[2]))
-# Ankle angle limits (deg)
-ankle_max = 18
-ankle_min = -10
-# Natural frequency of the sine wave (rad/s)
-freq = 2 * np.pi * 0.2 # 0.2 Hz
-# DC offset of the sine wave
-ankle_offset_initial = 10
-ankle_offset_final = (ankle_max + ankle_min) / 2
-# Amplitude of the sine wave
-ankle_amplitude_initial = 0
-ankle_amplitude_final = (ankle_max - ankle_min) / 2
-
-# Fade-in time (sec)
-fade_in_time = 3
-
-## Main Loop #####################################################################################
-ankle_ref = []
-t_0 = time.perf_counter() # sec
-t = 0
-while(t < 15):
-    t = time.perf_counter() - t_0
-
-    # 1) Sinusoidal ankle command with fade-in effect (deg)
-    if t < fade_in_time:
-        amplitude = ankle_amplitude_initial + (ankle_amplitude_final - ankle_amplitude_initial) * t / fade_in_time
-        ankle_offset = ankle_offset_initial + (ankle_offset_final - ankle_offset_initial) * t / fade_in_time
-    elif t >= fade_in_time:
-        amplitude = ankle_amplitude_final
-        ankle_offset = ankle_offset_final
-
-    ankle_cmd = amplitude * np.sin(freq * t) + ankle_offset
-        
-    # Saturation for ankle command
-    if ankle_cmd > ankle_max: 
-        ankle_cmd = ankle_max
-    elif ankle_cmd < ankle_min:
-        ankle_cmd = ankle_min
-
-    ankle_ref.append(ankle_cmd)
-
-ankle_ref = np.array(ankle_ref)
-plt.figure()
-plt.plot(ankle_ref)
-plt.show()
+a = [0,1,2,3,4]
+b = [0,1,4]
+for z in zip(a,b):
+    print(z)
 
 
-
-
-
-
-print("Knee initial position: %.2f deg" % -5)
-
-a = []
-b = []
-
-for i in range(10):
-    a.append(1)
-    b.append(0)
-a = np.array(a)
-b = np.array(b)
-rmse = np.sqrt(np.square(a - b).mean())
-print(rmse)
-
-t_0 = time.perf_counter() # sec
-t = 0
-while(t < 7):
-    t = time.perf_counter() - t_0
-    print(t)
-    time.sleep(1)
-
-dict1  = {"a": 1, 'b':2}
-
-print(len(dict1))
-
-
-mat = scipy.io.loadmat('OSL_walking_data/Treadmill_speed1_incline0_file1.mat')
-thighY = mat['ThighIMU'][0, 0]['ThetaY']
-
-plt.figure()
-plt.plot(mat['ThighIMU'][0, 0]['ThetaY'])
-plt.plot(mat['ThighIMU'][0, 0]['ThetaX'])
-plt.plot(mat['ThighIMU'][0, 0]['ThetaZ'])
-plt.legend(('Y', 'X', 'Z'))
-
-plt.figure()
-tt = np.cumsum(mat['ControllerOutputs'][0, 0]['dt']).reshape(-1)
-
-plt.plot(np.diff(tt))
-plt.plot(mat['ControllerOutputs'][0, 0]['dt'])
-plt.show()
-
+with open('Continuous_data/GlobalThighAngles_with_Nan.pickle', 'rb') as file:
+#with open('Continuous_data/KneeAngles_with_Nan.pickle', 'rb') as file:
+        nan_dict = pickle.load(file)
+    
+for subject in Conti_subject_names():
+        for trial in Conti_trial_names(subject):
+            if trial == 'subjectdetails':
+                continue
+            for side in ['left', 'right']:
+                if nan_dict[subject][trial][side] == False:
+                    print(subject + "/"+ trial + "/"+ side+ ": Trial skipped!")
+                    

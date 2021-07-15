@@ -137,7 +137,7 @@ try:
     knee_mea = []
     t_0 = time.perf_counter() # sec
     t = 0
-    while(t < 10):
+    while(t < 20):
         t = time.perf_counter() - t_0
 
         if t < fade_in_time:
@@ -188,10 +188,10 @@ try:
         knee_mea.append(dataOSL['kneJoiPos'] * 180 / np.pi)
 
     # Convert list to numpy array
-    ankle_ref = np.array(ankle_ref)
-    ankle_mea = np.array(ankle_mea)
-    knee_ref = np.array(knee_ref)
-    knee_mea = np.array(knee_mea)
+    #ankle_ref = np.array(ankle_ref)
+    #ankle_mea = np.array(ankle_mea)
+    #knee_ref = np.array(knee_ref)
+    #knee_mea = np.array(knee_mea)
 
 except KeyboardInterrupt:
     print('\n*** OSL shutting down ***\n')
@@ -207,10 +207,10 @@ finally:
     print('Communication with ActPacks closed and IMU set to idle')
 
     # RMSE of joints positions
-    ankle_rmse = np.sqrt(np.square(ankle_ref - ankle_mea).mean())
-    knee_rmse = np.sqrt(np.square(knee_ref - knee_mea).mean())
-    print("RMSE of ankle position: %.2f deg" % ankle_rmse)
-    print("RMSE of knee position: %.2f deg" % knee_rmse)
+    #ankle_rmse = np.sqrt(np.square(ankle_ref - ankle_mea).mean())
+    #knee_rmse = np.sqrt(np.square(knee_ref - knee_mea).mean())
+    #print("RMSE of ankle position: %.2f deg" % ankle_rmse)
+    #print("RMSE of knee position: %.2f deg" % knee_rmse)
 
     # Plot and save figures
     fig, ax = plt.subplots(2,1)

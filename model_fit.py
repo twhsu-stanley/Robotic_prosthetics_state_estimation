@@ -87,7 +87,7 @@ def model_fit(model, mode):
     for subject in subject_names:
         # generate data
         if mode == 'global_thigh_angle_Y':
-            with open('Gait_cycle_data/Global_thigh_angle.npz', 'rb') as file:
+            with open('Gait_cycle_data/Global_thigh_angle_withoutNan.npz', 'rb') as file:
                 g_t = np.load(file)
                 if subject == 'AB01':
                     measurement_input = g_t[subject][0]
@@ -115,14 +115,14 @@ def model_fit(model, mode):
                 else:
                     measurement_input = np.vstack((measurement_input, r_w[subject][4]))
         elif mode == 'global_thigh_angVel_2hz':
-            with open('Gait_cycle_data/global_thigh_angVel_2hz.npz', 'rb') as file:
+            with open('Gait_cycle_data/global_thigh_angVel_2hz_withoutNan.npz', 'rb') as file:
                 g_tv = np.load(file)
                 if subject == 'AB01':
                     measurement_input = g_tv[subject]
                 else:
                     measurement_input = np.vstack((measurement_input, g_tv[subject]))
         elif mode == 'atan2':
-            with open('Gait_cycle_data/atan2_s.npz', 'rb') as file: # scaled
+            with open('Gait_cycle_data/atan2_s_withoutNan.npz', 'rb') as file: # scaled
                 atan2 = np.load(file)
                 if subject == 'AB01':
                     measurement_input = atan2[subject]
@@ -149,15 +149,21 @@ def model_fit(model, mode):
             sys.exit('Error: no such mode of input')
 
         if subject == 'AB01':
-            phase_dots = get_phase_dot(subject)
-            step_lengths = get_step_length(subject)
-            ramps = get_ramp(subject)
+            phase_dots = get_phase_dot(subject, mode)
+            step_lengths = get_step_length(subject, mode)
+            ramps = get_ramp(subject, mode)
         else:
-            phase_dots = np.vstack((phase_dots, get_phase_dot(subject)))
-            step_lengths = np.vstack((step_lengths, get_step_length(subject)))
-            ramps = np.vstack((ramps, get_ramp(subject)))
+            phase_dots = np.vstack((phase_dots, get_phase_dot(subject, mode)))
+            step_lengths = np.vstack((step_lengths, get_step_length(subject, mode)))
+            ramps = np.vstack((ramps, get_ramp(subject, mode)))
 
     phases = get_phase(measurement_input)
+
+    print("Shape of measurement: ", np.shape(measurement_input))
+    print("Shape of phase: ", np.shape(phases))
+    print("Shape of phase dot: ", np.shape(phase_dots))
+    print("Shape of step length: ", np.shape(step_lengths))
+    print("Shape of ramp: ", np.shape(ramps))
 
     # Fit the model
     if mode == 'atan2':
@@ -173,7 +179,7 @@ def model_fit(model, mode):
     else:
         psi = least_squares(model, measurement_input.ravel(),\
                             phases.ravel(), phase_dots.ravel(), step_lengths.ravel(), ramps.ravel())
-        
+
     PSI = psi
 
     return PSI
@@ -389,7 +395,7 @@ if __name__ == '__main__':
     #psi_thigh_Y = model_fit(model_thigh_Y, 'global_thigh_angle_Y')
     #with open('Psi/Psi_thigh_Y.npz', 'wb') as file:
     #    np.savez(file, psi_thigh_Y, allow_pickle = True)
-    #with open('Psi/Psi_thigh_Y_G.pickle', 'wb') as file:
+    #with open('Psi/Psi_thigh_Y_G_withoutNan.pickle', 'wb') as file:
     #    pickle.dump(psi_thigh_Y, file)
 
     # Measrurement model for reaction_force_z_ankle
@@ -433,7 +439,7 @@ if __name__ == '__main__':
     #psi_thighVel_2hz = model_fit(model_thighVel_2hz, 'global_thigh_angVel_2hz')
     #with open('Psi/Psi_thighVel_2hz_p.npz', 'wb') as file:
     #   np.savez(file, psi_thighVel_2hz, allow_pickle = True)
-    #with open('Psi/Psi_thighVel_2hz_G.pickle', 'wb') as file:
+    #with open('Psi/Psi_thighVel_2hz_G_withoutNan.pickle', 'wb') as file:
     #    pickle.dump(psi_thighVel_2hz, file)
 
     phase_dot_model = Polynomial_Basis(1, 'phase_dot')
@@ -444,7 +450,7 @@ if __name__ == '__main__':
     #psi_atan2 = model_fit(model_atan2, 'atan2')
     #with open('Psi/Psi_atan2_s_pv.npz', 'wb') as file:
     #    np.savez(file, psi_atan2, allow_pickle = True)
-    #with open('Psi/Psi_atan2_G.pickle', 'wb') as file:
+    #with open('Psi/Psi_atan2_G_withoutNan.pickle', 'wb') as file:
     #    pickle.dump(psi_atan2, file)
     
     #####################################################################################################
@@ -473,15 +479,16 @@ if __name__ == '__main__':
 
     model_knee = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     psi_knee = model_fit(model_knee, 'knee_angle')
-    with open('Psi/Psi_knee_G.pickle', 'wb') as file:
+    with open('Psi/Psi_knee_G_withoutNan.pickle', 'wb') as file:
         pickle.dump(psi_knee, file)
 
     print("Finished fitting the knee model")
 
     model_ankle = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     psi_ankle = model_fit(model_ankle, 'ankle_angle')
-    with open('Psi/Psi_ankle_G.pickle', 'wb') as file:
+    with open('Psi/Psi_ankle_G_withoutNan.pickle', 'wb') as file:
         pickle.dump(psi_ankle, file)
     
-    c_model = Measurement_Model(model_knee, model_ankle)
-    model_saver(c_model, 'Control_model.pickle')
+    #c_model = Measurement_Model(model_knee, model_ankle)
+    #model_saver(c_model, 'Control_model.pickle')
+    

@@ -4,7 +4,7 @@ from EKF import joints_control
 from model_framework import *
 import csv
 
-logFile = r"OSL_walking_data/210702_170412_OSL_benchtop_test.csv"
+logFile = r"OSL_walking_data/210714_113523_OSL_benchtop_test.csv"
 datatxt = np.genfromtxt(logFile , delimiter=',', names = True)
 
 #Actual trajectory obtained from log files
@@ -59,20 +59,20 @@ axs[0].set_ylabel('EKF phase')
 axs[0].plot(xindex, ekfEstimates['phase'][ranA:ranB], 'r-')
 #axs[0].legend(["PV/998","EKF Phase"])
 
-axs[1].set_ylabel('Ankle angle command (Deg)')
-axs[1].plot(xindex, referenceTrajectory['AnkleRef'][ranA:ranB], 'r-')
+axs[1].set_ylabel('Ankle angle (Deg)')
 axs[1].plot(xindex, actualTrajectory['AnkleAngle'][ranA:ranB])
+axs[1].plot(xindex, referenceTrajectory['AnkleRef'][ranA:ranB], 'r-')
 #axs[1].plot(xindex, ankle_angle_kmodel[ranA:ranB], 'm-')
 #axs[1].set_ylim([-30,20])
-axs[1].legend(["Edgar\'s trajectory", "measured", "kinematic model"])
+axs[1].legend(["Measured", "Commanded: Edgar\'s trajectory", "Command: kinematic model"])
 
 axs[2].set_xlabel('Time(s)')
-axs[2].set_ylabel('Knee angle command (Deg)')
-axs[2].plot(xindex, referenceTrajectory['KneeRef'][ranA:ranB], 'r-')
+axs[2].set_ylabel('Knee angle (Deg)')
 axs[2].plot(xindex, actualTrajectory['KneeAngle'][ranA:ranB])
+axs[2].plot(xindex, referenceTrajectory['KneeRef'][ranA:ranB], 'r-')
 #axs[2].plot(xindex, knee_angle_kmodel[ranA:ranB], 'm-')
 axs[2].set_ylim([-70,10])
-axs[2].legend(["Edgar\'s trajectory","measured", "kinematic model"])
+axs[2].legend(["Measured", "Commanded: Edgar\'s trajectory", "Command: kinematic model"])
 
 fig.set_size_inches(22, 13)
 plt.savefig(logFile + 'Joints_Commands.png', dpi=100)
