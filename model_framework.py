@@ -215,12 +215,12 @@ def least_squares(model, output, *data):
 
 #Save the model so that you can use them later
 def model_saver(model, filename):
-	with open('Measurement_model/' + filename, 'wb') as file:
+	with open('Basis_model/' + filename, 'wb') as file:
 		pickle.dump(model, file)
 
 #Load the model from a file
 def model_loader(filename):
-	with open('Measurement_model/' + filename, 'rb') as file:
+	with open('Basis_model/' + filename, 'rb') as file:
 		return pickle.load(file)
 
 # Speed up implementation of the kronecker product 

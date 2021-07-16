@@ -6,6 +6,11 @@ import time
 import pickle
 from continuous_data import *
 
+a = np.array([[1,2,3], [3,4,5], [6,7,8], [4,5,5]])
+print(np.delete(a, [1,2], 0))
+
+print(a-1)
+
 a = [0,1,2,3,4]
 b = [0,1,4]
 for z in zip(a,b):

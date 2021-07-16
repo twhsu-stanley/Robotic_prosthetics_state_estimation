@@ -392,7 +392,7 @@ if __name__ == '__main__':
     
     # Measrurement model for global_thigh_angle_Y
     model_thigh_Y = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
-    #psi_thigh_Y = model_fit(model_thigh_Y, 'global_thigh_angle_Y')
+    psi_thigh_Y = model_fit(model_thigh_Y, 'global_thigh_angle_Y')
     #with open('Psi/Psi_thigh_Y.npz', 'wb') as file:
     #    np.savez(file, psi_thigh_Y, allow_pickle = True)
     #with open('Psi/Psi_thigh_Y_G_withoutNan.pickle', 'wb') as file:

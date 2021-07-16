@@ -411,9 +411,9 @@ def plot_Conti_joints_angles(subject, trial, side):
     with open('Psi/Psi_ankle_G.pickle', 'rb') as file:
         Psi_ankle = pickle.load(file)
     
-    with open('Psi/Psi_knee_G_withoutNan.pickle', 'rb') as file:
+    with open('New_Psi/Psi_kneeAngles.pickle', 'rb') as file:
         Psi_knee_withoutNan = pickle.load(file)
-    with open('Psi/Psi_ankle_G_withoutNan.pickle', 'rb') as file:
+    with open('New_Psi/Psi_ankleAngles.pickle', 'rb') as file:
         Psi_ankle_withoutNan = pickle.load(file)
     
     knee_angle_pred = model_prediction(c_model.models[0], Psi_knee, phases, phase_dots, step_lengths, ramps)
@@ -440,10 +440,10 @@ def plot_Conti_joints_angles(subject, trial, side):
 
 def detect_knee_over_extention():
     c_model = model_loader('Control_model.pickle')
-    with open('Psi/Psi_knee_G_withoutNan.pickle', 'rb') as file:
+    with open('New_Psi/Psi_kneeAngles.pickle', 'rb') as file:
         Psi_knee = pickle.load(file)
-    with open('Psi/Psi_ankle_G.pickle', 'rb') as file:
-        Psi_ankle = pickle.load(file)
+    #with open('New_Psi/Psi_ankleAngles.pickle', 'rb') as file:
+    #    Psi_ankle = pickle.load(file)
     n = 0
     for subject in Conti_subject_names():
         for trial in Conti_trial_names(subject):
@@ -618,7 +618,7 @@ if __name__ == '__main__':
     ##################################################################
     
     subject = 'AB03'
-    trial = 's1i0'
+    trial = 's0x8i0'
     side = 'left'
 
     #detect_knee_over_extention()
@@ -636,11 +636,11 @@ if __name__ == '__main__':
     #plt.ylabel('knee angle')
     #plt.show()
 
-    #plot_Conti_joints_angles(subject, trial, side)
+    plot_Conti_joints_angles(subject, trial, side)
     #Conti_global_thigh_angle_Y(subject, trial, side)
     #plt.show()
     #plot_Conti_measurement_data(subject, trial, side)
-    print(Conti_maxmin('AB01', plot = False))
+    #print(Conti_maxmin('AB01', plot = False))
 
     ######## test real0time filters #############
     """
