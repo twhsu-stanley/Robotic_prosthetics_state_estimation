@@ -6,7 +6,7 @@ from model_framework import *
 from model_fit import *
 from EKF import wrapTo2pi, load_Psi
 
-"""
+#"""
 # Dictionary of the sensors
 sensors_dict = {'global_thigh_angle': 0, 'force_z_ankle': 1, 'force_x_ankle': 2,
                 'moment_y_ankle': 3, 'global_thigh_angle_vel': 4, 'atan2': 5}
@@ -14,28 +14,23 @@ sensors_dict = {'global_thigh_angle': 0, 'force_z_ankle': 1, 'force_x_ankle': 2,
 # Determine which sensors to be used
 sensors = ['global_thigh_angle', 'global_thigh_angle_vel', 'atan2']
 
-sensor_id = 1
+sensor_id = 0
 
 m_model = model_loader('Measurement_model_3.pickle')
 Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 
 ## A. Visualize Measurement Model w.r.t. phase_dot ===========================================================================
 phases = np.linspace(0, 1, num = 50)
-phase_dots = np.linspace(0.6, 1, num = 50)
+phase_dots = np.linspace(0.6, 1.2, num = 50)
 step_lengths = 1.1
-ramps = 0
+ramps = -10
 
 measurement = np.zeros((len(phases), len(phase_dots)))
 
 for i in range(len(phases)):
     for j in range(len(phase_dots)):
-        #z[i,j] = model_prediction(m_model.models[sensor], Psi[sensor], phases[i], phase_dots[j], step_lengths, ramps)
         z = m_model.evaluate_h_func(Psi, phases[i], phase_dots[j], step_lengths, ramps)
-        if sensor_id == 7:
-            #measurement[i,j] = wrapTo2pi(m[sensor] + 2 * np.pi * phases[i])
-            measurement[i,j] = z[sensor_id]
-        else:
-            measurement[i,j] = z[sensor_id]
+        measurement[i,j] = z[sensor_id]
 
 fig = plt.figure()
 X, Y = np.meshgrid(phases, phase_dots)
@@ -48,20 +43,15 @@ ax.set_ylabel('phase_dot')
 ## B. Visualize Measurement Model w.r.t. stpe_length ===========================================================================
 phases = np.linspace(0, 1, num = 50)
 phase_dots = 0.8
-step_lengths = np.linspace(0.5, 1.5, num = 50)
+step_lengths = np.linspace(0.7, 1.6, num = 50)
 ramps = 0
 
 measurement = np.zeros((len(phases), len(step_lengths)))
 
 for i in range(len(phases)):
     for j in range(len(step_lengths)):
-        #z[i,j] = model_prediction(m_model.models[sensor], Psi[sensor], phases[i], phase_dots[j], step_lengths, ramps)
         z = m_model.evaluate_h_func(Psi, phases[i], phase_dots, step_lengths[j], ramps)
-        if sensor_id == 7:
-            #measurement[i,j] = wrapTo2pi(m[sensor] + 2 * np.pi * phases[i])
-            measurement[i,j] = z[sensor_id]
-        else:
-            measurement[i,j] = z[sensor_id]
+        measurement[i,j] = z[sensor_id]
 
 fig = plt.figure()
 X, Y = np.meshgrid(phases, step_lengths)
@@ -70,9 +60,29 @@ ax.plot_surface(X, Y, measurement.T)
 ax.set_xlabel('phase')
 ax.set_ylabel('step_length')
 # ==========================================================================================================================
+
+## C. Visualize Measurement Model w.r.t. ramp ===========================================================================
+phases = np.linspace(0, 1, num = 50)
+phase_dots = 0.8
+step_lengths = 1.1
+ramps = np.linspace(-10, 10, num = 50)
+
+measurement = np.zeros((len(phases), len(ramps)))
+
+for i in range(len(phases)):
+    for j in range(len(ramps)):
+        z = m_model.evaluate_h_func(Psi, phases[i], phase_dots, step_lengths, ramps[j])
+        measurement[i,j] = z[sensor_id]
+
+fig = plt.figure()
+X, Y = np.meshgrid(phases, ramps)
+ax = plt.axes(projection='3d')
+ax.plot_surface(X, Y, measurement.T)
+ax.set_xlabel('phase')
+ax.set_ylabel('ramp')
+# ==========================================================================================================================
+
 """
-
-
 c_model = model_loader('Control_model.pickle')
 with open('New_Psi/Psi_kneeAngles.pickle', 'rb') as file:#_withoutNan
     Psi_knee = pickle.load(file)
@@ -182,5 +192,5 @@ ax.set_ylabel('phase_dots')
 ax.set_zlabel('knee angle (deg)')
 
 #==============================================================================================================================
-
+"""
 plt.show()

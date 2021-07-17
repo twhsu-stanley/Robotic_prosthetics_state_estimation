@@ -57,11 +57,14 @@ if __name__ == '__main__':
     step_length_model = Berstein_Basis(N,'step_length')
     ramp_model = Berstein_Basis(N, 'ramp')
 
-    model_knee = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
-    psi_knee = basis_model_fitting(model_knee, 'kneeAngles')
+    model_globalThighAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    psi_globalThighAngles = basis_model_fitting(model_globalThighAngles, 'globalThighAngles')
 
-    model_ankle = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
-    psi_ankle = basis_model_fitting(model_ankle, 'ankleAngles')
+    #model_kneeAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    #psi_kneeAngles = basis_model_fitting(model_kneeAngles, 'kneeAngles')
+
+    #model_ankleAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    #psi_ankleAngles = basis_model_fitting(model_ankleAngles, 'ankleAngles')
     
     #c_model = Measurement_Model(model_knee, model_ankle)
     #model_saver(c_model, 'Control_model.pickle')

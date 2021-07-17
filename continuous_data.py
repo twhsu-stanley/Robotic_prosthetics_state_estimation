@@ -129,8 +129,11 @@ def plot_Conti_measurement_data(subject, trial, side):
     m_model = model_loader('Measurement_model_6.pickle') # load new model w/ linear phase_dot
     Psi = load_Psi('Generic')
 
+    with open('New_Psi/Psi_globalThighAngles.pickle', 'rb') as file:
+        Psi_globalThighAngles = pickle.load(file)
+
     global_thigh_angle_Y_pred = model_prediction(m_model.models[0], Psi['global_thigh_angle'], phases, phase_dots, step_lengths, ramps)
-    global_thigh_angle_Y_pred_withoutNan = model_prediction(m_model.models[0], Psi['global_thigh_angle_withoutNan'], phases, phase_dots, step_lengths, ramps)
+    global_thigh_angle_Y_pred_withoutNan = model_prediction(m_model.models[0], Psi_globalThighAngles, phases, phase_dots, step_lengths, ramps)
 
     force_z_ankle_pred = model_prediction(m_model.models[1], Psi['force_Z'], phases, phase_dots, step_lengths, ramps)
     force_x_ankle_pred = model_prediction(m_model.models[2], Psi['force_X'], phases, phase_dots, step_lengths, ramps)
@@ -617,10 +620,10 @@ if __name__ == '__main__':
     """
     ##################################################################
     
-    subject = 'AB03'
-    trial = 's0x8i0'
+    subject = 'AB02'
+    trial = 's0x8d10'
     side = 'left'
-
+    
     #detect_knee_over_extention()
     #detect_nan_in_globalThighAngle()
     #detect_nan_in_joints()
@@ -636,10 +639,10 @@ if __name__ == '__main__':
     #plt.ylabel('knee angle')
     #plt.show()
 
-    plot_Conti_joints_angles(subject, trial, side)
+    #plot_Conti_joints_angles(subject, trial, side)
     #Conti_global_thigh_angle_Y(subject, trial, side)
     #plt.show()
-    #plot_Conti_measurement_data(subject, trial, side)
+    plot_Conti_measurement_data(subject, trial, side)
     #print(Conti_maxmin('AB01', plot = False))
 
     ######## test real0time filters #############
