@@ -21,8 +21,8 @@ with open('Psi/Psi_ankle_G.pickle', 'rb') as file:
 ## Load model coefficients
 def load_Psi(subject = 'Generic'):
     if subject == 'Generic':
-        with open('Psi/Psi_thigh_Y_G.pickle', 'rb') as file:
-        #with open('New_Psi/Psi_globalThighAngles.pickle', 'rb') as file:
+        #with open('Psi/Psi_thigh_Y_G.pickle', 'rb') as file:
+        with open('New_Psi/Psi_globalThighAngles.pickle', 'rb') as file:
             Psi_thigh_Y = pickle.load(file)
         
         with open('Psi/Psi_force_Z_G.pickle', 'rb') as file:

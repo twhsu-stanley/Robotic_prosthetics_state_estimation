@@ -13,7 +13,7 @@ import scipy.io
 import sender_test as sender   # for real-time plotting
 
 ### A. Load Ross's pre-recorded walking data 
-#"""
+"""
 logFile = r"OSL_walking_data/210714_113523_OSL_benchtop_test.csv"
 # 1) 210617_113644_PV_Siavash_walk_oscillations in phase
 # 2) 210617_121732_PV_Siavash_walk_300_1600
@@ -28,13 +28,19 @@ dataOSL = {
     'KneeAngle': datatxt["kneJoiPos"],
     'KneeAngleRef': datatxt["refKnee"],
 }
-#"""
+"""
 
 ### B. Load Kevin's bypass-adapter walking data
-"""
-mat = scipy.io.loadmat('OSL_walking_data/Treadmill_speed1_incline0_file2.mat')
+#"""
+mat = scipy.io.loadmat('OSL_walking_data/Treadmill_speed1_incline5_file2.mat')
 # Treadmill_speed1_incline0_file2
 # Treadmill_speed1_incline0_file1
+# Treadmill_speed1_incline5_file1
+# Treadmill_speed1_incline5_file2
+# Treadmill_speed1_incline10_file1
+# Treadmill_speed1_inclineneg5_file1
+# Treadmill_speed1_inclineneg10_file1
+
 dataOSL = {
     "Time": np.cumsum(mat['ControllerOutputs'][0, 0]['dt']).reshape(-1),
     "ThighSagi": mat['ThighIMU'][0, 0]['ThetaX'].reshape(-1) / (180 / np.pi),
@@ -44,7 +50,7 @@ dataOSL = {
     'KneeAngle': -mat['KneeEncoder'][0, 0]['FilteredJointAngle'].reshape(-1),
     'KneeAngleRef': -mat['ControllerOutputs'][0, 0]['knee_des'].reshape(-1),
 }
-"""
+#"""
 
 
 ## From loco_OSL.py: Load referenced trajectories
@@ -113,7 +119,7 @@ try:
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-5, 1e-5, 0])
+    sys.Q = np.diag([0, 1e-5, 1e-5, 1e-5])
     # measurement noise covariance
     sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
     U = np.diag([2, 2, 2])
@@ -122,7 +128,7 @@ try:
     # initialize the state
     init = myStruct()
     init.x = np.array([[0], [0.4], [1.1], [0]])
-    init.Sigma = np.diag([1e-3, 1e-3, 1e-3, 0])
+    init.Sigma = np.diag([1e-3, 1e-3, 1e-3, 1e-3])
 
     ekf = extended_kalman_filter(sys, init)
 
@@ -308,7 +314,7 @@ except KeyboardInterrupt:
 finally:
     ## Plot the results
     t_lower = 0
-    t_upper = 20
+    t_upper = 30
     plt.figure("Gait Phase")
     plt.subplot(411)
     plt.title("EKF Gait State Estimate")
