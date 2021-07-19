@@ -131,9 +131,12 @@ def plot_Conti_measurement_data(subject, trial, side):
 
     with open('New_Psi/Psi_globalThighAngles.pickle', 'rb') as file:
         Psi_globalThighAngles = pickle.load(file)
+    
+    with open('New_Psi/Psi_globalThighVelocities.pickle', 'rb') as file:
+        Psi_globalThighVelocities = pickle.load(file)
 
     global_thigh_angle_Y_pred = model_prediction(m_model.models[0], Psi['global_thigh_angle'], phases, phase_dots, step_lengths, ramps)
-    global_thigh_angle_Y_pred_withoutNan = model_prediction(m_model.models[0], Psi_globalThighAngles, phases, phase_dots, step_lengths, ramps)
+    global_thigh_angle_Y_pred_new = model_prediction(m_model.models[0], Psi_globalThighAngles, phases, phase_dots, step_lengths, ramps)
 
     force_z_ankle_pred = model_prediction(m_model.models[1], Psi['force_Z'], phases, phase_dots, step_lengths, ramps)
     force_x_ankle_pred = model_prediction(m_model.models[2], Psi['force_X'], phases, phase_dots, step_lengths, ramps)
@@ -141,10 +144,10 @@ def plot_Conti_measurement_data(subject, trial, side):
     #global_thigh_angVel_5hz_pred = model_prediction(m_model.models[4], Psi[4], phases, phase_dots, step_lengths, ramps)
     #global_thigh_angVel_2x5hz_pred = model_prediction(m_model.models[5], Psi[5], phases, phase_dots, step_lengths, ramps)
     global_thigh_angVel_2hz_pred = model_prediction(m_model.models[4], Psi['global_thigh_angle_vel'], phases, phase_dots, step_lengths, ramps)
-    global_thigh_angVel_2hz_pred_withoutNan = model_prediction(m_model.models[4], Psi['global_thigh_angle_vel_withoutNan'], phases, phase_dots, step_lengths, ramps)
+    global_thigh_angVel_2hz_pred_new = model_prediction(m_model.models[4], Psi_globalThighVelocities, phases, phase_dots, step_lengths, ramps)
     
     atan2_pred = model_prediction(m_model.models[5], Psi['atan2'], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
-    atan2_pred_withoutNan = model_prediction(m_model.models[5], Psi['atan2_withoutNan'], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
+    #atan2_pred_withoutNan = model_prediction(m_model.models[5], Psi['atan2_withoutNan'], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
  
     # compute rmse
     print("subject: ",  subject)
@@ -204,13 +207,13 @@ def plot_Conti_measurement_data(subject, trial, side):
            at2[i] -= 2*np.pi
     plt.plot(at2[0:1600], '--')
 
-    at2_withoutNan = atan2_pred_withoutNan + 0
-    for i in range(len(at2_withoutNan)):
-        if at2_withoutNan[i] > 2*np.pi:
-           at2_withoutNan[i] -= 2*np.pi
-    plt.plot(at2_withoutNan[0:1600], 'm-')
+    #at2_withoutNan = atan2_pred_withoutNan + 0
+    #for i in range(len(at2_withoutNan)):
+    #    if at2_withoutNan[i] > 2*np.pi:
+    #       at2_withoutNan[i] -= 2*np.pi
+    #plt.plot(at2_withoutNan[0:1600], 'm-')
     #plt.plot(phases[0:1600]*2*np.pi, 'r')
-    plt.legend(['atan2', 'atan2_predicted'])#, 'phase*2pi'
+    #plt.legend(['atan2', 'atan2_predicted'])#, 'phase*2pi'
     
     plt.subplot(212)
     a = atan2[0:1600] - 2*np.pi*phases[0:1600]
@@ -227,7 +230,7 @@ def plot_Conti_measurement_data(subject, trial, side):
     plt.subplot(411)
     plt.plot(tt, global_thigh_angle_Y[0:total_step], 'k-')
     plt.plot(tt, global_thigh_angle_Y_pred[0:total_step],'b--')
-    plt.plot(tt, global_thigh_angle_Y_pred_withoutNan[0:total_step],'m--')
+    plt.plot(tt, global_thigh_angle_Y_pred_new[0:total_step],'m--')
     plt.ylim([-25, 105])
     #plt.xlim([0, 13.6])
     plt.legend(('actual', 'least squares'))
@@ -268,13 +271,13 @@ def plot_Conti_measurement_data(subject, trial, side):
     plt.subplot(211)
     plt.plot(tt, global_thigh_angVel_2hz[0:total_step],'k-')
     plt.plot(tt, global_thigh_angVel_2hz_pred[0:total_step], 'b--')
-    plt.plot(tt, global_thigh_angVel_2hz_pred_withoutNan[0:total_step], 'm-')
+    plt.plot(tt, global_thigh_angVel_2hz_pred_new[0:total_step], 'm-')
     plt.ylabel('$\dot{\\theta}_{Y_{2Hz}} ~(deg/s)$')
     #plt.xlim([0, 13.6])
     plt.subplot(212)
     plt.plot(tt, atan2[0:total_step],'k-')
     plt.plot(tt, at2[0:total_step], 'b--')
-    plt.plot(tt, at2_withoutNan[0:total_step],'m-')
+    #plt.plot(tt, at2_withoutNan[0:total_step],'m-')
     plt.ylabel('$atan2~(rad)$')
     plt.xlabel('time (s)')
     plt.ylim([0, 7.5])
@@ -620,8 +623,8 @@ if __name__ == '__main__':
     """
     ##################################################################
     
-    subject = 'AB02'
-    trial = 's0x8d10'
+    subject = 'AB04'
+    trial = 's1x2i0'
     side = 'left'
     
     #detect_knee_over_extention()
