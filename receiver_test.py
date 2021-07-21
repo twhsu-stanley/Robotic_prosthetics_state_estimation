@@ -103,9 +103,9 @@ time.sleep(0.5) # gives extra time for sockets to be created
 p1 = win.addPlot() ## setting plot name
 #p1.addLegend()
 #p1.setTitle('',**{'size': '40pt'})
-curve1 = p1.plot(pen=pg.mkPen(width = 3, color=(0, 0, 0)))
+curve1 = p1.plot(pen=pg.mkPen(width = 3, color=(0, 0, 0)), name = 'EKF')
 #### additional data streams #######################################################################
-curve1_2 = p1.plot(pen=pg.mkPen(width = 3, color=(255, 0, 0)))
+curve1_2 = p1.plot(pen=pg.mkPen(width = 3, color=(255, 0, 0)), name = '2 states')
 ####################################################################################################
 ylabel1 = soc5.read_str()
 ylabelU1 = soc9.read_str()

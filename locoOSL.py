@@ -563,7 +563,7 @@ def getVirtualConstraints(refKnee,refAnkle, pv, N):
     return knee_traj,ankle_traj
 
 
-def getPhaseVariable_vTwoStates(OSLdic,maxHip, minHip, load_z, FCThr = 10):
+def getPhaseVariable_vTwoStates(OSLdic, maxHip, minHip, load_z, FCThr = 10):
     """
     Compute the walking phase variable using the thigh angle during only two monotonic regions: stance and swing.
     Note: With this phase variable the subject may need to modify the gait pattern to obtain better results. 

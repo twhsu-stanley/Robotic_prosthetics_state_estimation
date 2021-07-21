@@ -13,7 +13,7 @@ import scipy.io
 import sender_test as sender   # for real-time plotting
 
 ### A. Load Ross's pre-recorded walking data
-"""
+#"""
 logFile = r"OSL_walking_data/210617_113644_PV_Siavash_walk_oscillations in phase.csv"
 # 1) 210617_113644_PV_Siavash_walk_oscillations in phase
 # 2) 210617_121732_PV_Siavash_walk_300_1600
@@ -38,10 +38,10 @@ dataOSL = {
     'LoadCellMy':  datatxt['loadCelMy'],
     'LoadCellMz':  datatxt['loadCelMz']
 }
-"""
+#"""
 
 ### B. Load Kevin's bypass-adapter walking data
-#"""
+"""
 mat = scipy.io.loadmat('OSL_walking_data/Treadmill_speed1_incline0_file1.mat')
 # Treadmill_speed1_incline0_file2
 # Treadmill_speed1_incline0_file1
@@ -60,7 +60,7 @@ dataOSL = {
     'KneeAngle': -mat['KneeEncoder'][0, 0]['FilteredJointAngle'].reshape(-1),
     'KneeAngleRef': -mat['ControllerOutputs'][0, 0]['knee_des'].reshape(-1),
 }
-#"""
+"""
 
 ## From loco_OSL.py: Load referenced trajectories
 def loadTrajectory(trajectory = 'walking'):
@@ -128,10 +128,10 @@ try:
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-7, 1e-7, 0])
+    sys.Q = np.diag([0, 1e-6, 1e-6, 0])
     # measurement noise covariance
     sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
-    U = np.diag([1, 1, 1])
+    U = np.diag([2, 2, 2])
     sys.R = U @ sys.R @ U.T
 
     # initialize the state
@@ -145,14 +145,14 @@ try:
     fs = 1 / (dataOSL["Time"][1] - dataOSL["Time"][0])        # sampling rate = 100 Hz (actual: ~77 Hz)
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
     ## configure low-pass filter (1-order)
-    normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
+    normal_cutoff = 1 / nyq   #cut-off frequency = 2Hz
     b_lp, a_lp = butter(1, normal_cutoff, btype = 'low', analog = False)
     z_lp_1 = lfilter_zi(b_lp,  a_lp)
     z_lp_2 = lfilter_zi(b_lp,  a_lp)
     
     ## configure band-pass filter (2-order)
-    normal_lowcut = 0.5 / nyq    #lower cut-off frequency = 0.5Hz 
-    normal_highcut = 2 / nyq     #upper cut-off frequency = 2Hz
+    normal_lowcut = 0.25 / nyq    #lower cut-off frequency = 0.5Hz 
+    normal_highcut = 1 / nyq     #upper cut-off frequency = 2Hz
     b_bp, a_bp = butter(2, [normal_lowcut, normal_highcut], btype = 'band', analog = False)
     z_bp = lfilter_zi(b_bp,  a_bp)
 
@@ -161,12 +161,14 @@ try:
     null = 0   # number of null data points
     t_0 = dataOSL["Time"][ptr]   # for EKF
     start_time = t_0             # for live plotting
-    fade_in_time = 3             # sec
+    fade_in_time = 2             # sec
     
-    stride_peroid = np.array([0, 0, 0])
+    stride_peroid = np.array([0, 0])
     steady_state = False
+    monotonicity = True
+    previous_phase = 0
     heel_strike_time = []
-    heel_strike_previous = start_time
+    previous_heelstrike_time = start_time
     
     knee_angle_initial = dataOSL['KneeAngle'][0]
     ankle_angle_initial = dataOSL['AnkleAngle'][0]
@@ -179,6 +181,7 @@ try:
         "ramp_est": np.zeros((len(dataOSL["Time"]), 1)),
         
         "steady-state walking": np.zeros((len(dataOSL["Time"]), 1)),
+        "monotonicity": np.zeros((len(dataOSL["Time"]), 1)),
         "MD": np.zeros((len(dataOSL["Time"]), 1)),
 
         # EKF prediction of measurements/ derived measurements
@@ -250,31 +253,32 @@ try:
         ekf.correction(measurement, Psi, arctan2, steady_state_walking = steady_state)
         ekf.state_saturation(saturation_range)
 
-        # Detect steady-state waling
-        phase_current = ekf.x[0, 0]
-        if indx > 0:
-            phase_previous = simulation_log['phase_est'][indx - 1]
-        else:
-            phase_previous = 0
+        # Detect steady-state waling =========================================================================
+        if ekf.x[0, 0] < 0.05 and previous_phase > 0.95: # detect heel strike using EKF phase estimate
+            if monotonicity:
+                heel_strike_time.append(t)
+                stride_peroid = np.array([t - previous_heelstrike_time, stride_peroid[0]]) #, stride_peroid[1]
+                steady_state = np.all(np.logical_and(stride_peroid > 0.5, stride_peroid < 5))
+                previous_heelstrike_time = t
+            monotonicity = True
+        elif ekf.x[0, 0] < previous_phase: # make sure phase increases monotonically
+            monotonicity = False
+            steady_state = False
+        previous_phase = ekf.x[0, 0]
 
-        if phase_current < 0.05 and phase_previous > 0.95: # heel strike
-            heel_strike_time.append(t)
-            stride_peroid = np.array([t - heel_strike_previous, stride_peroid[0], stride_peroid[1]])
-            heel_strike_previous = t
-            steady_state = np.all(np.logical_and(stride_peroid > 0.5, stride_peroid < 2.5))
-            
         if steady_state == True:
             ekf.Q = sys.Q
         else:
             ekf.Q[2, 2] = 0
             ekf.Q[3, 3] = 0
-            ekf.x[2, 0] = 1.2
-            ekf.x[3, 0] = 0
+            #ekf.x[2, 0] = 1.2
+            #ekf.x[3, 0] = 0
+        #=====================================================================================================
 
         ### Control commands: joints angles
         ## 1) Control commands generated by the trainned model
-        joint_angles = joints_control(ekf.x[0, 0], ekf.x[1, 0], ekf.x[2, 0], ekf.x[3, 0])
         if steady_state == True:
+            joint_angles = joints_control(ekf.x[0, 0], ekf.x[1, 0], ekf.x[2, 0], ekf.x[3, 0])
             knee_angle_model = joint_angles[0]
             ankle_angle_model = joint_angles[1] # negative sign
         else:
@@ -317,6 +321,7 @@ try:
         simulation_log['ramp_est'][indx] = ekf.x[3, 0]
         
         simulation_log["steady-state walking"][indx] = steady_state
+        simulation_log["monotonicity"][indx] = monotonicity
         simulation_log["MD"][indx] = ekf.MD
 
         simulation_log["global_thigh_angle_pred"][indx] = ekf.z_hat[0,0]
@@ -363,7 +368,7 @@ except KeyboardInterrupt:
 finally:
     ## Plot the results
     t_lower = 0
-    t_upper = 35
+    t_upper = 130
     plt.figure("Gait Phase")
     plt.subplot(511)
     plt.title("EKF Gait State Estimate")
@@ -375,6 +380,7 @@ finally:
 
     plt.subplot(512)
     plt.plot(dataOSL["Time"], simulation_log["steady-state walking"], 'r-')
+    plt.plot(dataOSL["Time"], simulation_log["monotonicity"], 'b--')
     plt.plot(np.array(heel_strike_time).reshape(-1), np.zeros((len(heel_strike_time), 1)), 'rx')
     plt.xlim((t_lower, t_upper))
 
@@ -440,30 +446,30 @@ finally:
     plt.xlabel("Time (s)")
     plt.xlim((t_lower, t_upper))
 
-    plt.figure("MD")
-    plt.plot(dataOSL["Time"], simulation_log["MD"], 'r-')
-    plt.ylabel("MD")
-    plt.xlabel("Time (s)")
-    plt.xlim((t_lower, t_upper))
+    #plt.figure("MD")
+    #plt.plot(dataOSL["Time"], simulation_log["MD"], 'r-')
+    #plt.ylabel("MD")
+    #plt.xlabel("Time (s)")
+    #plt.xlim((t_lower, t_upper))
 
-    """
+    
     plt.figure("Kinetics")
     plt.subplot(211)
-    plt.plot(dataOSL["Time"], dataOSL['LoadCellFx'])
-    plt.plot(dataOSL["Time"], dataOSL['LoadCellFy'])
+    #plt.plot(dataOSL["Time"], dataOSL['LoadCellFx'])
+    #plt.plot(dataOSL["Time"], dataOSL['LoadCellFy'])
     plt.plot(dataOSL["Time"], dataOSL['LoadCellFz'])
-    plt.ylabel("Load Cell Force (?)")
+    plt.ylabel("Load Cell Force (N)")
     plt.xlabel("Time (s)")
-    plt.legend(('Fx', 'Fy', 'Fz'))
+    #plt.legend(('Fx', 'Fy', 'Fz'))
     
     plt.subplot(212)
     plt.plot(dataOSL["Time"], dataOSL['LoadCellMx'])
     #plt.plot(dataOSL["Time"], dataOSL['LoadCellMy'])
     #plt.plot(dataOSL["Time"], dataOSL['LoadCellMz'])
-    plt.plot(dataOSL["Time"], -dataOSL['AnkleTorque']*9.81)
+    plt.plot(dataOSL["Time"], dataOSL['AnkleTorque'])
     plt.plot(dataOSL["Time"], dataOSL['KneeTorque'])
     plt.ylabel("Load Cell Moment (?)")
     plt.xlabel("Time (s)")
     plt.legend(('Mx', 'Ankle Torque', 'Knee Torque'))
-    """
+    
     plt.show()
