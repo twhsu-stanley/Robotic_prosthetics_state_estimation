@@ -1,7 +1,7 @@
 import numpy as numpy
 import h5py as hp
 import pickle
-from EKF import load_Psi
+from EKF import load_Psi, wrapTo2pi
 from incline_experiment_utils import *
 from model_framework import *
 from model_fit import *
@@ -129,11 +129,15 @@ def plot_Conti_measurement_data(subject, trial, side):
     m_model = model_loader('Measurement_model_6.pickle') # load new model w/ linear phase_dot
     Psi = load_Psi('Generic')
 
+    # New Psi  
     with open('New_Psi/Psi_globalThighAngles.pickle', 'rb') as file:
         Psi_globalThighAngles = pickle.load(file)
     
     with open('New_Psi/Psi_globalThighVelocities.pickle', 'rb') as file:
         Psi_globalThighVelocities = pickle.load(file)
+
+    with open('New_Psi/Psi_atan2.pickle', 'rb') as file:
+        Psi_atan2 = pickle.load(file)
 
     global_thigh_angle_Y_pred = model_prediction(m_model.models[0], Psi['global_thigh_angle'], phases, phase_dots, step_lengths, ramps)
     global_thigh_angle_Y_pred_new = model_prediction(m_model.models[0], Psi_globalThighAngles, phases, phase_dots, step_lengths, ramps)
@@ -141,13 +145,15 @@ def plot_Conti_measurement_data(subject, trial, side):
     force_z_ankle_pred = model_prediction(m_model.models[1], Psi['force_Z'], phases, phase_dots, step_lengths, ramps)
     force_x_ankle_pred = model_prediction(m_model.models[2], Psi['force_X'], phases, phase_dots, step_lengths, ramps)
     moment_y_ankle_pred = model_prediction(m_model.models[3],Psi['moment_Y'], phases, phase_dots, step_lengths, ramps)
-    #global_thigh_angVel_5hz_pred = model_prediction(m_model.models[4], Psi[4], phases, phase_dots, step_lengths, ramps)
-    #global_thigh_angVel_2x5hz_pred = model_prediction(m_model.models[5], Psi[5], phases, phase_dots, step_lengths, ramps)
+    
     global_thigh_angVel_2hz_pred = model_prediction(m_model.models[4], Psi['global_thigh_angle_vel'], phases, phase_dots, step_lengths, ramps)
     global_thigh_angVel_2hz_pred_new = model_prediction(m_model.models[4], Psi_globalThighVelocities, phases, phase_dots, step_lengths, ramps)
     
     atan2_pred = model_prediction(m_model.models[5], Psi['atan2'], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
-    #atan2_pred_withoutNan = model_prediction(m_model.models[5], Psi['atan2_withoutNan'], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
+    atan2_pred_new = model_prediction(m_model.models[5], Psi_atan2, phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
+
+    atan2_pred = wrapTo2pi(atan2_pred)
+    atan2_pred_new = wrapTo2pi(atan2_pred_new)
  
     # compute rmse
     print("subject: ",  subject)
@@ -174,16 +180,6 @@ def plot_Conti_measurement_data(subject, trial, side):
     print("RMSE m_y ", np.sqrt(np.square(err_my).mean()))
     print('________________________________')
     
-    err_gtv_5hz = global_thigh_angVel_5hz - global_thigh_angVel_5hz_pred
-    print("mean gtv_5hz ", np.mean(err_gtv_5hz))
-    print("std gtv_5hz ", np.std(err_gtv_5hz))
-    print("RMSE gtv_5hz ", np.sqrt(np.square(err_gtv_5hz).mean()))
-    print('________________________________')
-    err_gtv_2x5hz = global_thigh_angVel_2x5hz - global_thigh_angVel_2x5hz_pred
-    print("mean gtv_2x5hz ", np.mean(err_gtv_2x5hz))
-    print("std gtv_2x5hz ", np.std(err_gtv_2x5hz))
-    print("RMSE gtv_2x5hz ", np.sqrt(np.square(err_gtv_2x5hz).mean()))
-    print('________________________________')
     
     err_gtv_2hz = global_thigh_angVel_2hz - global_thigh_angVel_2hz_pred
     print("mean gtv_2hz ", np.mean(err_gtv_2hz))
@@ -197,31 +193,41 @@ def plot_Conti_measurement_data(subject, trial, side):
     print("std atan2 ", np.std(err_atan2))
     print("RMSE atan2 ", np.sqrt(np.square(err_atan2).mean()))
     """
+
+    plt.figure('State')
+    plt.subplot(411)
+    plt.plot(phases)
+    plt.ylabel('phase')
+    plt.subplot(412)
+    plt.plot(phase_dots)
+    plt.ylabel('phase dot')
+    plt.subplot(413)
+    plt.plot(step_lengths)
+    plt.ylabel('step length')
+    plt.subplot(414)
+    plt.plot(ramps)
+    plt.ylabel('ramp')
+
     plt.figure('atan2')
     plt.subplot(211)
     plt.plot(atan2[0:1600])
-
-    at2 = atan2_pred + 0
-    for i in range(len(at2)):
-        if at2[i] > 2*np.pi:
-           at2[i] -= 2*np.pi
-    plt.plot(at2[0:1600], '--')
-
-    #at2_withoutNan = atan2_pred_withoutNan + 0
-    #for i in range(len(at2_withoutNan)):
-    #    if at2_withoutNan[i] > 2*np.pi:
-    #       at2_withoutNan[i] -= 2*np.pi
-    #plt.plot(at2_withoutNan[0:1600], 'm-')
-    #plt.plot(phases[0:1600]*2*np.pi, 'r')
-    #plt.legend(['atan2', 'atan2_predicted'])#, 'phase*2pi'
-    
+    plt.plot(atan2_pred[0:1600], '--')
+    plt.plot(atan2_pred_new [0:1600], 'm-')
+    plt.legend(['atan2', 'atan2_predicted'])
     plt.subplot(212)
-    a = atan2[0:1600] - 2*np.pi*phases[0:1600]
-    for i in range(len(a)):
-        a[i] = np.arctan2(np.sin(a[i]), np.cos(a[i])) 
-    plt.plot(a)
-    plt.plot(atan2_pred[0:1600] - 2*np.pi*phases[0:1600], '--')
-    plt.legend(['atan2-phase*2pi', 'least-squares fitting'])
+    a1 = atan2[0:1600] - 2*np.pi*phases[0:1600]
+    for i in range(len(a1)):
+        a1[i] = np.arctan2(np.sin(a1[i]), np.cos(a1[i])) 
+    plt.plot(a1)
+    a2 = atan2_pred[0:1600] - 2*np.pi*phases[0:1600]
+    for i in range(len(a2)):
+        a2[i] = np.arctan2(np.sin(a2[i]), np.cos(a2[i])) 
+    plt.plot(a2)
+    a3 = atan2_pred_new[0:1600] - 2*np.pi*phases[0:1600]
+    for i in range(len(a3)):
+        a3[i] = np.arctan2(np.sin(a3[i]), np.cos(a3[i])) 
+    plt.plot(a3, 'm--')
+    plt.legend(['atan2-phase*2pi', 'least-squares fitting', 'new'])
     
     heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
     total_step =  np.shape(global_thigh_angle_Y)[0]#int(heel_strike_index[20, 0])+1 #
@@ -252,20 +258,6 @@ def plot_Conti_measurement_data(subject, trial, side):
     plt.ylabel('$m_Y~(N \cdot m)$')
     #plt.xlim([0, 13.6])
     plt.xlabel('time (s)')
-
-    plt.figure('State')
-    plt.subplot(411)
-    plt.plot(phases)
-    plt.ylabel('phase')
-    plt.subplot(412)
-    plt.plot(phase_dots)
-    plt.ylabel('phase dot')
-    plt.subplot(413)
-    plt.plot(step_lengths)
-    plt.ylabel('step length')
-    plt.subplot(414)
-    plt.plot(ramps)
-    plt.ylabel('ramp')
     
     plt.figure('Fictitious Sensors')
     plt.subplot(211)
@@ -276,8 +268,8 @@ def plot_Conti_measurement_data(subject, trial, side):
     #plt.xlim([0, 13.6])
     plt.subplot(212)
     plt.plot(tt, atan2[0:total_step],'k-')
-    plt.plot(tt, at2[0:total_step], 'b--')
-    #plt.plot(tt, at2_withoutNan[0:total_step],'m-')
+    plt.plot(tt, atan2_pred[0:total_step], 'b--')
+    plt.plot(tt, atan2_pred_new[0:total_step],'m-')
     plt.ylabel('$atan2~(rad)$')
     plt.xlabel('time (s)')
     plt.ylim([0, 7.5])
@@ -519,6 +511,29 @@ def detect_nan_in_joints():
     with open('Continuous_data/KneeAngles_with_Nan.pickle', 'wb') as file:
     	pickle.dump(nan_dict, file)
 
+def plot_Conti_kinetics_data(subject, trial, side):
+    jointforce = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointforce'][side]['knee'][:, :]
+    jointmoment = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointmoment'][side]['knee'][:, :]
+    
+    plt.figure()
+    plt.subplot(211)
+    #plt.plot(range(np.shape(jointforce)[1]), jointforce[0, :])
+    #plt.plot(range(np.shape(jointforce)[1]), jointforce[1, :])
+    plt.plot(range(np.shape(jointforce)[1]), jointforce[2, :])
+    #plt.legend(('0', '1', '2'))
+    plt.xlabel('samples')
+    plt.ylabel('Joint Force')
+    
+    plt.subplot(212)
+    plt.plot(range(np.shape(jointmoment)[1]), jointmoment[0, :])
+    plt.plot(range(np.shape(jointmoment)[1]), jointmoment[1, :])
+    #plt.plot(range(np.shape(jointmoment)[1]), jointmoment[2, :])
+    plt.legend(('0', '1', '2'))
+    plt.xlabel('samples')
+    plt.ylabel('Joint Moment')
+    plt.show()
+
+
 if __name__ == '__main__':
     """
     Continuous_joint_data = dict()
@@ -623,10 +638,10 @@ if __name__ == '__main__':
     """
     ##################################################################
     
-    subject = 'AB04'
+    subject = 'AB02'
     trial = 's1x2i0'
     side = 'left'
-    
+    plot_Conti_kinetics_data(subject, trial, side)
     #detect_knee_over_extention()
     #detect_nan_in_globalThighAngle()
     #detect_nan_in_joints()
@@ -645,7 +660,7 @@ if __name__ == '__main__':
     #plot_Conti_joints_angles(subject, trial, side)
     #Conti_global_thigh_angle_Y(subject, trial, side)
     #plt.show()
-    plot_Conti_measurement_data(subject, trial, side)
+    #plot_Conti_measurement_data(subject, trial, side)
     #print(Conti_maxmin('AB01', plot = False))
 
     ######## test real0time filters #############

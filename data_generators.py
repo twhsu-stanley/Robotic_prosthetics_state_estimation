@@ -309,34 +309,23 @@ if __name__ == '__main__':
     
     # Global thigh angle velocities and atan2
     #"""
-    #dict_gt_bp = dict()
-    #dict_gtv_5hz = dict()
-    #dict_gtv_2x5hz = dict()
     dict_gtv_2hz = dict()
-    #dict_atan2 = dict()
     dict_atan2_s = dict()
 
     with open('Gait_cycle_data/Global_thigh_angle_withoutNan.npz', 'rb') as file:
         gt_Y = np.load(file)
         for subject in subject_names:
             dt = get_time_step(subject, mode = 'global_thigh_angle_Y')
-            #gt_bp = np.zeros(np.shape(gt_Y[subject][0]))
-            #gtv_5hz = np.zeros(np.shape(gt_Y[subject][0]))
-            #gtv_2x5hz = np.zeros(np.shape(gt_Y[subject][0]))
+
             gtv_2hz = np.zeros(np.shape(gt_Y[subject][0]))
-            #atan2 = np.zeros(np.shape(gt_Y[subject][0]))
             atan2_s = np.zeros(np.shape(gt_Y[subject][0]))
             for i in range(np.shape(gt_Y[subject][0])[0]):
                 # compute angular velocities w/ LP filters w/ different cutoff frequencies
                 v = np.diff(gt_Y[subject][0][i, :]) / dt[i, 0]
                 gtv = np.insert(v, 0, 0)
                 gtv_stack = np.array([gtv, gtv, gtv, gtv, gtv]).reshape(-1)
-                #gtv_5hz_stack = butter_lowpass_filter(gtv_stack, 5, 1/dt[i, 0], order = 1)
-                #gtv_2x5hz_stack = butter_lowpass_filter(gtv_stack, 2.5, 1/dt[i, 0], order = 1)
                 gtv_2hz_stack = butter_lowpass_filter(gtv_stack, 2, 1/dt[i, 0], order = 1)
 
-                #gtv_5hz[i, :] = gtv_5hz_stack[2 * len(gt_Y[subject][0][i, :]): 3 * len(gt_Y[subject][0][i, :])]
-                #gtv_2x5hz[i, :] = gtv_2x5hz_stack[2 * len(gt_Y[subject][0][i, :]): 3 * len(gt_Y[subject][0][i, :])]
                 gtv_2hz[i, :] = gtv_2hz_stack[2 * len(gt_Y[subject][0][i, :]): 3 * len(gt_Y[subject][0][i, :])]
 
                 # compute atan2 w/ a band-pass filter
@@ -345,9 +334,7 @@ if __name__ == '__main__':
                 gt_bp_stack = butter_bandpass_filter(gt_stack, 0.5, 2, 1/dt[i, 0], order = 2)
                 gt_bp = gt_bp_stack[2 * len(gt_Y[subject][0][i, :]): 3 * len(gt_Y[subject][0][i, :])]
 
-                #gt_bp = butter_bandpass_filter(gt_Y[subject][0][i, :], 0.5, 2, 1/dt[i, 0], order = 1)
                 v_bp = np.diff(gt_bp) / dt[i, 0]
-                #gtv_bp = butter_lowpass_filter(np.insert(v_bp, 0, 0), 2, 1/dt[i, 0], order = 1)
                 gtv_bp = np.insert(v_bp, 0, 0)
                 gtv_bp_stack = np.array([gtv_bp, gtv_bp, gtv_bp, gtv_bp, gtv_bp]).reshape(-1)
                 gtv_blp_stack = butter_lowpass_filter(gtv_bp_stack, 2, 1/dt[i, 0], order = 1)
@@ -357,18 +344,10 @@ if __name__ == '__main__':
                 for j in range(np.shape(atan2_s[i, :])[0]):
                     if atan2_s[i, j] < 0:
                         atan2_s[i, j] = atan2_s[i, j] + 2 * np.pi
-            #dict_gt_bp[subject] = gt_bp
-            #dict_gtv_5hz[subject] = gtv_5hz
-            #dict_gtv_2x5hz[subject] = gtv_2x5hz
+
             dict_gtv_2hz[subject] = gtv_2hz
             dict_atan2_s[subject] = atan2_s
 
-    #with open('Gait_cycle_data/Global_thigh_angle_bp.npz', 'wb') as file:
-        #np.savez(file, **dict_gt_bp)
-    #with open('Gait_cycle_data/Global_thigh_angVel_5hz.npz', 'wb') as file:
-    #    np.savez(file, **dict_gtv_5hz)
-    #with open('Gait_cycle_data/Global_thigh_angVel_2x5hz.npz', 'wb') as file:
-    #    np.savez(file, **dict_gtv_2x5hz)
     with open('Gait_cycle_data/Global_thigh_angVel_2hz_withoutNan.npz', 'wb') as file:
         np.savez(file, **dict_gtv_2hz)
     with open('Gait_cycle_data/atan2_s_withoutNan.npz', 'wb') as file:

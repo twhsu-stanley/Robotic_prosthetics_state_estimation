@@ -29,10 +29,7 @@ def basis_model_fitting(model, mode):
         data_atan2 = data.ravel() - 2 * np.pi * phase.ravel()
         # wrap to [-pi, pi]
         for i in range(np.shape(data_atan2)[0]):
-            if data_atan2[i] < -np.pi:
-                data_atan2[i] += 2 * np.pi
-            elif data_atan2[i] > np.pi:
-                data_atan2[i] -= 2 * np.pi
+            data_atan2[i] = np.arctan2(np.sin(data_atan2[i]), np.cos(data_atan2[i]))
         Psi = least_squares(model, data_atan2,\
                             phase.ravel(), phase_dot.ravel(), step_length.ravel(), ramp.ravel())
     else:

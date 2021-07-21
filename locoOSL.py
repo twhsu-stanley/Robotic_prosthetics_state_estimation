@@ -101,7 +101,7 @@ OSL_units = {
 def state2Dict(actPackState, prefix = '', iniJoint = 0, biasJoint = 0):
     """
     Convert state of ActPack to SI units and wrap it into a dictionary
-    """       
+    """
     # Auxiliary conversions
     tick2rad = lambda x: x*(2*np.pi)/(2**14 - 1)    #14 bit encoder ticks to radians
     bits2rps = lambda x: x/32.8*(2*np.pi)/(360)     #Gyro bits to radians per second

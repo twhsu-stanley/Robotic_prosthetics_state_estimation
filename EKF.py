@@ -13,9 +13,13 @@ def process_model(x, dt):
 
 ## Load control model & coefficients (for OSL implementation)
 c_model = model_loader('Control_model.pickle')
-with open('Psi/Psi_knee_G.pickle', 'rb') as file:#_withoutNan
+#with open('Psi/Psi_knee_G.pickle', 'rb') as file:#_withoutNan
+#    Psi_knee = pickle.load(file)
+#with open('Psi/Psi_ankle_G.pickle', 'rb') as file:
+#    Psi_ankle = pickle.load(file)
+with open('New_Psi/Psi_kneeAngles.pickle', 'rb') as file:
     Psi_knee = pickle.load(file)
-with open('Psi/Psi_ankle_G.pickle', 'rb') as file:
+with open('New_Psi/Psi_ankleAngles.pickle', 'rb') as file:
     Psi_ankle = pickle.load(file)
 
 ## Load model coefficients
@@ -23,7 +27,7 @@ def load_Psi(subject = 'Generic'):
     if subject == 'Generic':
         #with open('Psi/Psi_thigh_Y_G.pickle', 'rb') as file:
         with open('New_Psi/Psi_globalThighAngles.pickle', 'rb') as file:
-            Psi_thigh_Y = pickle.load(file)
+            Psi_globalThighAngles = pickle.load(file)
         
         with open('Psi/Psi_force_Z_G.pickle', 'rb') as file:
             Psi_force_Z = pickle.load(file)
@@ -34,16 +38,18 @@ def load_Psi(subject = 'Generic'):
         with open('Psi/Psi_moment_Y_G.pickle', 'rb') as file:
             Psi_moment_Y = pickle.load(file)
         
-        with open('Psi/Psi_thighVel_2hz_G.pickle', 'rb') as file:
-            Psi_thighVel_2hz = pickle.load(file)
+        #with open('Psi/Psi_thighVel_2hz_G.pickle', 'rb') as file:
+        with open('New_Psi/Psi_globalThighVelocities.pickle', 'rb') as file:
+            Psi_globalThighVelocities = pickle.load(file)
 
-        with open('Psi/Psi_atan2_G.pickle', 'rb') as file:
+        #with open('Psi/Psi_atan2_G.pickle', 'rb') as file:
+        with open('New_Psi/Psi_atan2.pickle', 'rb') as file:
             Psi_atan2 = pickle.load(file)
 
     else:
         with open('Psi/Psi_thigh_Y.pickle', 'rb') as file:
             p = pickle.load(file)
-            Psi_thigh_Y = p[subject]
+            Psi_globalThighAngles = p[subject]
         with open('Psi/Psi_force_Z.pickle', 'rb') as file:
             p = pickle.load(file)
             Psi_force_Z = p[subject]
@@ -55,13 +61,13 @@ def load_Psi(subject = 'Generic'):
             Psi_moment_Y = p[subject]
         with open('Psi/Psi_thighVel_2hz.pickle', 'rb') as file:
             p = pickle.load(file)
-            Psi_thighVel_2hz = p[subject]
+            Psi_globalThighVelocities = p[subject]
         with open('Psi/Psi_atan2.pickle', 'rb') as file:
             p = pickle.load(file)
             Psi_atan2 = p[subject]
            
-    Psi = {'global_thigh_angle': Psi_thigh_Y, 'force_Z': Psi_force_Z, 'force_X': Psi_force_X, 'moment_Y': Psi_moment_Y,
-           'global_thigh_angle_vel': Psi_thighVel_2hz, 'atan2': Psi_atan2}
+    Psi = {'global_thigh_angle': Psi_globalThighAngles, 'force_Z': Psi_force_Z, 'force_X': Psi_force_X, 'moment_Y': Psi_moment_Y,
+           'global_thigh_angle_vel': Psi_globalThighVelocities, 'atan2': Psi_atan2}
     return Psi
 
 def warpToOne(phase):
@@ -110,7 +116,7 @@ class extended_kalman_filter:
         self.x[0, 0] = warpToOne(self.x[0, 0]) # wrap to be between 0 and 1
         self.Sigma = self.A(dt) @ self.Sigma @ self.A(dt).T + self.Q  # predicted state covariance
 
-    def correction(self, z, Psi, arctan2 = False):
+    def correction(self, z, Psi, arctan2 = False, steady_state_walking = False):
         # EKF correction step
         # Inputs:
         #   z:  measurement
@@ -146,16 +152,11 @@ class extended_kalman_filter:
         R = self.R
         
         # Detect kidnapping event
-        #lost = False
         self.MD = np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) # Mahalanobis distance
-        #if self.MD > np.sqrt(22.458): # 6-DOF Chi-square test np.sqrt(22.458)
-            #lost = True
-            # scale R of thigh angle vel
-            #U = np.diag([1, 1, 1, 1, 1, 1/2])
-            #R = U @ R @ U.T
-
-            #self.Sigma += np.diag([2e-5, 2e-4, 4e-3, 4])
-            #self.Sigma += np.diag([0, 1e-7, 1e-7, 0])
+        #if steady_state_walking:
+            #if self.MD > np.sqrt(25):
+                #self.Sigma += np.diag([2e-5, 2e-4, 4e-3, 4])
+                #self.Sigma += np.diag([0, 1e-7, 1e-7, 0])
         
         # innovation covariance
         S = H @ self.Sigma @ H.T + R
