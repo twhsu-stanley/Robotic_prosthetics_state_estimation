@@ -14,7 +14,7 @@ import sender_test as sender   # for real-time plotting
 
 ### A. Load Ross's pre-recorded walking data
 #"""
-logFile = r"OSL_walking_data/210617_113644_PV_Siavash_walk_oscillations in phase.csv"
+logFile = r"OSL_walking_data/210617_121732_PV_Siavash_walk_300_1600.csv"
 # 1) 210617_113644_PV_Siavash_walk_oscillations in phase
 # 2) 210617_121732_PV_Siavash_walk_300_1600
 # 3) 210617_122334_PV_Siavash_walk_500_2500
@@ -29,8 +29,9 @@ dataOSL = {
     'KneeAngleRef': datatxt["refKnee"],
     
     # Kinetics data
-    'AnkleTorque': datatxt["ankMotTor"],
-    'KneeTorque': datatxt["kneMotTor"],
+    'AnkleTorque': datatxt["ankJoiTor"],
+    #'AnkleMotorTorque': datatxt["ankMotTor"],
+    'KneeTorque': datatxt["kneJoiTor"],
     'LoadCellFx':  datatxt['loadCelFx'],
     'LoadCellFy':  datatxt['loadCelFy'],
     'LoadCellFz':  datatxt['loadCelFz'],
@@ -59,6 +60,17 @@ dataOSL = {
     'AnkleAngleRef': -mat['ControllerOutputs'][0, 0]['ankle_des'].reshape(-1),
     'KneeAngle': -mat['KneeEncoder'][0, 0]['FilteredJointAngle'].reshape(-1),
     'KneeAngleRef': -mat['ControllerOutputs'][0, 0]['knee_des'].reshape(-1),
+    
+    #'AnkleTorque': -mat['ControllerOutputs'][0, 0]['AnkleStanceTorque'].reshape(-1),
+    #'AnkleTorqueSwing': -mat['ControllerOutputs'][0, 0]['AnkleSwingTorque'].reshape(-1),
+    'AnkleTorque': -mat['ControllerOutputs'][0, 0]['AnkleTorqueCommand'].reshape(-1),
+    'KneeTorque': -mat['ControllerOutputs'][0, 0]['KneeStanceTorque'].reshape(-1),
+    'LoadCellFx': mat['LoadCell'][0, 0]['Fx'].reshape(-1),
+    'LoadCellFy': mat['LoadCell'][0, 0]['Fy'].reshape(-1),
+    'LoadCellFz': mat['LoadCell'][0, 0]['Fz'].reshape(-1),
+    'LoadCellMx': mat['LoadCell'][0, 0]['Mx'].reshape(-1),
+    'LoadCellMy': mat['LoadCell'][0, 0]['My'].reshape(-1),
+    'LoadCellMz': mat['LoadCell'][0, 0]['Mz'].reshape(-1),
 }
 """
 
@@ -145,14 +157,14 @@ try:
     fs = 1 / (dataOSL["Time"][1] - dataOSL["Time"][0])        # sampling rate = 100 Hz (actual: ~77 Hz)
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
     ## configure low-pass filter (1-order)
-    normal_cutoff = 1 / nyq   #cut-off frequency = 2Hz
+    normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
     b_lp, a_lp = butter(1, normal_cutoff, btype = 'low', analog = False)
     z_lp_1 = lfilter_zi(b_lp,  a_lp)
     z_lp_2 = lfilter_zi(b_lp,  a_lp)
     
     ## configure band-pass filter (2-order)
-    normal_lowcut = 0.25 / nyq    #lower cut-off frequency = 0.5Hz 
-    normal_highcut = 1 / nyq     #upper cut-off frequency = 2Hz
+    normal_lowcut = 0.5 / nyq    #lower cut-off frequency = 0.5Hz 
+    normal_highcut = 2 / nyq     #upper cut-off frequency = 2Hz
     b_bp, a_bp = butter(2, [normal_lowcut, normal_highcut], btype = 'band', analog = False)
     z_bp = lfilter_zi(b_bp,  a_bp)
 
@@ -463,13 +475,14 @@ finally:
     #plt.legend(('Fx', 'Fy', 'Fz'))
     
     plt.subplot(212)
-    plt.plot(dataOSL["Time"], dataOSL['LoadCellMx'])
+    #plt.plot(dataOSL["Time"], dataOSL['LoadCellMx'])
     #plt.plot(dataOSL["Time"], dataOSL['LoadCellMy'])
     #plt.plot(dataOSL["Time"], dataOSL['LoadCellMz'])
     plt.plot(dataOSL["Time"], dataOSL['AnkleTorque'])
-    plt.plot(dataOSL["Time"], dataOSL['KneeTorque'])
-    plt.ylabel("Load Cell Moment (?)")
+    #plt.plot(dataOSL["Time"], dataOSL['AnkleTorqueSwing'])
+    #plt.plot(dataOSL["Time"], dataOSL['KneeTorque'])
+    plt.ylabel("Ankle Moment (N-m)")
     plt.xlabel("Time (s)")
-    plt.legend(('Mx', 'Ankle Torque', 'Knee Torque'))
+    #plt.legend(('Load Cell Mx', 'Load Cell My', 'Ankle Torque', 'Knee Torque'))
     
     plt.show()

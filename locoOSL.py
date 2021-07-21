@@ -594,7 +594,7 @@ def getPhaseVariable_vTwoStates(OSLdic, maxHip, minHip, load_z, FCThr = 10):
         elif pv < s:
             pv = s
     else:        
-        pv =  ( (thigh - maxHip) / (minHip - maxHip)  )*s
+        pv =  ( (thigh - maxHip) / (minHip - maxHip) ) * s
         if pv > s:
             pv = s
         elif pv < 0:
