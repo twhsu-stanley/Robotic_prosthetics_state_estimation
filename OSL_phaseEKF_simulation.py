@@ -14,7 +14,7 @@ import sender_test as sender   # for real-time plotting
 
 ### A. Load Ross's pre-recorded walking data
 #"""
-logFile = r"OSL_walking_data/210617_121732_PV_Siavash_walk_300_1600.csv"
+logFile = r"OSL_walking_data/210617_122334_PV_Siavash_walk_500_2500.csv"
 # 1) 210617_113644_PV_Siavash_walk_oscillations in phase
 # 2) 210617_121732_PV_Siavash_walk_300_1600
 # 3) 210617_122334_PV_Siavash_walk_500_2500
@@ -140,7 +140,7 @@ try:
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-6, 1e-6, 0])
+    sys.Q = np.diag([0, 1e-6, 0, 0])
     # measurement noise covariance
     sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
     U = np.diag([2, 2, 2])
@@ -149,7 +149,7 @@ try:
     # initialize the state
     init = myStruct()
     init.x = np.array([[0], [0.4], [1.1], [0]])
-    init.Sigma = np.diag([1e-3, 1e-3, 1e-3, 0])
+    init.Sigma = np.diag([1e-3, 1e-3, 0, 0])
 
     ekf = extended_kalman_filter(sys, init)
 
@@ -163,7 +163,7 @@ try:
     z_lp_2 = lfilter_zi(b_lp,  a_lp)
     
     ## configure band-pass filter (2-order)
-    normal_lowcut = 0.5 / nyq    #lower cut-off frequency = 0.5Hz 
+    normal_lowcut = 0.2 / nyq    #lower cut-off frequency = 0.5Hz 
     normal_highcut = 2 / nyq     #upper cut-off frequency = 2Hz
     b_bp, a_bp = butter(2, [normal_lowcut, normal_highcut], btype = 'band', analog = False)
     z_bp = lfilter_zi(b_bp,  a_bp)
@@ -177,6 +177,7 @@ try:
     
     stride_peroid = np.array([0, 0])
     steady_state = False
+    previous_steady_state = False
     monotonicity = True
     previous_phase = 0
     heel_strike_time = []
@@ -278,13 +279,17 @@ try:
             steady_state = False
         previous_phase = ekf.x[0, 0]
 
-        if steady_state == True:
-            ekf.Q = sys.Q
-        else:
-            ekf.Q[2, 2] = 0
-            ekf.Q[3, 3] = 0
+        if steady_state == True and previous_steady_state == False:
+            ekf.Q = np.diag([0, 1e-6, 1e-6, 0])
+            ekf.Sigma = np.diag([1e-3, 1e-3, 1e-3, 0])
+
+        elif steady_state == False and previous_steady_state == True:
+            ekf.Q = np.diag([0, 1e-6, 0, 0])
+            ekf.Sigma = np.diag([1e-3, 1e-3, 0, 0])
             #ekf.x[2, 0] = 1.2
             #ekf.x[3, 0] = 0
+        
+        previous_steady_state = steady_state
         #=====================================================================================================
 
         ### Control commands: joints angles
@@ -379,8 +384,8 @@ except KeyboardInterrupt:
 
 finally:
     ## Plot the results
-    t_lower = 0
-    t_upper = 130
+    t_lower = 10
+    t_upper = 135
     plt.figure("Gait Phase")
     plt.subplot(511)
     plt.title("EKF Gait State Estimate")
@@ -392,8 +397,9 @@ finally:
 
     plt.subplot(512)
     plt.plot(dataOSL["Time"], simulation_log["steady-state walking"], 'r-')
-    plt.plot(dataOSL["Time"], simulation_log["monotonicity"], 'b--')
+    #plt.plot(dataOSL["Time"], simulation_log["monotonicity"], 'b--')
     plt.plot(np.array(heel_strike_time).reshape(-1), np.zeros((len(heel_strike_time), 1)), 'rx')
+    plt.ylabel("Steady-state (T/F)")
     plt.xlim((t_lower, t_upper))
 
     plt.subplot(513)
@@ -433,14 +439,18 @@ finally:
     plt.xlim((t_lower, t_upper))
 
     plt.figure("Joints Angles")
-    plt.subplot(311)
+    plt.subplot(411)
     plt.title("Joints Angles Commands")
     plt.plot(dataOSL["Time"], simulation_log['phase_est'], 'r-')
-    #plt.plot(dataOSL["Time"], dataOSL['PV'] / 998, 'k-')
+    plt.plot(dataOSL["Time"], dataOSL['PV'] / 998, 'k-')
     plt.ylabel("Phase")
     plt.xlim((t_lower, t_upper))
     plt.legend(('EKF phase', 'phase variable'))
-    plt.subplot(312)
+    plt.subplot(412)
+    plt.plot(dataOSL["Time"], simulation_log["steady-state walking"], 'r-')
+    plt.ylabel("Steady-state walking (T/F")
+    plt.xlim((t_lower, t_upper))
+    plt.subplot(413)
     plt.plot(dataOSL["Time"], dataOSL["AnkleAngleRef"], 'k-')
     plt.plot(dataOSL["Time"], simulation_log["ankle_angle_cmd"], 'r-')
     plt.plot(dataOSL["Time"], simulation_log["ankle_angle_model"], 'm-')
@@ -448,7 +458,7 @@ finally:
     plt.legend(('recorded', 'Edgar\'s trajectories', 'kinematic model'))
     plt.ylabel("Ankle angle command(deg)")
     plt.xlim((t_lower, t_upper))
-    plt.subplot(313)
+    plt.subplot(414)
     plt.plot(dataOSL["Time"], dataOSL["KneeAngleRef"], 'k-')
     plt.plot(dataOSL["Time"], simulation_log["knee_angle_cmd"], 'r-')
     plt.plot(dataOSL["Time"], simulation_log["knee_angle_model"], 'm-')
@@ -472,6 +482,7 @@ finally:
     plt.plot(dataOSL["Time"], dataOSL['LoadCellFz'])
     plt.ylabel("Load Cell Force (N)")
     plt.xlabel("Time (s)")
+    plt.xlim((t_lower, t_upper))
     #plt.legend(('Fx', 'Fy', 'Fz'))
     
     plt.subplot(212)
@@ -483,6 +494,7 @@ finally:
     #plt.plot(dataOSL["Time"], dataOSL['KneeTorque'])
     plt.ylabel("Ankle Moment (N-m)")
     plt.xlabel("Time (s)")
+    plt.xlim((t_lower, t_upper))
     #plt.legend(('Load Cell Mx', 'Load Cell My', 'Ankle Torque', 'Knee Torque'))
     
     plt.show()

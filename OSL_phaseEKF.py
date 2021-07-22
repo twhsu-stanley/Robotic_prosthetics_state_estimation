@@ -154,7 +154,7 @@ try:
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-5, 1e-5, 0])
+    sys.Q = np.diag([0, 1e-5, 0, 0])
     # measurement noise covariance
     sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
     U = np.diag([2, 2, 2])
@@ -163,7 +163,7 @@ try:
     # initialize the state
     init = myStruct()
     init.x = np.array([[0], [0.5], [1.1], [0]])
-    init.Sigma = np.diag([1, 1, 1, 0])
+    init.Sigma = np.diag([1, 1, 0, 0])
 
     ekf = extended_kalman_filter(sys, init)
     #==================================================================================================================
@@ -198,6 +198,7 @@ try:
 
     stride_peroid = np.array([0, 0])
     steady_state = False
+    previous_steady_state = False
     monotonicity = True
     previous_heelstrike_time = start_time
     previous_phase = 0
@@ -300,15 +301,17 @@ try:
             steady_state = False
         previous_phase = ekf.x[0, 0]
 
-        if steady_state == True:
-            ekf.Q = sys.Q
-        else:
-            # Stop updating task variable estimates
-            ekf.Q[2, 2] = 0
-            ekf.Q[3, 3] = 0
+        if steady_state == True and previous_steady_state == False:
+            ekf.Q = np.diag([0, 1e-5, 1e-5, 0])
+            ekf.Sigma = np.diag([1, 1, 1, 0])
+
+        elif steady_state == False and previous_steady_state == True:
+            ekf.Q = np.diag([0, 1e-5, 0, 0])
+            ekf.Sigma = np.diag([1, 1, 0, 0])
             #ekf.x[2, 0] = 1.2
             #ekf.x[3, 0] = 0
         
+        previous_steady_state = steady_state
         #==========================================================================================================
 
         ## Generate joint control commands ========================================================================
