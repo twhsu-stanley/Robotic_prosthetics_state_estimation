@@ -512,11 +512,14 @@ def detect_nan_in_joints():
     	pickle.dump(nan_dict, file)
 
 def plot_Conti_kinetics_data(subject, trial, side):
+
     ptr = raw_walking_data['Gaitcycle'][subject]['subjectdetails'][1][3]
     subject_weight = raw_walking_data[ptr] # kg
-    kneeForce = -raw_walking_data['Continuous'][subject][trial]['kinetics']['jointforce'][side]['knee'][:, :] * subject_weight
+    kneeForce = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointforce'][side]['knee'][:, :] * subject_weight
     ankleMoment = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointmoment'][side]['ankle'][:, :] * subject_weight / 1000 # N-mm to N-m
     
+    _, force_z_ankle, _, moment_y_ankle, _, _ = load_Conti_measurement_data(subject, trial, side)
+
     start = 1000
     end = 2000
     plt.figure()
@@ -524,19 +527,20 @@ def plot_Conti_kinetics_data(subject, trial, side):
     #plt.plot(range(np.shape(kneeForce)[1])[start:end], kneeForce[0, start:end])
     #plt.plot(range(np.shape(kneeForce)[1])[start:end], kneeForce[1, start:end])
     plt.plot(range(np.shape(kneeForce)[1])[start:end], kneeForce[2, start:end])
+    #plt.plot(range(np.shape(kneeForce)[1])[start:end], force_z_ankle[start:end])
     #plt.legend(('0', '1', '2'))
     plt.xlabel('samples')
-    plt.ylabel('Knee Force')
+    plt.ylabel('Knee Force (N)')
     
     plt.subplot(212)
     plt.plot(range(np.shape(ankleMoment)[1])[start:end], ankleMoment[0, start:end])
+    #plt.plot(range(np.shape(ankleMoment)[1])[start:end], moment_y_ankle[start:end])
     #plt.plot(range(np.shape(ankleMoment)[1])[start:end], ankleMoment[1, start:end])
     #plt.plot(range(np.shape(ankleMoment)[1]), ankleMoment[2, :])
     #plt.legend(('0', '1', '2'))
     plt.xlabel('samples')
-    plt.ylabel('Ankle Moment')
+    plt.ylabel('Ankle Moment (N-m)')
     plt.show()
-
 
 if __name__ == '__main__':
     """
@@ -643,7 +647,7 @@ if __name__ == '__main__':
     ##################################################################
     
     subject = 'AB10'
-    trial = 's0x8i0'
+    trial = 's0x8i10'
     side = 'left'
     plot_Conti_kinetics_data(subject, trial, side)
     #detect_knee_over_extention()
