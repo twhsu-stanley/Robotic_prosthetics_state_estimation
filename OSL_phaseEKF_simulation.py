@@ -10,12 +10,12 @@ import csv
 from EKF import *
 from model_framework import *
 from scipy.signal import butter, lfilter, lfilter_zi
-import scipy.io
+from incline_experiment_utils import butter_lowpass_filter
 import sender_test as sender   # for real-time plotting
 
 ### A. Load Ross's pre-recorded walking data
-#"""
-logFile = r"OSL_walking_data/210617_113644_PV_Siavash_walk_oscillations in phase.csv"
+"""
+logFile = r"OSL_walking_data/210617_121732_PV_Siavash_walk_300_1600.csv"
 # 1) 210617_113644_PV_Siavash_walk_oscillations in phase
 # 2) 210617_121732_PV_Siavash_walk_300_1600
 # 3) 210617_122334_PV_Siavash_walk_500_2500
@@ -24,7 +24,7 @@ datatxt = np.genfromtxt(logFile , delimiter=',', names = True)
 dataOSL = {
     "Time": datatxt["Time"],
     "ThighSagi": datatxt["ThighSagi"],
-    #"PV": datatxt['PV'],
+    "PV": datatxt['PV'],
     'AnkleAngle': datatxt["ankJoiPos"],
     'AnkleAngleRef': datatxt["refAnk"],
     'KneeAngle': datatxt["kneJoiPos"],
@@ -41,10 +41,10 @@ dataOSL = {
     'LoadCellMy':  datatxt['loadCelMy'],
     'LoadCellMz':  datatxt['loadCelMz']
 }
-#"""
+"""
 
 ### B. Load Kevin's bypass-adapter walking data
-"""
+#"""
 mat = scipy.io.loadmat('OSL_walking_data/Treadmill_speed1_incline0_file2.mat')
 # Treadmill_speed1_incline0_file2
 # Treadmill_speed1_incline0_file1
@@ -74,7 +74,7 @@ dataOSL = {
     'LoadCellMy': mat['LoadCell'][0, 0]['My'].reshape(-1),
     'LoadCellMz': mat['LoadCell'][0, 0]['Mz'].reshape(-1),
 }
-"""
+#"""
 
 ## From loco_OSL.py: Load referenced trajectories
 def loadTrajectory(trajectory = 'walking'):
@@ -120,7 +120,7 @@ try:
     ### Intitialize EKF
     # Dictionary of the sensors
     sensors_dict = {'global_thigh_angle': 0, 'force_z_ankle': 1, 'force_x_ankle': 2,
-                    'moment_y_ankle': 3, 'global_thigh_angle_vel': 4, 'atan2': 5}
+                    'ankleMoment': 3, 'global_thigh_angle_vel': 4, 'atan2': 5}
 
     # Determine which sensors to be used
     sensors = ['global_thigh_angle', 'global_thigh_angle_vel', 'atan2']
@@ -145,7 +145,7 @@ try:
     sys.Q = np.diag([0, 1e-6, 0, 0])
     # measurement noise covariance
     sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
-    U = np.diag([2, 3, 2])
+    U = np.diag([2, 2, 1])
     sys.R = U @ sys.R @ U.T
 
     # initialize the state
@@ -165,10 +165,14 @@ try:
     z_lp_2 = lfilter_zi(b_lp,  a_lp)
     
     ## configure band-pass filter (2-order)
-    normal_lowcut = 0.3 / nyq    #lower cut-off frequency = 0.5Hz 
+    normal_lowcut = 0.5 / nyq    #lower cut-off frequency = 0.5Hz 
     normal_highcut = 2 / nyq     #upper cut-off frequency = 2Hz
     b_bp, a_bp = butter(2, [normal_lowcut, normal_highcut], btype = 'band', analog = False)
     z_bp = lfilter_zi(b_bp,  a_bp)
+
+    ### Kinetic data processing
+    #dataOSL['AnkleTorque_lp'] = butter_lowpass_filter(dataOSL['AnkleTorque'], 10, fs, order = 1)
+    #dataOSL['LoadCellFz_lp'] = butter_lowpass_filter(dataOSL['LoadCellFz'], 10, fs, order = 1)
 
     ptr = 0    # for reading sensor data
     indx = 0   # for logging data
@@ -177,7 +181,7 @@ try:
     start_time = t_0             # for live plotting
     fade_in_time = 2             # sec
     
-    MD_hist= deque([])
+    
     """
     stride_peroid = np.array([0, 0])
     monotonicity = True
@@ -194,6 +198,10 @@ try:
     t_ns_previous = start_time
     steady_state = False
     steady_state_previous = False
+    walking = False
+
+    MD_hist= deque([])
+    global_thigh_angle_vel_hist = np.zeros((50,1))
     
     knee_angle_initial = dataOSL['KneeAngle'][0]
     ankle_angle_initial = dataOSL['AnkleAngle'][0]
@@ -203,6 +211,8 @@ try:
         loadCell_Fz_buffer.append(dataOSL['LoadCellFz'][ptr])
     dataOSL['LoadCellFz'][ptr] = np.median(loadCell_Fz_buffer)
 
+    subject_weight = 60
+
     simulation_log = {
         # state estimates
         "phase_est": np.zeros((len(dataOSL["Time"]), 1)),
@@ -210,14 +220,16 @@ try:
         "step_length_est": np.zeros((len(dataOSL["Time"]), 1)),
         "ramp_est": np.zeros((len(dataOSL["Time"]), 1)),
         
-        "steady-state walking": np.zeros((len(dataOSL["Time"]), 1)),
-        "monotonicity": np.zeros((len(dataOSL["Time"]), 1)),
+        "steady-state": np.zeros((len(dataOSL["Time"]), 1)),
+        "walking": np.zeros((len(dataOSL["Time"]), 1)),
         "MD": np.zeros((len(dataOSL["Time"]), 1)),
         "MD_movingAverage": np.zeros((len(dataOSL["Time"]), 1)),
 
         # EKF prediction of measurements/ derived measurements
         "global_thigh_angle_pred": np.zeros((len(dataOSL["Time"]), 1)),
         "global_thigh_angle": np.zeros((len(dataOSL["Time"]), 1)),
+        "ankleMoment_pred": np.zeros((len(dataOSL["Time"]), 1)),
+        "ankleMoment": np.zeros((len(dataOSL["Time"]), 1)),
         "global_thigh_angle_vel_pred": np.zeros((len(dataOSL["Time"]), 1)),
         "global_thigh_angle_vel": np.zeros((len(dataOSL["Time"]), 1)),
         "Atan2_pred": np.zeros((len(dataOSL["Time"]), 1)),
@@ -230,12 +242,14 @@ try:
         "knee_angle_cmd": np.zeros((len(dataOSL["Time"]), 1))
     }
 
+
     while True:
         ### Read OSL measurement data
         global_thigh_angle = dataOSL["ThighSagi"][ptr] * 180 / np.pi # deg # NO negative sign
         ankle_angle = dataOSL['AnkleAngle'][ptr]
         knee_angle = dataOSL['KneeAngle'][ptr]
-        
+        ankleMoment = dataOSL['AnkleTorque'][ptr] / subject_weight
+
         ## Calculate loadCell Fz using the buffer
         if dataOSL['LoadCellFz'][ptr] > 50:
             loadCell_Fz_buffer = [loadCell_Fz_buffer[0], loadCell_Fz_buffer[0], loadCell_Fz_buffer[1]]
@@ -283,9 +297,17 @@ try:
         if Atan2 < 0:
             Atan2 = Atan2 + 2 * np.pi
         
-        measurement = np.array([[global_thigh_angle], [global_thigh_angle_vel_lp], [Atan2]])
+        # set atan2 to zero when the subejct is not waking
+        global_thigh_angle_vel_hist = np.roll(global_thigh_angle_vel_hist, -1)
+        global_thigh_angle_vel_hist[-1] = global_thigh_angle_vel_lp
+        if np.all(abs(global_thigh_angle_vel_hist) < 20):
+            walking = False
+            Atan2 = 0
+        else:
+            walking = True
+
+        measurement = np.array([[global_thigh_angle], [global_thigh_angle_vel_lp], [Atan2]])#, [ankleMoment]])
         measurement = np.squeeze(measurement)
-        #measurement = measurement[sensors]
 
         ### EKF implementation
         ekf.prediction(dt)
@@ -317,7 +339,7 @@ try:
             MD_hist.append(ekf.MD)
             MD_hist.popleft()
         MD_movingAverage = np.mean(MD_hist)
-        if MD_movingAverage < 5.5:
+        if MD_movingAverage < 5:
             t_s[indx] = t
             t_ns[indx] = t_ns_previous
         else:
@@ -326,15 +348,18 @@ try:
         
         if t_s[indx] - t_ns[indx] > 3:
             steady_state = True
-        else:
+        #else:
+        elif t_s[indx] - t_ns[indx] < -1:
             steady_state = False
+        
+        steady_state = steady_state and walking
         
         t_s_previous = t_s[indx]
         t_ns_previous = t_ns[indx]
         
         if steady_state == True and steady_state_previous == False:
-            ekf.Q = np.diag([0, 1e-6, 1e-6, 0])
-            ekf.Sigma = np.diag([1e-3, 1e-3, 1e-3, 0])
+            ekf.Q = np.diag([0, 1e-6, 1e-6, 1e-6])
+            ekf.Sigma = np.diag([1e-3, 1e-3, 1e-3, 1e-3])
 
         elif steady_state == False and steady_state_previous == True:
             ekf.Q = np.diag([0, 1e-6, 0, 0])
@@ -393,13 +418,15 @@ try:
         simulation_log['step_length_est'][indx] = ekf.x[2, 0]
         simulation_log['ramp_est'][indx] = ekf.x[3, 0]
         
-        simulation_log["steady-state walking"][indx] = steady_state
-        #simulation_log["monotonicity"][indx] = monotonicity
+        simulation_log["steady-state"][indx] = steady_state
+        simulation_log["walking"][indx] = walking
         simulation_log["MD"][indx] = ekf.MD
         simulation_log["MD_movingAverage"][indx] = MD_movingAverage
 
         simulation_log["global_thigh_angle_pred"][indx] = ekf.z_hat[0,0]
         simulation_log["global_thigh_angle"][indx] = global_thigh_angle
+        #simulation_log["ankleMoment_pred"][indx] = ekf.z_hat[1,0]
+        simulation_log["ankleMoment"][indx] = ankleMoment
         simulation_log["global_thigh_angle_vel_pred"][indx] = ekf.z_hat[1,0]
         simulation_log["global_thigh_angle_vel"][indx] = global_thigh_angle_vel_lp
         simulation_log["Atan2_pred"][indx] = ekf.z_hat[2,0]
@@ -447,14 +474,14 @@ finally:
     plt.subplot(511)
     plt.title("EKF Gait State Estimate")
     plt.plot(dataOSL["Time"], simulation_log['phase_est'], 'r-')
-    #plt.plot(dataOSL["Time"], dataOSL['PV'] / 998, 'k-')
+    plt.plot(dataOSL["Time"], dataOSL['PV'] / 998, 'k-')
     plt.ylabel("Phase")
     plt.xlim((t_lower, t_upper))
     plt.legend(('EKF phase', 'phase variable'))
 
     plt.subplot(512)
-    plt.plot(dataOSL["Time"], simulation_log["steady-state walking"], 'r-')
-    #plt.plot(dataOSL["Time"], simulation_log["monotonicity"], 'b--')
+    plt.plot(dataOSL["Time"], simulation_log["steady-state"], 'r-')
+    plt.plot(dataOSL["Time"], simulation_log["walking"], 'b--')
     #plt.plot(np.array(heel_strike_time).reshape(-1), np.zeros((len(heel_strike_time), 1)), 'rx')
     plt.ylabel("Steady-state (T/F)")
     plt.xlim((t_lower, t_upper))
@@ -474,20 +501,27 @@ finally:
     plt.xlim((t_lower, t_upper))
 
     plt.figure("Measurements")
-    plt.subplot(311)
+    plt.subplot(411)
     plt.title("Measurements")
     plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle"], 'k-')
     plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle_pred"], 'r-')
     plt.legend(('actual', 'EKF predicted'))
     plt.ylabel("Global Thigh Angle (deg)")
     plt.xlim((t_lower, t_upper))
-    plt.subplot(312)
+    plt.subplot(412)
+    plt.plot(dataOSL["Time"], simulation_log["ankleMoment"], 'k-')
+    plt.plot(dataOSL["Time"], simulation_log["ankleMoment_pred"], 'r-')
+    plt.legend(('actual', 'EKF predicted'))
+    plt.ylabel("ankleMoment (N-m)")
+    plt.xlim((t_lower, t_upper))
+    plt.ylim((-2, 3))
+    plt.subplot(413)
     plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle_vel"], 'k-')
     plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle_vel_pred"], 'r-')
     plt.legend(('actual', 'EKF predicted'))
     plt.ylabel("Global Thigh Angle Vel (deg/s)")
     plt.xlim((t_lower, t_upper))
-    plt.subplot(313)
+    plt.subplot(414)
     plt.plot(dataOSL["Time"], simulation_log["Atan2"], 'k-')
     plt.plot(dataOSL["Time"], simulation_log["Atan2_pred"], 'r-')
     plt.legend(('actual', 'EKF predicted'))
@@ -504,7 +538,7 @@ finally:
     plt.xlim((t_lower, t_upper))
     plt.legend(('EKF phase', 'phase variable'))
     plt.subplot(412)
-    plt.plot(dataOSL["Time"], simulation_log["steady-state walking"], 'r-')
+    plt.plot(dataOSL["Time"], simulation_log["steady-state"], 'r-')
     plt.ylabel("Steady-state (T/F)")
     plt.xlim((t_lower, t_upper))
     plt.subplot(413)
@@ -534,7 +568,7 @@ finally:
     plt.ylabel("MD")
     plt.xlim((t_lower, t_upper))
     plt.subplot(312)
-    plt.plot(dataOSL["Time"], simulation_log["steady-state walking"], 'r-')
+    plt.plot(dataOSL["Time"], simulation_log["steady-state"], 'r-')
     plt.ylabel("Steady-state (T/F)")
     plt.xlim((t_lower, t_upper))
     plt.subplot(313)
@@ -549,13 +583,13 @@ finally:
     
     plt.figure("Kinetics")
     plt.subplot(211)
-    #plt.plot(dataOSL["Time"], dataOSL['LoadCellFx'])
-    #plt.plot(dataOSL["Time"], dataOSL['LoadCellFy'])
     plt.plot(dataOSL["Time"], dataOSL['LoadCellFz'])
+    #plt.plot(datatxt["Time"], datatxt['loadCelFz'])
     plt.ylabel("Load Cell Force (N)")
     plt.xlabel("Time (s)")
     plt.xlim((t_lower, t_upper))
-    #plt.legend(('Fx', 'Fy', 'Fz'))
+    #plt.ylim((-300, 20))
+    plt.legend(('Median-filtered', 'Original'))
     
     plt.subplot(212)
     #plt.plot(dataOSL["Time"], dataOSL['LoadCellMx'])
@@ -567,6 +601,7 @@ finally:
     plt.ylabel("Ankle Moment (N-m)")
     plt.xlabel("Time (s)")
     plt.xlim((t_lower, t_upper))
+    #plt.ylim((-2, 3))
     #plt.legend(('Load Cell Mx', 'Load Cell My', 'Ankle Torque', 'Knee Torque'))
     
     plt.show()

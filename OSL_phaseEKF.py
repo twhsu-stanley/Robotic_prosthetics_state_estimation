@@ -102,21 +102,25 @@ try:
     logger = loco.ini_log({**dataOSL, **cmd_log, **ekf_log}, sensors = "all_sensors", trialName = "OSL_benchtop_test")
 
     ## Initialize buffers for joints angles =============================================================================
-    knee_buffer = []   # in rad
-    ankle_buffer = []
+    knee_angle_buffer = []   # in rad
+    ankle_angle_buffer = []
     loadCell_Fz_buffer = []
+    ankle_moment_buffer = []
     for i in range(3):
         dataOSL = loco.read_OSL(kneSta, ankSta, IMUPac, logger['ini_time'], encMap)
-        knee_buffer.append(dataOSL['kneJoiPos'])
-        ankle_buffer.append(dataOSL['ankJoiPos'])
+        knee_angle_buffer.append(dataOSL['kneJoiPos'])
+        ankle_angle_buffer.append(dataOSL['ankJoiPos'])
         loadCell_Fz_buffer.append(dataOSL['loadCelFz'])
-    print("Initial knee position (deg): %.2f, %.2f, %.2f " % (knee_buffer[0]*180/np.pi, knee_buffer[1]*180/np.pi, knee_buffer[2]*180/np.pi))
-    print("Initial ankle position (deg): %.2f, %.2f, %.2f " % (ankle_buffer[0]*180/np.pi, ankle_buffer[1]*180/np.pi, ankle_buffer[2]*180/np.pi))
+        ankle_moment_buffer.append(dataOSL['ankJoiTor'])
+    print("Initial knee position (deg): %.2f, %.2f, %.2f " % (knee_angle_buffer[0]*180/np.pi, knee_angle_buffer[1]*180/np.pi, knee_angle_buffer[2]*180/np.pi))
+    print("Initial ankle position (deg): %.2f, %.2f, %.2f " % (ankle_angle_buffer[0]*180/np.pi, ankle_angle_buffer[1]*180/np.pi, ankle_angle_buffer[2]*180/np.pi))
     print("Initial loadCell Fz (N): %.2f, %.2f, %.2f " % (loadCell_Fz_buffer[0], loadCell_Fz_buffer[1], loadCell_Fz_buffer[2]))
+    print("Initial ankle torque (N-m): %.2f, %.2f, %.2f " % (ankle_moment_buffer[0], ankle_moment_buffer[1], ankle_moment_buffer[2]))
 
-    knee_angle_initial = np.median(knee_buffer) * 180/np.pi # deg
-    ankle_angle_initial = np.median(ankle_buffer) * 180/np.pi
+    knee_angle_initial = np.median(knee_angle_buffer) * 180/np.pi # deg
+    ankle_angle_initial = np.median(ankle_angle_buffer) * 180/np.pi
     dataOSL['loadCelFz'] = np.median(loadCell_Fz_buffer)
+    dataOSL['ankJoiTor'] = np.median(ankle_moment_buffer)
     #===================================================================================================================
 
     ## Saturation for joint angles =====================================================================================
@@ -169,7 +173,7 @@ try:
     #==================================================================================================================
 
     ### Create filters ================================================================================================
-    fs = 100          # sampling rate = 100Hz (actual: ~77Hz)
+    fs = 100          # sampling rate = 100Hz (actual: dt ~ 0.0135 sec; 74Hz) 
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
     # configure low-pass filter (1-order)
     normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
@@ -184,7 +188,6 @@ try:
     z_bp = lfilter_zi(b_bp,  a_bp)
     #==================================================================================================================
 
-    
     if input('\n\nAbout to walk. Would you like to continue? (y/n): ').lower() == 'y':
         print("\n Let's walk!")
     else:
@@ -194,7 +197,7 @@ try:
     t_0 = time.time()     # for EKF
     start_time = t_0      # for live plotting
     
-    fade_in_time = 2      # sec
+    fade_in_time = 1.5      # sec
 
     # ------------------------------------------ MAIN LOOP --------------------------------------------------------- 
     while True:
@@ -212,24 +215,29 @@ try:
 
         # 2) Use the buffers
         """
-        knee_buffer = [dataOSL['kneJoiPos'], knee_buffer[0], knee_buffer[1]]
-        ankle_buffer = [dataOSL['ankJoiPos'], ankle_buffer[0], ankle_buffer[1]]
+        knee_angle_buffer = [dataOSL['kneJoiPos'], knee_angle_buffer[0], knee_angle_buffer[1]]
+        ankle_angle_buffer = [dataOSL['ankJoiPos'], ankle_angle_buffer[0], ankle_angle_buffer[1]]
 
-        dataOSL['kneJoiPos'] = np.median(knee_buffer) # rad
-        dataOSL['ankJoiPos'] = np.median(ankle_buffer)
+        dataOSL['kneJoiPos'] = np.median(knee_angle_buffer) # rad
+        dataOSL['ankJoiPos'] = np.median(ankle_angle_buffer)
 
         knee_angle = dataOSL['kneJoiPos'] * 180 / np.pi # deg
         ankle_angle = dataOSL['ankJoiPos'] * 180 / np.pi
         """
         #==========================================================================================================
         
-        ## Calculate loadCell Fz using the buffer
+        ## Calculate loadCell Fz using the buffer =================================================================
         if dataOSL['loadCelFz'] > 50:
             loadCell_Fz_buffer = [loadCell_Fz_buffer[0], loadCell_Fz_buffer[0], loadCell_Fz_buffer[1]]
         else:
             loadCell_Fz_buffer = [dataOSL['loadCelFz'], loadCell_Fz_buffer[0], loadCell_Fz_buffer[1]]
 
         dataOSL['loadCelFz'] =  int(np.median(loadCell_Fz_buffer))
+        #==========================================================================================================
+
+        ## Calculate ankle moment using the buffer =================================================================
+        ankle_moment_buffer = [dataOSL['ankJoiTor'], ankle_moment_buffer[0], ankle_moment_buffer[1]]
+        dataOSL['ankJoiTor'] = np.median(ankle_moment_buffer)
         #==========================================================================================================
 
         ## Time and dt ============================================================================================
@@ -352,7 +360,7 @@ try:
         #elapsed_time = t - start_time
         if ptr % 2 == 0:
             sender.graph(elapsed_time,
-                         ekf.x[0, 0], pv / 998, 'Phase', '--',
+                         ekf.x[0, 0], ekf.x[0, 0], 'Phase', '--',
                          #ekf.x[0, 0], 'phase', '-',
                          #ekf.x[1, 0], 'phase_dot', '1/s',
                          #ekf.x[2, 0], 'step_length', 'm',

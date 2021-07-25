@@ -35,8 +35,8 @@ def load_Psi(subject = 'Generic'):
         with open('Psi/Psi_force_X_G.pickle', 'rb') as file:
             Psi_force_X = pickle.load(file)
         
-        with open('Psi/Psi_moment_Y_G.pickle', 'rb') as file:
-            Psi_moment_Y = pickle.load(file)
+        with open('New_Psi/Psi_ankleMoment.pickle', 'rb') as file:
+            Psi_ankleMoment = pickle.load(file)
         
         #with open('Psi/Psi_thighVel_2hz_G.pickle', 'rb') as file:
         with open('New_Psi/Psi_globalThighVelocities.pickle', 'rb') as file:
@@ -58,7 +58,7 @@ def load_Psi(subject = 'Generic'):
             Psi_force_X = p[subject]
         with open('Psi/Psi_moment_Y.pickle', 'rb') as file:
             p = pickle.load(file)
-            Psi_moment_Y = p[subject]
+            Psi_ankleMoment = p[subject]
         with open('Psi/Psi_thighVel_2hz.pickle', 'rb') as file:
             p = pickle.load(file)
             Psi_globalThighVelocities = p[subject]
@@ -66,7 +66,7 @@ def load_Psi(subject = 'Generic'):
             p = pickle.load(file)
             Psi_atan2 = p[subject]
            
-    Psi = {'global_thigh_angle': Psi_globalThighAngles, 'force_Z': Psi_force_Z, 'force_X': Psi_force_X, 'moment_Y': Psi_moment_Y,
+    Psi = {'global_thigh_angle': Psi_globalThighAngles, 'force_Z': Psi_force_Z, 'force_X': Psi_force_X, 'ankleMoment': Psi_ankleMoment,
            'global_thigh_angle_vel': Psi_globalThighVelocities, 'atan2': Psi_atan2}
     return Psi
 
@@ -151,12 +151,12 @@ class extended_kalman_filter:
 
         R = self.R
         
-        # Detect kidnapping event
+        # Kidnapping detector 
         self.MD = np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) # Mahalanobis distance
         #if steady_state_walking:
-            #if self.MD > np.sqrt(25):
-                #self.Sigma += np.diag([2e-5, 2e-4, 4e-3, 4])
-                #self.Sigma += np.diag([0, 1e-7, 1e-7, 0])
+        #    if self.MD > np.sqrt(25):
+        #        #self.Sigma += np.diag([2e-5, 2e-4, 4e-3, 4])
+        #        self.Sigma += np.diag([0, 1e-3, 1e-3, 0])
         
         # innovation covariance
         S = H @ self.Sigma @ H.T + R

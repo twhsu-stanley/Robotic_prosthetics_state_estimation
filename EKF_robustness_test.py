@@ -12,10 +12,10 @@ import csv
 
 # Dictionary of the sensors
 sensors_dict = {'global_thigh_angle': 0, 'force_z_ankle': 1, 'force_x_ankle': 2,
-                'moment_y_ankle': 3, 'global_thigh_angle_vel': 4, 'atan2': 5}
+                'ankleMoment': 3, 'global_thigh_angle_vel': 4, 'atan2': 5}
 
 # Determine which sensors to be used
-sensors = ['global_thigh_angle', 'global_thigh_angle_vel', 'atan2']
+sensors = ['global_thigh_angle', 'ankleMoment', 'global_thigh_angle_vel']
 sensor_id = [sensors_dict[key] for key in sensors]
 
 arctan2 = False
@@ -67,7 +67,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     # load ground truth
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
     # load measurements
-    global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle, global_thigh_angVel_2hz, atan2\
+    global_thigh_angle_Y, force_z_ankle, force_x_ankle, ankleMoment, global_thigh_angVel_2hz, atan2\
                                         = load_Conti_measurement_data(subject, trial, side)
 
     #### Joint Control ############################################################
@@ -81,7 +81,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     z = np.array([[global_thigh_angle_Y],
                   [force_z_ankle],
                   [force_x_ankle],
-                  [moment_y_ankle],
+                  [ankleMoment],
                   [global_thigh_angVel_2hz],
                   [atan2]])
     z = np.squeeze(z)
@@ -95,16 +95,16 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-5, 1e-5, 0])
+    sys.Q = np.diag([0, 1e-5, 1e-5, 1e-2])
     # measurement noise covariance
     sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
-    U = np.diag([2, 2, 2])
+    U = np.diag([1.5, 0.5, 1.5])
     sys.R = U @ sys.R @ U.T
 
     # initialize the state
     init = myStruct()
-    init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
-    init.Sigma = np.diag([10, 10, 10, 0])
+    init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [0]])
+    init.Sigma = np.diag([1e-3, 1e-3, 1e-3, 1e-3])
 
     ekf = extended_kalman_filter(sys, init)
     
@@ -142,11 +142,10 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
             ekf.x[kidnap] = state_kidnap[kidnap]
         
         ekf.prediction(dt)
-        ekf.state_saturation(saturation_range)
+        #ekf.state_saturation(saturation_range)
 
         ekf.correction(z[:, i], Psi, arctan2)
-        ekf.state_saturation(saturation_range)
-        
+        #ekf.state_saturation(saturation_range)
 
         x[i,:] = ekf.x.T
         z_pred[i,:] = ekf.z_hat.T
@@ -238,7 +237,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         plt.ylabel('$\\alpha~(deg)$')
         plt.xlabel('time (s)')
         plt.xlim([0, tt[-1]+0.1])
-        #plt.ylim([-10, 10])
+        plt.ylim([-15, 15])
 
         plt.figure("Sigma")
         plt.title("Sigma Norms")
@@ -275,27 +274,20 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         plt.plot(tt, z[0, 0:total_step], 'k-')
         plt.plot(tt, z_pred[:, 0], 'r--')
         plt.legend(('actual', 'predicted'))
-        plt.ylabel('$\\theta_Y$')
-        #plt.ylim([-10, 50])
         plt.xlim([0, tt[-1]+0.1])
         plt.subplot(412)
         plt.plot(tt, z[1, 0:total_step], 'k-')
         plt.plot(tt, z_pred[:, 1], 'r--')
-        #plt.ylabel('$f_Z$')
-        #plt.ylim([0, 1500])
         plt.xlim([0, tt[-1]+0.1])
+        
         plt.subplot(413)
         plt.plot(tt, z[2, 0:total_step], 'k-')
         plt.plot(tt, z_pred[:, 2], 'r--')
-        #plt.ylabel('$f_X$')
-        #plt.ylim([-500, 200])
         plt.xlim([0, tt[-1]+0.1])
         """
         plt.subplot(414)
         plt.plot(tt, z[3, 0:total_step], 'k-')
         plt.plot(tt, z_pred[:, 3], 'r--')
-        plt.ylabel('$m_Y$')
-        #plt.ylim([0, 2000])
         plt.xlim([0, tt[-1]+0.1])
         plt.xlabel("time (s)")
         
@@ -602,8 +594,8 @@ def ekf_robustness(kidnap = True):
     return robustness
 
 if __name__ == '__main__':
-    subject = 'AB02'
-    trial = 's1i0'
+    subject = 'AB08'
+    trial = 's0x8i10'
     side = 'left'
 
     ekf_test(subject, trial, side, kidnap = False, plot = True)

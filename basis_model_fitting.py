@@ -47,15 +47,15 @@ if __name__ == '__main__':
     
     F = 11
     N = 3
-    #phase_model = Fourier_Basis(F, 'phase')
-    #phase_dot_model = Polynomial_Basis(1, 'phase_dot')
-    #step_length_model = Berstein_Basis(N,'step_length')
-    #ramp_model = Berstein_Basis(N, 'ramp')
+    phase_model = Fourier_Basis(F, 'phase')
+    phase_dot_model = Polynomial_Basis(1, 'phase_dot')
+    step_length_model = Berstein_Basis(N,'step_length')
+    ramp_model = Berstein_Basis(N, 'ramp')
 
-    #model_globalThighAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    model_globalThighAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_globalThighAngles = basis_model_fitting(model_globalThighAngles, 'globalThighAngles')
 
-    #model_globalThighVelocities = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    model_globalThighVelocities = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_globalThighAngles = basis_model_fitting(model_globalThighVelocities, 'globalThighVelocities')
 
     #model_kneeAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
@@ -64,14 +64,19 @@ if __name__ == '__main__':
     #model_ankleAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_ankleAngles = basis_model_fitting(model_ankleAngles, 'ankleAngles')
     
+    model_ankleMoment = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    #psi_ankleMoment = basis_model_fitting(model_ankleMoment, 'ankleMoment')
+
+    # Atan2 fitting
+    
     phase_model = Fourier_Basis(F, 'phase')
     phase_dot_model = Polynomial_Basis(1, 'phase_dot')
     step_length_model = Berstein_Basis(0,'step_length')
     ramp_model = Berstein_Basis(0, 'ramp')
 
     model_atan2 = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
-    psi_atan2 = basis_model_fitting(model_atan2, 'atan2')
+    #psi_atan2 = basis_model_fitting(model_atan2, 'atan2')
 
-    #c_model = Measurement_Model(model_knee, model_ankle)
-    #model_saver(c_model, 'Control_model.pickle')
+    m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities, model_atan2)
+    model_saver(m_model, 'Measurement_model_3.pickle')
     

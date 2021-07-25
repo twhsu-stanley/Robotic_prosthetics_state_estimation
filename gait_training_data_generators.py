@@ -2,6 +2,7 @@ import h5py
 import pickle
 import numpy as np
 from numpy.core.fromnumeric import mean
+from numpy.lib.twodim_base import tri
 from incline_experiment_utils import *
 import time
 
@@ -289,6 +290,63 @@ def derivedMeasurements_statistics():
     with open('Gait_training_data/atan2_original.pickle', 'wb') as file:
     	pickle.dump(atan2, file)
 
+def ankleMoment_statistics():
+    """ Compute mean and standard deviaton of ankle moment (normalized w.r.t. subject's weight) across the phase
+    """    
+    subject_names = get_subject_names()
+
+    data_mean_std = dict()
+    
+    for trial in raw_walking_data['Gaitcycle']['AB01'].keys():
+        if trial == 'subjectdetails':
+            continue
+        data_mean_std[trial] = dict()
+        for subject in subject_names:
+            data_left = raw_walking_data['Gaitcycle'][subject][trial]['kinetics']['jointmoment']['left']['ankle']['x'][:] / 1000 # N-mm to N-m
+            data_right = raw_walking_data['Gaitcycle'][subject][trial]['kinetics']['jointmoment']['right']['ankle']['x'][:] / 1000 # N-mm to N-m
+
+            # Delete additional rows with zeros
+            all_zeros_left = []
+            for i in range(np.shape(data_left)[0]):
+                if np.count_nonzero(data_left[i,:] == 0) > 50:
+                    all_zeros_left.append(i)
+            data_left = np.delete(data_left, all_zeros_left, 0) # remove rows
+
+            all_zeros_right = []
+            for i in range(np.shape(data_right)[0]):
+                if np.count_nonzero(data_right[i,:] == 0) > 50:
+                    all_zeros_right.append(i)
+            data_right = np.delete(data_right, all_zeros_right, 0) # remove rows
+
+
+            if subject == 'AB01':
+                data = data_left
+                data = np.vstack((data, data_right))
+            else:
+                data = np.vstack((data, data_left))
+                data = np.vstack((data, data_right))
+            
+            #if subject == 'AB05' and trial == 's1x2d7x5':
+            #    print(all_zeros_left)
+            #    print(all_zeros_right)
+            #    plt.figure()
+            #    plt.plot(range(150), data_left.T, 'k-')
+            #    plt.show()
+            #    print(" ")
+            
+
+        data_mean_std[trial]['mean'] = np.mean(data, axis = 0)
+        data_mean_std[trial]['std'] = np.std(data, axis = 0)
+
+        #plt.figure(trial)
+        #plt.plot(range(150), data.T, 'k-', alpha = 0.2)
+        #plt.plot(range(150), data_mean_std[trial]['mean'])
+        #plt.plot(range(150), data_mean_std[trial]['mean'] + 3 * data_mean_std[trial]['std'])
+        #plt.plot(range(150), data_mean_std[trial]['mean'] - 3 * data_mean_std[trial]['std'])
+        #plt.show()
+    
+    with open('Gait_data_statistics/ankleMoment_mean_std.pickle', 'wb') as file:
+    	pickle.dump(data_mean_std, file)
 
 def gait_training_data_generator(mode):
 
@@ -316,11 +374,13 @@ def gait_training_data_generator(mode):
 
     subject_names = get_subject_names()
 
+    num_trials = 0
+    error_trials = 0
     for trial in raw_walking_data['Gaitcycle']['AB01'].keys():
         if trial == 'subjectdetails':
             continue
         for subject in subject_names:
-            # 1) Joint angles
+            # 1) Gait data
             if mode == 'kneeAngles':
                 data_left = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['left']['knee']['x'][:]
                 data_right = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['right']['knee']['x'][:]
@@ -338,7 +398,10 @@ def gait_training_data_generator(mode):
             elif mode == 'globalThighAngles' or mode == 'globalThighVelocities' or mode == 'atan2':
                 data_left = globalThighAngles[trial][subject]['left']
                 data_right = globalThighAngles[trial][subject]['right']
-
+            
+            elif mode == 'ankleMoment':
+                data_left = raw_walking_data['Gaitcycle'][subject][trial]['kinetics']['jointmoment']['left']['ankle']['x'][:] / 1000 # N-mm to N-m
+                data_right = raw_walking_data['Gaitcycle'][subject][trial]['kinetics']['jointmoment']['right']['ankle']['x'][:] / 1000 # N-mm to N-m
             
             if mode == 'globalThighVelocities':
                 derived_data_left = globalThighVelocities[trial][subject]['left']
@@ -394,6 +457,15 @@ def gait_training_data_generator(mode):
             for i in range(np.shape(data_right)[0]):
                 ramp_right.append(np.full((1, 150), incline))
             ramp_right = np.squeeze(np.array(ramp_right))
+
+            if len(data_left) != np.shape(phase_dot_left)[0]:
+                #print(trial + '/' + subject + '/left')
+                error_trials += 1
+                continue
+            if len(data_right) != np.shape(phase_dot_right)[0]:
+                #print(trial + '/' + subject + '/right')
+                error_trials += 1
+                continue
 
             # Step 1: Remove outliers ==========================================================================================
             remove_left = []
@@ -470,7 +542,7 @@ def gait_training_data_generator(mode):
             #===================================================================================================================
 
             # Step 3: Store to training data
-            if subject == 'AB01' and trial == 's0x8d10':
+            if num_trials == 0:
                 if mode == 'globalThighVelocities' or mode == 'atan2':
                     data = derived_data_left
                     data = np.vstack((data, derived_data_right))
@@ -503,6 +575,8 @@ def gait_training_data_generator(mode):
 
                 ramp = np.vstack((ramp, ramp_left))
                 ramp = np.vstack((ramp, ramp_right))
+            
+            num_trials += 1
             #===================================================================================================================
     
     phase = []
@@ -517,10 +591,12 @@ def gait_training_data_generator(mode):
     print("Shape of phase dot: ", np.shape(phase_dot))
     print("Shape of step length: ", np.shape(step_length))
     print("Shape of ramp: ", np.shape(ramp))
+    print("Total # of used trials: ", num_trials)
+    print("Total # of trials with errors: ", error_trials)
 
     with open(('Gait_training_data/' + mode + '_training_dataset.pickle'), 'wb') as file:
     	pickle.dump(gait_training_dataset, file)
-
+    
 if __name__ == '__main__':
 
     #derivedMeasurements_statistics()
@@ -534,5 +610,8 @@ if __name__ == '__main__':
     #gait_training_data_generator('kneeAngles')
     #gait_training_data_generator('ankleAngles')
     #gait_training_data_generator('globalThighAngles')
-    gait_training_data_generator('globalThighVelocities')
-    gait_training_data_generator('atan2')
+    #gait_training_data_generator('globalThighVelocities')
+    #gait_training_data_generator('atan2')
+
+    #ankleMoment_statistics()
+    gait_training_data_generator('ankleMoment')

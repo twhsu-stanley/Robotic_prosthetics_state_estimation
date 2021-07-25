@@ -113,86 +113,39 @@ def load_Conti_measurement_data(subject, trial, side):
     global_thigh_angle_Y = Continuous_measurement_data[subject][trial][side]['global_thigh_angle_Y'][0, start_index:end_index]
     force_z_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_z'][0, start_index:end_index]
     force_x_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_x'][0, start_index:end_index]
-    moment_y_ankle = Continuous_measurement_data[subject][trial][side]['moment_ankle_y'][0, start_index:end_index]
+    #moment_y_ankle = Continuous_measurement_data[subject][trial][side]['moment_ankle_y'][0, start_index:end_index]
     #global_thigh_angVel_5hz = Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_5hz'][start_index:end_index]
     #global_thigh_angVel_2x5hz = Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_2x5hz'][start_index:end_index]
     global_thigh_angVel_2hz = Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_2hz'][start_index:end_index]
     atan2 = Continuous_measurement_data[subject][trial][side]['atan2_s'][start_index:end_index]
 
-    return global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle,\
+    ankleMoment = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointmoment'][side]['ankle'][0, start_index:end_index] / 1000 # N-mm to N-m
+
+    return global_thigh_angle_Y, force_z_ankle, force_x_ankle, ankleMoment,\
            global_thigh_angVel_2hz, atan2
 
 def plot_Conti_measurement_data(subject, trial, side):
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
-    global_thigh_angle_Y, force_z_ankle, force_x_ankle, moment_y_ankle, global_thigh_angVel_2hz, atan2\
+    global_thigh_angle_Y, force_z_ankle, force_x_ankle, ankleMoment, global_thigh_angVel_2hz, atan2\
                                          = load_Conti_measurement_data(subject, trial, side)
+    
     m_model = model_loader('Measurement_model_6.pickle') # load new model w/ linear phase_dot
     Psi = load_Psi('Generic')
 
-    # New Psi  
-    with open('New_Psi/Psi_globalThighAngles.pickle', 'rb') as file:
-        Psi_globalThighAngles = pickle.load(file)
-    
-    with open('New_Psi/Psi_globalThighVelocities.pickle', 'rb') as file:
-        Psi_globalThighVelocities = pickle.load(file)
-
-    with open('New_Psi/Psi_atan2.pickle', 'rb') as file:
-        Psi_atan2 = pickle.load(file)
 
     global_thigh_angle_Y_pred = model_prediction(m_model.models[0], Psi['global_thigh_angle'], phases, phase_dots, step_lengths, ramps)
-    global_thigh_angle_Y_pred_new = model_prediction(m_model.models[0], Psi_globalThighAngles, phases, phase_dots, step_lengths, ramps)
-
     force_z_ankle_pred = model_prediction(m_model.models[1], Psi['force_Z'], phases, phase_dots, step_lengths, ramps)
     force_x_ankle_pred = model_prediction(m_model.models[2], Psi['force_X'], phases, phase_dots, step_lengths, ramps)
-    moment_y_ankle_pred = model_prediction(m_model.models[3],Psi['moment_Y'], phases, phase_dots, step_lengths, ramps)
+    ankleMoment_pred = model_prediction(m_model.models[3], Psi['ankleMoment'], phases, phase_dots, step_lengths, ramps)
     
     global_thigh_angVel_2hz_pred = model_prediction(m_model.models[4], Psi['global_thigh_angle_vel'], phases, phase_dots, step_lengths, ramps)
-    global_thigh_angVel_2hz_pred_new = model_prediction(m_model.models[4], Psi_globalThighVelocities, phases, phase_dots, step_lengths, ramps)
     
     atan2_pred = model_prediction(m_model.models[5], Psi['atan2'], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
-    atan2_pred_new = model_prediction(m_model.models[5], Psi_atan2, phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
-
     atan2_pred = wrapTo2pi(atan2_pred)
-    atan2_pred_new = wrapTo2pi(atan2_pred_new)
  
     # compute rmse
     print("subject: ",  subject)
     print("trial: ",  trial)
-    """
-    err_gthY = global_thigh_angle_Y - global_thigh_angle_Y_pred
-    print("mean g_th_Y ", np.mean(err_gthY))
-    print("std g_th_Y ", np.std(err_gthY))
-    print("RMSE g_th_Y ", np.sqrt(np.square(err_gthY).mean()))
-    print('________________________________')
-    err_fz = force_z_ankle - force_z_ankle_pred
-    print("mean f_z ", np.mean(err_fz))
-    print("std f_z ", np.std(err_fz))
-    print("RMSE f_z ", np.sqrt(np.square(err_fz).mean()))
-    print('________________________________')
-    err_fx = force_x_ankle - force_x_ankle_pred
-    print("mean f_x ", np.mean(err_fx))
-    print("std f_x ", np.std(err_fx))
-    print("RMSE f_x ", np.sqrt(np.square(err_fx).mean()))
-    print('________________________________')
-    err_my = moment_y_ankle - moment_y_ankle_pred
-    print("mean m_y ", np.mean(err_my))
-    print("std m_y ", np.std(err_my))
-    print("RMSE m_y ", np.sqrt(np.square(err_my).mean()))
-    print('________________________________')
-    
-    
-    err_gtv_2hz = global_thigh_angVel_2hz - global_thigh_angVel_2hz_pred
-    print("mean gtv_2hz ", np.mean(err_gtv_2hz))
-    print("std gtv_2hz ", np.std(err_gtv_2hz))
-    print("RMSE gtv_2hz ", np.sqrt(np.square(err_gtv_2hz).mean()))
-    print('________________________________')
-    
-    err_atan2 = atan2 - atan2_pred
-    err_atan2 = np.arctan2(np.sin(err_atan2), np.cos(err_atan2)) # wrap to pi
-    print("mean atan2 ", np.mean(err_atan2))
-    print("std atan2 ", np.std(err_atan2))
-    print("RMSE atan2 ", np.sqrt(np.square(err_atan2).mean()))
-    """
 
     plt.figure('State')
     plt.subplot(411)
@@ -212,7 +165,6 @@ def plot_Conti_measurement_data(subject, trial, side):
     plt.subplot(211)
     plt.plot(atan2[0:1600])
     plt.plot(atan2_pred[0:1600], '--')
-    plt.plot(atan2_pred_new [0:1600], 'm-')
     plt.legend(['atan2', 'atan2_predicted'])
     plt.subplot(212)
     a1 = atan2[0:1600] - 2*np.pi*phases[0:1600]
@@ -223,10 +175,6 @@ def plot_Conti_measurement_data(subject, trial, side):
     for i in range(len(a2)):
         a2[i] = np.arctan2(np.sin(a2[i]), np.cos(a2[i])) 
     plt.plot(a2)
-    a3 = atan2_pred_new[0:1600] - 2*np.pi*phases[0:1600]
-    for i in range(len(a3)):
-        a3[i] = np.arctan2(np.sin(a3[i]), np.cos(a3[i])) 
-    plt.plot(a3, 'm--')
     plt.legend(['atan2-phase*2pi', 'least-squares fitting', 'new'])
     
     heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
@@ -236,7 +184,6 @@ def plot_Conti_measurement_data(subject, trial, side):
     plt.subplot(411)
     plt.plot(tt, global_thigh_angle_Y[0:total_step], 'k-')
     plt.plot(tt, global_thigh_angle_Y_pred[0:total_step],'b--')
-    plt.plot(tt, global_thigh_angle_Y_pred_new[0:total_step],'m--')
     plt.ylim([-25, 105])
     #plt.xlim([0, 13.6])
     plt.legend(('actual', 'least squares'))
@@ -253,8 +200,8 @@ def plot_Conti_measurement_data(subject, trial, side):
     plt.ylabel('$f_X~(N)$')
     #plt.xlim([0, 13.6])
     plt.subplot(414)
-    plt.plot(tt, moment_y_ankle[0:total_step], 'k-')
-    plt.plot(tt, moment_y_ankle_pred[0:total_step], 'b--')
+    plt.plot(tt, ankleMoment[0:total_step], 'k-')
+    plt.plot(tt, ankleMoment_pred[0:total_step], 'b--')
     plt.ylabel('$m_Y~(N \cdot m)$')
     #plt.xlim([0, 13.6])
     plt.xlabel('time (s)')
@@ -263,13 +210,11 @@ def plot_Conti_measurement_data(subject, trial, side):
     plt.subplot(211)
     plt.plot(tt, global_thigh_angVel_2hz[0:total_step],'k-')
     plt.plot(tt, global_thigh_angVel_2hz_pred[0:total_step], 'b--')
-    plt.plot(tt, global_thigh_angVel_2hz_pred_new[0:total_step], 'm-')
     plt.ylabel('$\dot{\\theta}_{Y_{2Hz}} ~(deg/s)$')
     #plt.xlim([0, 13.6])
     plt.subplot(212)
     plt.plot(tt, atan2[0:total_step],'k-')
     plt.plot(tt, atan2_pred[0:total_step], 'b--')
-    plt.plot(tt, atan2_pred_new[0:total_step],'m-')
     plt.ylabel('$atan2~(rad)$')
     plt.xlabel('time (s)')
     plt.ylim([0, 7.5])
@@ -516,7 +461,7 @@ def plot_Conti_kinetics_data(subject, trial, side):
     ptr = raw_walking_data['Gaitcycle'][subject]['subjectdetails'][1][3]
     subject_weight = raw_walking_data[ptr] # kg
     kneeForce = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointforce'][side]['knee'][:, :] * subject_weight
-    ankleMoment = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointmoment'][side]['ankle'][:, :] * subject_weight / 1000 # N-mm to N-m
+    ankleMoment = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointmoment'][side]['ankle'][:, :]* subject_weight / 1000 # N-mm to N-m
     
     _, force_z_ankle, _, moment_y_ankle, _, _ = load_Conti_measurement_data(subject, trial, side)
 
@@ -541,6 +486,36 @@ def plot_Conti_kinetics_data(subject, trial, side):
     plt.xlabel('samples')
     plt.ylabel('Ankle Moment (N-m)')
     plt.show()
+
+def offset_for_atan2(subject, trial, side):
+    phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
+    start_index, end_index = Conti_start_end(subject, trial, side)
+    
+    with open('Continuous_data/Continuous_measurement_data.pickle', 'rb') as file:
+        Continuous_measurement_data = pickle.load(file)
+
+    dt = 1/100
+    gt_Y = Continuous_measurement_data[subject][trial][side]['global_thigh_angle_Y'][0, start_index:end_index]
+    gt_bp = butter_bandpass_filter(gt_Y, 0.5, 2, 1/dt, order = 2)
+    v_bp = np.diff(gt_bp) / dt
+    gtv_bp = butter_lowpass_filter(np.insert(v_bp, 0, 0), 2, 1/dt, order = 1)
+    atan2 = np.arctan2(-gtv_bp/(2*np.pi*0.8), gt_bp) # scaled
+    for i in range(np.shape(atan2)[0]):
+        if atan2[i] < 0:
+            atan2[i] = atan2[i] + 2 * np.pi
+    
+    m_model = model_loader('Measurement_model_6.pickle') # load new model w/ linear phase_dot
+    Psi = load_Psi('Generic')
+    atan2_pred = model_prediction(m_model.models[5], Psi['atan2'], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
+    atan2_pred = wrapTo2pi(atan2_pred)
+
+    total_step =  np.shape(gt_Y)[0]#int(heel_strike_index[20, 0])+1 #
+    tt = 0.01 * np.arange(total_step)
+    plt.figure()
+    plt.plot(tt, phases)
+    plt.plot(tt, atan2/(2*np.pi))
+    plt.plot(tt, atan2_pred/(2*np.pi), '--')
+    plt.legend(('phase', 'atan2', 'atan2_pred'))
 
 if __name__ == '__main__':
     """
@@ -647,9 +622,11 @@ if __name__ == '__main__':
     ##################################################################
     
     subject = 'AB10'
-    trial = 's0x8i10'
+    trial = 's0x8d10'
     side = 'left'
-    plot_Conti_kinetics_data(subject, trial, side)
+
+    offset_for_atan2(subject, trial, side)
+    #plot_Conti_kinetics_data(subject, trial, side)
     #detect_knee_over_extention()
     #detect_nan_in_globalThighAngle()
     #detect_nan_in_joints()

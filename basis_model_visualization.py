@@ -9,14 +9,14 @@ from EKF import wrapTo2pi, load_Psi
 #"""
 # Dictionary of the sensors
 sensors_dict = {'global_thigh_angle': 0, 'force_z_ankle': 1, 'force_x_ankle': 2,
-                'moment_y_ankle': 3, 'global_thigh_angle_vel': 4, 'atan2': 5}
+                'ankleMoment': 3, 'global_thigh_angle_vel': 4, 'atan2': 5}
 
 # Determine which sensors to be used
-sensors = ['global_thigh_angle', 'global_thigh_angle_vel', 'atan2']
+sensors = ['global_thigh_angle', 'global_thigh_angle_vel', 'atan2', 'ankleMoment']
 
-sensor_id = 0
+sensor_id = 3
 
-m_model = model_loader('Measurement_model_3.pickle')
+m_model = model_loader('Measurement_model_4.pickle')
 Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 
 ## A. Visualize Measurement Model w.r.t. phase_dot ===========================================================================
