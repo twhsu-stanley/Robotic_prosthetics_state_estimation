@@ -158,7 +158,7 @@ try:
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-5, 0, 0])
+    sys.Q = np.diag([0, 1e-5, 1e-5, 0])
     # measurement noise covariance
     sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
     U = np.diag([2, 2, 2])
@@ -166,14 +166,14 @@ try:
 
     # initialize the state
     init = myStruct()
-    init.x = np.array([[0], [0.5], [1.1], [0]])
-    init.Sigma = np.diag([1, 1, 0, 0])
+    init.x = np.array([[0], [0.8], [1.1], [0]])
+    init.Sigma = np.diag([1, 1, 1, 0])
 
     ekf = extended_kalman_filter(sys, init)
     #==================================================================================================================
 
     ### Create filters ================================================================================================
-    fs = 100          # sampling rate = 100Hz (actual: dt ~ 0.0135 sec; 74Hz) 
+    fs = 74          # sampling rate = 100Hz (actual: dt ~ 0.0135 sec; 74Hz) 
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
     # configure low-pass filter (1-order)
     normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
@@ -197,7 +197,7 @@ try:
     t_0 = time.time()     # for EKF
     start_time = t_0      # for live plotting
     
-    fade_in_time = 1.5      # sec
+    fade_in_time = 2      # sec
 
     # ------------------------------------------ MAIN LOOP --------------------------------------------------------- 
     while True:
@@ -231,8 +231,7 @@ try:
             loadCell_Fz_buffer = [loadCell_Fz_buffer[0], loadCell_Fz_buffer[0], loadCell_Fz_buffer[1]]
         else:
             loadCell_Fz_buffer = [dataOSL['loadCelFz'], loadCell_Fz_buffer[0], loadCell_Fz_buffer[1]]
-
-        dataOSL['loadCelFz'] =  int(np.median(loadCell_Fz_buffer))
+        dataOSL['loadCelFz'] =  np.median(loadCell_Fz_buffer)
         #==========================================================================================================
 
         ## Calculate ankle moment using the buffer =================================================================
@@ -374,7 +373,7 @@ try:
         print('Elapsed time:', elapsed_time, ptr)
         #==========================================================================================================
         
-        ptr+=1
+        ptr += 1
 
 except KeyboardInterrupt:
     print('\n*** OSL shutting down ***\n')
