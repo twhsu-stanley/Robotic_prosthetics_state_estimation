@@ -15,7 +15,7 @@ import sender_test as sender   # for real-time plotting
 
 ### A. Load Ross's pre-recorded walking data / EKF Tests 
 #"""
-logFile = r"OSL_walking_data/210726_102901_OSL_parallelBar_test.csv"
+logFile = r"OSL_walking_data/210617_113644_PV_Siavash_walk_oscillations in phase.csv"
 # 1) 210617_113644_PV_Siavash_walk_oscillations in phase
 # 2) 210617_121732_PV_Siavash_walk_300_1600
 # 3) 210617_122334_PV_Siavash_walk_500_2500
@@ -196,7 +196,10 @@ try:
     walking = False
 
     MD_hist= deque([])
-    global_thigh_angle_hist = np.ones((int(fs*1.5), 1)) * dataOSL["ThighSagi"][0] * 180 / np.pi # ~ 2seconds window
+    global_thigh_angle_hist = np.ones((int(fs*2), 1)) * dataOSL["ThighSagi"][0] * 180 / np.pi # ~ 2seconds window
+
+    steady_state_threshold = 5 # MD
+    walking_threshold = 28     # global thigh angle range (deg)
     
     knee_angle_initial = dataOSL['KneeAngle'][0]
     ankle_angle_initial = dataOSL['AnkleAngle'][0]
@@ -217,6 +220,7 @@ try:
         
         "steady-state": np.zeros((len(dataOSL["Time"]), 1)),
         "walking": np.zeros((len(dataOSL["Time"]), 1)),
+        "global_thigh_angle_range": np.zeros((len(dataOSL["Time"]), 1)),
         "MD": np.zeros((len(dataOSL["Time"]), 1)),
         "MD_movingAverage": np.zeros((len(dataOSL["Time"]), 1)),
 
@@ -295,8 +299,9 @@ try:
         # set atan2 to zero when the subejct is not waking
         global_thigh_angle_hist = np.roll(global_thigh_angle_hist, -1)
         global_thigh_angle_hist[-1] = global_thigh_angle
-
-        if np.ptp(global_thigh_angle_hist) < 28:
+        #global_thigh_angle_range = np.ptp(global_thigh_angle_hist)
+        
+        if np.ptp(global_thigh_angle_hist) < walking_threshold:
             walking = False
             Atan2 = 0
         else:
@@ -318,7 +323,8 @@ try:
             MD_hist.append(ekf.MD)
             MD_hist.popleft()
         MD_movingAverage = np.mean(MD_hist)
-        if MD_movingAverage < 5:
+        
+        if MD_movingAverage < steady_state_threshold:
             t_s[indx] = t
             t_ns[indx] = t_ns_previous
         else:
@@ -399,6 +405,7 @@ try:
         
         simulation_log["steady-state"][indx] = steady_state
         simulation_log["walking"][indx] = walking
+        simulation_log["global_thigh_angle_range"][indx] = np.ptp(global_thigh_angle_hist)
         simulation_log["MD"][indx] = ekf.MD
         simulation_log["MD_movingAverage"][indx] = MD_movingAverage
 
@@ -488,12 +495,14 @@ finally:
     plt.ylabel("Global Thigh Angle (deg)")
     plt.xlim((t_lower, t_upper))
     plt.subplot(412)
-    plt.plot(dataOSL["Time"], simulation_log["ankleMoment"], 'k-')
-    plt.plot(dataOSL["Time"], simulation_log["ankleMoment_pred"], 'r-')
-    plt.legend(('actual', 'EKF predicted'))
-    plt.ylabel("ankleMoment (N-m)")
+    plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle_range"], 'k-')
+    plt.plot(dataOSL["Time"], walking_threshold * np.ones((len(dataOSL["Time"]), 1)), 'b--')
+    plt.ylabel("Global Thigh Angle Range (deg)")
+    #plt.plot(dataOSL["Time"], simulation_log["ankleMoment"], 'k-')
+    #plt.plot(dataOSL["Time"], simulation_log["ankleMoment_pred"], 'r-')
+    #plt.legend(('actual', 'EKF predicted'))
+    #plt.ylabel("ankleMoment (N-m)")
     plt.xlim((t_lower, t_upper))
-    plt.ylim((-2, 3))
     plt.subplot(413)
     plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle_vel"], 'k-')
     plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle_vel_pred"], 'r-')
@@ -541,8 +550,8 @@ finally:
     plt.figure("MD")
     plt.subplot(311)
     plt.plot(dataOSL["Time"], simulation_log["MD"], 'r-')
-    plt.plot(dataOSL["Time"], simulation_log["MD_movingAverage"], 'b-')
-    plt.plot(dataOSL["Time"], 5 * np.ones((len(dataOSL["Time"]), 1)), 'k--')
+    plt.plot(dataOSL["Time"], simulation_log["MD_movingAverage"], 'm-')
+    plt.plot(dataOSL["Time"], steady_state_threshold * np.ones((len(dataOSL["Time"]), 1)), 'b--')
     plt.legend(('MD', '150-point moving averagre of MD'))
     plt.ylabel("MD")
     plt.xlim((t_lower, t_upper))
