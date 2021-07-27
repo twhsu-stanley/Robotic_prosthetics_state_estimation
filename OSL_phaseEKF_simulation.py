@@ -13,18 +13,21 @@ from scipy.signal import butter, lfilter, lfilter_zi
 from incline_experiment_utils import butter_lowpass_filter
 import sender_test as sender   # for real-time plotting
 
-### A. Load Ross's pre-recorded walking data
-"""
-logFile = r"OSL_walking_data/210617_121732_PV_Siavash_walk_300_1600.csv"
+### A. Load Ross's pre-recorded walking data / EKF Tests 
+#"""
+logFile = r"OSL_walking_data/210726_102901_OSL_parallelBar_test.csv"
 # 1) 210617_113644_PV_Siavash_walk_oscillations in phase
 # 2) 210617_121732_PV_Siavash_walk_300_1600
 # 3) 210617_122334_PV_Siavash_walk_500_2500
 # 4) 210714_113523_OSL_benchtop_test
+
+# 5) 210726_102901_OSL_parallelBar_test
+# 6) 210726_104823_OSL_parallelBar_test
 datatxt = np.genfromtxt(logFile , delimiter=',', names = True)
 dataOSL = {
     "Time": datatxt["Time"],
     "ThighSagi": datatxt["ThighSagi"],
-    "PV": datatxt['PV'],
+    #"PV": datatxt['PV'],
     'AnkleAngle': datatxt["ankJoiPos"],
     'AnkleAngleRef': datatxt["refAnk"],
     'KneeAngle': datatxt["kneJoiPos"],
@@ -41,10 +44,10 @@ dataOSL = {
     'LoadCellMy':  datatxt['loadCelMy'],
     'LoadCellMz':  datatxt['loadCelMz']
 }
-"""
+#"""
 
 ### B. Load Kevin's bypass-adapter walking data
-#"""
+"""
 mat = scipy.io.loadmat('OSL_walking_data/Treadmill_speed1_incline0_file2.mat')
 # Treadmill_speed1_incline0_file2
 # Treadmill_speed1_incline0_file1
@@ -74,7 +77,7 @@ dataOSL = {
     'LoadCellMy': mat['LoadCell'][0, 0]['My'].reshape(-1),
     'LoadCellMz': mat['LoadCell'][0, 0]['Mz'].reshape(-1),
 }
-#"""
+"""
 
 ## From loco_OSL.py: Load referenced trajectories
 def loadTrajectory(trajectory = 'walking'):
@@ -142,10 +145,10 @@ try:
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-6, 0, 0])
+    sys.Q = np.diag([0, 1e-5, 0, 0])
     # measurement noise covariance
     sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
-    U = np.diag([2, 2, 1])
+    U = np.diag([2, 2, 2])
     sys.R = U @ sys.R @ U.T
 
     # initialize the state
@@ -156,7 +159,8 @@ try:
     ekf = extended_kalman_filter(sys, init)
 
     ########## Create filters ################################################################
-    fs = 1 / (dataOSL["Time"][1] - dataOSL["Time"][0])        # sampling rate = 100 Hz (actual: ~77 Hz)
+    dtt = np.diff(dataOSL["Time"])
+    fs = 1 / np.average(np.diff(dataOSL["Time"]))        # sampling rate = 100 Hz (actual: ~77 Hz)
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
     ## configure low-pass filter (1-order)
     normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
@@ -180,15 +184,6 @@ try:
     t_0 = dataOSL["Time"][ptr]   # for EKF
     start_time = t_0             # for live plotting
     fade_in_time = 2             # sec
-    
-    
-    """
-    stride_peroid = np.array([0, 0])
-    monotonicity = True
-    previous_phase = 0
-    heel_strike_time = []
-    previous_heelstrike_time = start_time
-    """
 
     t_s = np.zeros((len(dataOSL["Time"]), 1))  # for steady-state
     t_ns = np.zeros((len(dataOSL["Time"]), 1)) # for non steady-state
@@ -201,7 +196,7 @@ try:
     walking = False
 
     MD_hist= deque([])
-    global_thigh_angle_vel_hist = np.zeros((50,1))
+    global_thigh_angle_hist = np.ones((int(fs*1.5), 1)) * dataOSL["ThighSagi"][0] * 180 / np.pi # ~ 2seconds window
     
     knee_angle_initial = dataOSL['KneeAngle'][0]
     ankle_angle_initial = dataOSL['AnkleAngle'][0]
@@ -298,9 +293,10 @@ try:
             Atan2 = Atan2 + 2 * np.pi
         
         # set atan2 to zero when the subejct is not waking
-        global_thigh_angle_vel_hist = np.roll(global_thigh_angle_vel_hist, -1)
-        global_thigh_angle_vel_hist[-1] = global_thigh_angle_vel_lp
-        if np.all(abs(global_thigh_angle_vel_hist) < 20):
+        global_thigh_angle_hist = np.roll(global_thigh_angle_hist, -1)
+        global_thigh_angle_hist[-1] = global_thigh_angle
+
+        if np.ptp(global_thigh_angle_hist) < 28:
             walking = False
             Atan2 = 0
         else:
@@ -316,23 +312,6 @@ try:
         ekf.state_saturation(saturation_range)
 
         # Detect steady-state waling =========================================================================
-        # 1) Using EKF phase estimate to detec heel strikes
-        """
-        if ekf.x[0, 0] < 0.05 and previous_phase > 0.95:
-            if monotonicity:
-                heel_strike_time.append(t)
-                stride_peroid = np.array([t - previous_heelstrike_time, stride_peroid[0]]) #, stride_peroid[1]
-                steady_state = np.all(np.logical_and(stride_peroid > 0.5, stride_peroid < 4))
-                previous_heelstrike_time = t
-            monotonicity = True
-        elif ekf.x[0, 0] < previous_phase: # make sure phase increases monotonically
-            pass
-            #monotonicity = False
-            #steady_state = False
-        previous_phase = ekf.x[0, 0]
-        """
-        
-        # 2) Using MD to evaluate measurement error
         if len(MD_hist) < 150:
             MD_hist.append(ekf.MD)
         else:
@@ -358,11 +337,11 @@ try:
         t_ns_previous = t_ns[indx]
         
         if steady_state == True and steady_state_previous == False:
-            ekf.Q = np.diag([0, 1e-6, 1e-6, 1e-6])
-            ekf.Sigma = np.diag([1e-3, 1e-3, 1e-3, 1e-3])
+            ekf.Q = np.diag([0, 1e-5, 1e-5, 0])
+            ekf.Sigma = np.diag([1e-3, 1e-3, 1e-3, 0])
 
         elif steady_state == False and steady_state_previous == True:
-            ekf.Q = np.diag([0, 1e-6, 0, 0])
+            ekf.Q = np.diag([0, 1e-5, 0, 0])
             ekf.Sigma = np.diag([1e-3, 1e-3, 0, 0])
             ekf.x[2, 0] = 1.1
             ekf.x[3, 0] = 0
@@ -474,7 +453,7 @@ finally:
     plt.subplot(511)
     plt.title("EKF Gait State Estimate")
     plt.plot(dataOSL["Time"], simulation_log['phase_est'], 'r-')
-    plt.plot(dataOSL["Time"], dataOSL['PV'] / 998, 'k-')
+    #plt.plot(dataOSL["Time"], dataOSL['PV'] / 998, 'k-')
     plt.ylabel("Phase")
     plt.xlim((t_lower, t_upper))
     plt.legend(('EKF phase', 'phase variable'))

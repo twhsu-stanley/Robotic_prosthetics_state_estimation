@@ -99,7 +99,7 @@ try:
     ekf_log = {'phase': 0.0, 'phase_dot': 0.0, 'stride_length': 0.0, 'ramp': 0.0,
                'thigh_angle_pred': 0.0, 'thigh_angle_vel_pred': 0.0, 'atan2_pred': 0.0,
                'thigh_angle_vel': 0.0, 'atan2': 0.0}
-    logger = loco.ini_log({**dataOSL, **cmd_log, **ekf_log}, sensors = "all_sensors", trialName = "OSL_benchtop_test")
+    logger = loco.ini_log({**dataOSL, **cmd_log, **ekf_log}, sensors = "all_sensors", trialName = "OSL_parallelBar_test")
 
     ## Initialize buffers for joints angles =============================================================================
     knee_angle_buffer = []   # in rad
@@ -320,7 +320,7 @@ try:
             knee_angle_cmd = knee_angle_cmd * alpha + knee_angle_initial * (1 - alpha)
 
         # Saturate ankle command
-        if ankle_angle_cmd > ankle_max: 
+        if ankle_angle_cmd > ankle_max:
             ankle_angle_cmd = ankle_max
         elif ankle_angle_cmd < ankle_min:
             ankle_angle_cmd = ankle_min
@@ -370,7 +370,7 @@ try:
                          knee_angle, knee_angle_cmd, 'Knee Angle', 'deg',
                          ankle_angle, ankle_angle_cmd, 'Ankle Angle', 'deg'
                          )
-        print('Elapsed time:', elapsed_time, ptr)
+        print('Elapsed time: ', elapsed_time, " knee angle: ", knee_angle, " ankle angle: ", ankle_angle, ptr)
         #==========================================================================================================
         
         ptr += 1

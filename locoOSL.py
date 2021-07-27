@@ -750,7 +750,7 @@ def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
             # Read IMU to control sample time
             joiDict = state2Dict( fxs.read_device(actPackID) )
             IMUDict = IMUPa2Dict( IMU.getDataPackets(TIMEOUT) )      
-            print('Calculated motor torque: %3.3f'%joiDict['MotTor'])  
+            #print('Calculated motor torque: %3.3f'%joiDict['MotTor'])  
 
             if ( np.abs( joiDict['MotTor'] ) >= motTorThr ):
                 keepGoing = False
@@ -790,7 +790,7 @@ def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
             motPosArray = np.append( motPosArray, joiDict['MotTic'])
             joiPosArray = np.append( joiPosArray, joiDict['JoiPos'])           
             
-            print('Calculated motor torque: %3.3f'%joiDict['MotTor'])
+            #print('Calculated motor torque: %3.3f'%joiDict['MotTor'])
 
             if ( np.abs( joiDict['MotTor'] ) >= motTorThr ):
                 keepGoing = False
@@ -803,7 +803,7 @@ def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
                 joiPosArray = np.append( joiPosArray, joiDict['JoiPos'])   
             elif (i > 2000):
                 raise Exception(f'Stopping homing routine after {i} samples')
-            print('Delta of time in the cycle: %4.4f [ms]'%deltaTime) 
+            #print('Delta of time in the cycle: %4.4f [ms]'%deltaTime) 
             i += 1
             deltaTime = (time.perf_counter_ns() - iniTime)/1e6
         time.sleep(0.1)     # Healthy pause before finishing

@@ -4,7 +4,7 @@ from EKF import joints_control
 from model_framework import *
 import csv
 
-logFile = r"OSL_walking_data/210714_113523_OSL_benchtop_test.csv"
+logFile = r"OSL_walking_data/210726_102901_OSL_parallelBar_test.csv"
 datatxt = np.genfromtxt(logFile , delimiter=',', names = True)
 
 #Actual trajectory obtained from log files
