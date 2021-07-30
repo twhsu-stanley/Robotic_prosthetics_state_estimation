@@ -1,7 +1,5 @@
 import numpy as np
 from model_framework import *
-#from model_fit import *
-import time
 
 # Process model for the EKF
 def A(dt):
@@ -13,10 +11,6 @@ def process_model(x, dt):
 
 ## Load control model & coefficients (for OSL implementation)
 c_model = model_loader('Control_model.pickle')
-#with open('Psi/Psi_knee_G.pickle', 'rb') as file:#_withoutNan
-#    Psi_knee = pickle.load(file)
-#with open('Psi/Psi_ankle_G.pickle', 'rb') as file:
-#    Psi_ankle = pickle.load(file)
 with open('New_Psi/Psi_kneeAngles.pickle', 'rb') as file:
     Psi_knee = pickle.load(file)
 with open('New_Psi/Psi_ankleAngles.pickle', 'rb') as file:
@@ -29,10 +23,10 @@ def load_Psi(subject = 'Generic'):
         with open('New_Psi/Psi_globalThighAngles.pickle', 'rb') as file:
             Psi_globalThighAngles = pickle.load(file)
         
-        with open('Psi/Psi_force_Z_G.pickle', 'rb') as file:
+        with open('New_Psi/Psi_force_Z_G.pickle', 'rb') as file:
             Psi_force_Z = pickle.load(file)
         
-        with open('Psi/Psi_force_X_G.pickle', 'rb') as file:
+        with open('New_Psi/Psi_force_X_G.pickle', 'rb') as file:
             Psi_force_X = pickle.load(file)
         
         with open('New_Psi/Psi_ankleMoment.pickle', 'rb') as file:

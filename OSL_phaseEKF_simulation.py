@@ -198,7 +198,7 @@ try:
     MD_hist= deque([])
     global_thigh_angle_hist = np.ones((int(fs*2), 1)) * dataOSL["ThighSagi"][0] * 180 / np.pi # ~ 2seconds window
 
-    MD_threshold = 10 # MD
+    MD_threshold = 5 # MD
     global_thigh_angle_max_threshold = 20    # global thigh angle range (deg)
     global_thigh_angle_min_threshold = 5     # global thigh angle range (deg)
     
