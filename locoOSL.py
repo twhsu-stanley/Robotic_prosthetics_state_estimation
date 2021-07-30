@@ -923,7 +923,7 @@ def print_OSL(dataOSL, sensors = 'all_sensors', clearConsole = False, data2print
         else:
             print(k, ': ', "{: >15.4f}".format(dataOSL[k][0]), "[%s]"%dataOSL[k][1])       
 
-def ini_log(dataOSL, sensors = "all_sensors",relativePath = "", trialName = ""):
+def ini_log(dataOSL, sensors = "all_sensors", relativePath = "", trialName = ""):
     """
     Initialize log file
     """    

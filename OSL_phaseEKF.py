@@ -17,6 +17,7 @@ sys.path.append(r'/home/pi/prosthetic_phase_estimation/')
 from EKF import *
 from model_framework import *
 from scipy.signal import butter, lfilter, lfilter_zi
+from collections import deque
 import sender_test as sender   # for real-time plotting
 
 # -----------------TODO: change these constants to match your setup ------------------------------------------------
@@ -98,7 +99,8 @@ try:
     cmd_log = {'refAnk': 0.0, 'refKnee': 0.0}
     ekf_log = {'phase': 0.0, 'phase_dot': 0.0, 'stride_length': 0.0, 'ramp': 0.0,
                'thigh_angle_pred': 0.0, 'thigh_angle_vel_pred': 0.0, 'atan2_pred': 0.0,
-               'thigh_angle_vel': 0.0, 'atan2': 0.0}
+               'thigh_angle_vel': 0.0, 'atan2': 0.0,
+               'walking': 0, 'MD_movingAverage': 0.0, 'steady_state': 0}
     logger = loco.ini_log({**dataOSL, **cmd_log, **ekf_log}, sensors = "all_sensors", trialName = "OSL_parallelBar_test")
 
     ## Initialize buffers for joints angles =============================================================================
@@ -117,7 +119,7 @@ try:
     print("Initial loadCell Fz (N): %.2f, %.2f, %.2f " % (loadCell_Fz_buffer[0], loadCell_Fz_buffer[1], loadCell_Fz_buffer[2]))
     print("Initial ankle torque (N-m): %.2f, %.2f, %.2f " % (ankle_moment_buffer[0], ankle_moment_buffer[1], ankle_moment_buffer[2]))
 
-    knee_angle_initial = np.median(knee_angle_buffer) * 180/np.pi # deg
+    knee_angle_initial = np.median(knee_angle_buffer) * 180/np.pi   # deg
     ankle_angle_initial = np.median(ankle_angle_buffer) * 180/np.pi
     dataOSL['loadCelFz'] = np.median(loadCell_Fz_buffer)
     dataOSL['ankJoiTor'] = np.median(ankle_moment_buffer)
@@ -182,7 +184,7 @@ try:
     z_lp_2 = lfilter_zi(b_lp,  a_lp)
     
     # configure band-pass filter (2-order)
-    normal_lowcut = 0.5 / nyq    #lower cut-off frequency = 0.5Hz
+    normal_lowcut = 0.2 / nyq    #lower cut-off frequency = 0.5Hz
     normal_highcut = 2 / nyq     #upper cut-off frequency = 2Hz
     b_bp, a_bp = butter(2, [normal_lowcut, normal_highcut], btype = 'band', analog = False)
     z_bp = lfilter_zi(b_bp,  a_bp)
@@ -198,10 +200,27 @@ try:
     start_time = t_0      # for live plotting
     
     fade_in_time = 2      # sec
+    
+    ### Walking Status Detector =====================================================================================
+    t_s = start_time
+    t_ns = start_time
+    t_s_previous = start_time
+    t_ns_previous = start_time
+    steady_state = False
+    steady_state_previous = False
+    walking = False
 
-    # ------------------------------------------ MAIN LOOP --------------------------------------------------------- 
+    MD_hist= deque([])
+    global_thigh_angle_hist = np.ones((int(fs*2), 1)) * dataOSL["ThighSagi"] * 180 / np.pi # ~ 2seconds window
+
+    #MD_threshold = 5 # MD
+    global_thigh_angle_max_threshold = 10    # global thigh angle range (deg)
+    global_thigh_angle_min_threshold = 5    # global thigh angle range (deg)
+
+    # ================================================= MAIN LOOP ====================================================
+    
     while True:
-        ## Read OSL ===============================================================================================
+        ## Read OSL ==================================================================================================
         kneSta  = fxs.read_device(kneID)
         ankSta  = fxs.read_device(ankID)
         IMUPac  = IMU.getDataPackets(TIMEOUT)  
@@ -249,6 +268,15 @@ try:
         # 1) Global thigh angle (deg)
         global_thigh_angle = dataOSL['ThighSagi'] * 180 / np.pi
 
+        # Walking detector
+        global_thigh_angle_hist = np.roll(global_thigh_angle_hist, -1)
+        global_thigh_angle_hist[-1] = global_thigh_angle
+        if (min(global_thigh_angle_hist) < global_thigh_angle_min_threshold
+            and max(global_thigh_angle_hist) > global_thigh_angle_max_threshold):
+            walking = True
+        else:
+            walking = False
+
         # 2) Global thigh angle velocity (deg/s)
         if ptr == 0:
             global_thigh_angle_vel_lp = 0 
@@ -277,6 +305,9 @@ try:
         Atan2 = np.arctan2(-global_thigh_angle_vel_blp / (2*np.pi*0.8), global_thigh_angle_bp)
         if Atan2 < 0:
             Atan2 = Atan2 + 2 * np.pi
+        
+        if walking == False:
+            Atan2 = 0
 
         measurement = np.array([[global_thigh_angle], [global_thigh_angle_vel_lp], [Atan2]])
         measurement = np.squeeze(measurement)
@@ -290,7 +321,43 @@ try:
         #==========================================================================================================
         
         ## Steady-State Walking Detection =========================================================================
+        if len(MD_hist) < int(fs * 2.5):
+            MD_hist.append(ekf.MD)
+        else:
+            MD_hist.append(ekf.MD)
+            MD_hist.popleft()
+        MD_movingAverage = np.mean(MD_hist)
+        
+        """
+        if MD_movingAverage < MD_threshold:
+            t_s = t
+            t_ns = t_ns_previous
+        else:
+            t_ns = t
+            t_s = t_s_previous
+        
+        if t_s - t_ns > 3:
+            steady_state = True
+        elif t_s - t_ns < -1:
+            steady_state = False
+        
+        steady_state = steady_state and walking
+        
+        t_s_previous = t_s
+        t_ns_previous = t_ns
+        
+        if steady_state == True and steady_state_previous == False:
+            ekf.Q = np.diag([0, 1e-3, 1e-3, 0]) * dt 
+            ekf.Sigma = np.diag([1e-3, 1e-3, 1e-3, 0])
 
+        elif steady_state == False and steady_state_previous == True:
+            ekf.Q = np.diag([0, 1e-3, 0, 0]) * dt 
+            ekf.Sigma = np.diag([1e-3, 1e-3, 0, 0])
+            ekf.x[2, 0] = 1.1
+            ekf.x[3, 0] = 0
+        
+        steady_state_previous = steady_state
+        """
         #==========================================================================================================
 
         ## Generate joint control commands ========================================================================
@@ -352,6 +419,9 @@ try:
         ekf_log['atan2_pred'] = ekf.z_hat[2][0]
         ekf_log['thigh_angle_vel'] = global_thigh_angle_vel_lp
         ekf_log['atan2'] = Atan2
+        ekf_log['walking'] = int(walking)
+        ekf_log['steady_state'] = int(steady_state)
+        ekf_log['MD_movingAverage'] = MD_movingAverage
         loco.log_OSL({**dataOSL,**cmd_log, **ekf_log}, logger)
         #==========================================================================================================
 
@@ -370,7 +440,7 @@ try:
                          knee_angle, knee_angle_cmd, 'Knee Angle', 'deg',
                          ankle_angle, ankle_angle_cmd, 'Ankle Angle', 'deg'
                          )
-        print('Elapsed time: ', elapsed_time, " knee angle: ", knee_angle, " ankle angle: ", ankle_angle, ptr)
+        print("knee angle cmd: ", knee_angle_cmd, "; ankle angle cmd: ", ankle_angle_cmd, "; walking (T/F): ", walking)
         #==========================================================================================================
         
         ptr += 1

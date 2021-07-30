@@ -4,7 +4,7 @@ from EKF import joints_control
 from model_framework import *
 import csv
 
-logFile = r"OSL_walking_data/210726_102901_OSL_parallelBar_test.csv"
+logFile = r"OSL_walking_data/210730_140347_OSL_parallelBar_test.csv"
 datatxt = np.genfromtxt(logFile , delimiter=',', names = True)
 
 #Actual trajectory obtained from log files
@@ -34,7 +34,11 @@ ekfEstimates = {
     "atan2_pred": datatxt["atan2_pred"],
     
     "thigh_angle_vel": datatxt["thigh_angle_vel"],
-    "atan2": datatxt["atan2"]
+    "atan2": datatxt["atan2"],
+
+    "walking": datatxt["walking"],
+    "MD_movingAverage": datatxt["MD_movingAverage"],
+    "steady_state": datatxt["steady_state"]
 }
 
 ## Generating joints angles using the kinematics model
@@ -121,5 +125,21 @@ axs[2].legend(["Actual", "EKF Predicted"])
 
 fig.set_size_inches(22, 13)
 plt.savefig(logFile + 'EKF_measurements.png', dpi=100)
+
+## Figure 4
+fig, axs = plt.subplots(3, 1)
+axs[0].set_title("Walking Status")
+axs[0].set_ylabel('Walking (T/F)')
+axs[0].plot(xindex, ekfEstimates["walking"][ranA:ranB], 'r-')
+
+axs[1].set_ylabel('Moving Average of MD')
+axs[1].plot(xindex, ekfEstimates["MD_movingAverage"][ranA:ranB], 'r-')
+
+axs[2].set_xlabel('Time(s)')
+axs[2].set_ylabel('Steady-state (T/F)')
+axs[2].plot(xindex, ekfEstimates["steady_state"][ranA:ranB], 'r-')
+
+fig.set_size_inches(22, 13)
+plt.savefig(logFile + 'EKF_walkingStatus.png', dpi=100)
 
 plt.show()

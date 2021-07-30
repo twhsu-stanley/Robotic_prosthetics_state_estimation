@@ -6,6 +6,12 @@ import time
 import pickle
 from continuous_data import *
 
+a = False
+b = True
+print(a)
+print(int(a))
+print(int(b))
+
 a = np.array([[1,2,3], [3,4,5], [6,7,8], [4,5,5]])
 print(np.delete(a, [1,2], 0))
 

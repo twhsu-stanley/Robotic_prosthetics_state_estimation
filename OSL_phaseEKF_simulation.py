@@ -4,7 +4,7 @@ Code to simulate the phase-EKF and control commands using pre-revorded walking d
 import sys, time
 import matplotlib.pyplot as plt
 import numpy as np
-from collections import deque 
+from collections import deque
 import csv
 
 from EKF import *
@@ -15,7 +15,7 @@ import sender_test as sender   # for real-time plotting
 
 ### A. Load Ross's pre-recorded walking data / EKF Tests 
 #"""
-logFile = r"OSL_walking_data/210726_102901_OSL_parallelBar_test.csv"
+logFile = r"OSL_walking_data/210730_140347_OSL_parallelBar_test.csv"
 # 1) 210617_113644_PV_Siavash_walk_oscillations in phase
 # 2) 210617_121732_PV_Siavash_walk_300_1600
 # 3) 210617_122334_PV_Siavash_walk_500_2500
@@ -145,7 +145,7 @@ try:
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-5, 0, 0])
+    sys.Q = np.diag([0, 1e-5, 1e-5, 0])
     # measurement noise covariance
     sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
     U = np.diag([2, 2, 2])
@@ -154,7 +154,7 @@ try:
     # initialize the state
     init = myStruct()
     init.x = np.array([[0], [0.4], [1.1], [0]])
-    init.Sigma = np.diag([1e-3, 1e-3, 0, 0])
+    init.Sigma = np.diag([1, 1, 1, 0])
 
     ekf = extended_kalman_filter(sys, init)
 
@@ -169,7 +169,7 @@ try:
     z_lp_2 = lfilter_zi(b_lp,  a_lp)
     
     ## configure band-pass filter (2-order)
-    normal_lowcut = 0.5 / nyq    #lower cut-off frequency = 0.5Hz 
+    normal_lowcut = 0.2 / nyq    #lower cut-off frequency = 0.5Hz 
     normal_highcut = 2 / nyq     #upper cut-off frequency = 2Hz
     b_bp, a_bp = butter(2, [normal_lowcut, normal_highcut], btype = 'band', analog = False)
     z_bp = lfilter_zi(b_bp,  a_bp)
@@ -199,8 +199,8 @@ try:
     global_thigh_angle_hist = np.ones((int(fs*2), 1)) * dataOSL["ThighSagi"][0] * 180 / np.pi # ~ 2seconds window
 
     MD_threshold = 5 # MD
-    global_thigh_angle_max_threshold = 20    # global thigh angle range (deg)
-    global_thigh_angle_min_threshold = 5     # global thigh angle range (deg)
+    global_thigh_angle_max_threshold = 5    # global thigh angle range (deg)
+    global_thigh_angle_min_threshold = 0     # global thigh angle range (deg)
     
     knee_angle_initial = dataOSL['KneeAngle'][0]
     ankle_angle_initial = dataOSL['AnkleAngle'][0]
@@ -318,6 +318,7 @@ try:
         ekf.state_saturation(saturation_range)
 
         # Detect steady-state waling =========================================================================
+        
         if len(MD_hist) < int(fs * 2.5):
             MD_hist.append(ekf.MD)
         else:
@@ -345,16 +346,16 @@ try:
         
         if steady_state == True and steady_state_previous == False:
             ekf.Q = np.diag([0, 1e-5, 1e-5, 0])
-            ekf.Sigma = np.diag([1e-3, 1e-3, 1e-3, 0])
+            ekf.Sigma = np.diag([1, 1, 1, 0])
 
         elif steady_state == False and steady_state_previous == True:
-            ekf.Q = np.diag([0, 1e-5, 0, 0])
-            ekf.Sigma = np.diag([1e-3, 1e-3, 0, 0])
+            ekf.Q = np.diag([0, 1e-5, 0, 0]) 
+            ekf.Sigma = np.diag([1, 1, 0, 0])
             ekf.x[2, 0] = 1.1
             ekf.x[3, 0] = 0
         
         steady_state_previous = steady_state
-
+        
         #=====================================================================================================
 
         ### Control commands: joints angles

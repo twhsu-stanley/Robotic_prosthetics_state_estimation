@@ -19,7 +19,6 @@ with open('New_Psi/Psi_ankleAngles.pickle', 'rb') as file:
 ## Load model coefficients
 def load_Psi(subject = 'Generic'):
     if subject == 'Generic':
-        #with open('Psi/Psi_thigh_Y_G.pickle', 'rb') as file:
         with open('New_Psi/Psi_globalThighAngles.pickle', 'rb') as file:
             Psi_globalThighAngles = pickle.load(file)
         
@@ -32,14 +31,11 @@ def load_Psi(subject = 'Generic'):
         with open('New_Psi/Psi_ankleMoment.pickle', 'rb') as file:
             Psi_ankleMoment = pickle.load(file)
         
-        #with open('Psi/Psi_thighVel_2hz_G.pickle', 'rb') as file:
-        with open('New_Psi/Psi_globalThighVelocities.pickle', 'rb') as file:
+        with open('New_Psi/Psi_globalThighVelocities_withoutPhaseDot.pickle', 'rb') as file:
             Psi_globalThighVelocities = pickle.load(file)
 
-        #with open('Psi/Psi_atan2_G.pickle', 'rb') as file:
         with open('New_Psi/Psi_atan2.pickle', 'rb') as file:
             Psi_atan2 = pickle.load(file)
-
     
     else:
         print("Subject-specific model is not available at this time.")
