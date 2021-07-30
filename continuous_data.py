@@ -504,9 +504,9 @@ def offset_for_atan2(subject, trial, side):
         if atan2[i] < 0:
             atan2[i] = atan2[i] + 2 * np.pi
     
-    m_model = model_loader('Measurement_model_6.pickle') # load new model w/ linear phase_dot
+    m_model = model_loader('Measurement_model_3.pickle') # load new model w/ linear phase_dot
     Psi = load_Psi('Generic')
-    atan2_pred = model_prediction(m_model.models[5], Psi['atan2'], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
+    atan2_pred = model_prediction(m_model.models[2], Psi['atan2'], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
     atan2_pred = wrapTo2pi(atan2_pred)
 
     total_step =  np.shape(gt_Y)[0]#int(heel_strike_index[20, 0])+1 #
@@ -516,6 +516,7 @@ def offset_for_atan2(subject, trial, side):
     plt.plot(tt, atan2/(2*np.pi))
     plt.plot(tt, atan2_pred/(2*np.pi), '--')
     plt.legend(('phase', 'atan2', 'atan2_pred'))
+    plt.show()
 
 if __name__ == '__main__':
     """
@@ -625,7 +626,7 @@ if __name__ == '__main__':
     trial = 's0x8d10'
     side = 'left'
 
-    offset_for_atan2(subject, trial, side)
+    #offset_for_atan2(subject, trial, side)
     #plot_Conti_kinetics_data(subject, trial, side)
     #detect_knee_over_extention()
     #detect_nan_in_globalThighAngle()
@@ -645,7 +646,7 @@ if __name__ == '__main__':
     #plot_Conti_joints_angles(subject, trial, side)
     #Conti_global_thigh_angle_Y(subject, trial, side)
     #plt.show()
-    #plot_Conti_measurement_data(subject, trial, side)
+    plot_Conti_measurement_data(subject, trial, side)
     #print(Conti_maxmin('AB01', plot = False))
 
     ######## test real0time filters #############

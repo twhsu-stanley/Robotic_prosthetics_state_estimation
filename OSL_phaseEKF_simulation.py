@@ -196,11 +196,11 @@ try:
     walking = False
 
     MD_hist= deque([])
-    global_thigh_angle_hist = np.ones((int(fs*2.5), 1)) * dataOSL["ThighSagi"][0] * 180 / np.pi # ~ 2seconds window
+    global_thigh_angle_hist = np.ones((int(fs*2), 1)) * dataOSL["ThighSagi"][0] * 180 / np.pi # ~ 2seconds window
 
-    MD_threshold = 5 # MD
-    global_thigh_angle_max_threshold = 25        # global thigh angle range (deg)
-    global_thigh_angle_min_threshold = 5         # global thigh angle range (deg)
+    MD_threshold = 10 # MD
+    global_thigh_angle_max_threshold = 20    # global thigh angle range (deg)
+    global_thigh_angle_min_threshold = 5     # global thigh angle range (deg)
     
     knee_angle_initial = dataOSL['KneeAngle'][0]
     ankle_angle_initial = dataOSL['AnkleAngle'][0]
@@ -242,7 +242,6 @@ try:
         "knee_angle_model": np.zeros((len(dataOSL["Time"]), 1)),
         "knee_angle_cmd": np.zeros((len(dataOSL["Time"]), 1))
     }
-
 
     while True:
         ### Read OSL measurement data
@@ -305,7 +304,6 @@ try:
         if (min(global_thigh_angle_hist) < global_thigh_angle_min_threshold
             and max(global_thigh_angle_hist) > global_thigh_angle_max_threshold):
             walking = True
-            
         else:
             walking = False
             Atan2 = 0 
@@ -320,7 +318,7 @@ try:
         ekf.state_saturation(saturation_range)
 
         # Detect steady-state waling =========================================================================
-        if len(MD_hist) < int(fs*2.5):
+        if len(MD_hist) < int(fs * 2.5):
             MD_hist.append(ekf.MD)
         else:
             MD_hist.append(ekf.MD)

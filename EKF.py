@@ -46,7 +46,10 @@ def load_Psi(subject = 'Generic'):
         with open('New_Psi/Psi_atan2.pickle', 'rb') as file:
             Psi_atan2 = pickle.load(file)
 
+    
     else:
+        print("Subject-specific model is not available at this time.")
+        """
         with open('Psi/Psi_thigh_Y.pickle', 'rb') as file:
             p = pickle.load(file)
             Psi_globalThighAngles = p[subject]
@@ -65,6 +68,7 @@ def load_Psi(subject = 'Generic'):
         with open('Psi/Psi_atan2.pickle', 'rb') as file:
             p = pickle.load(file)
             Psi_atan2 = p[subject]
+        """
            
     Psi = {'global_thigh_angle': Psi_globalThighAngles, 'force_Z': Psi_force_Z, 'force_X': Psi_force_X, 'ankleMoment': Psi_ankleMoment,
            'global_thigh_angle_vel': Psi_globalThighVelocities, 'atan2': Psi_atan2}

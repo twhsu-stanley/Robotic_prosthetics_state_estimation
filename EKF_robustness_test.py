@@ -15,7 +15,7 @@ sensors_dict = {'global_thigh_angle': 0, 'force_z_ankle': 1, 'force_x_ankle': 2,
                 'ankleMoment': 3, 'global_thigh_angle_vel': 4, 'atan2': 5}
 
 # Determine which sensors to be used
-sensors = ['global_thigh_angle', 'ankleMoment', 'global_thigh_angle_vel']
+sensors = ['global_thigh_angle', 'global_thigh_angle_vel', 'atan2']
 sensor_id = [sensors_dict[key] for key in sensors]
 
 arctan2 = False
@@ -98,13 +98,13 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     sys.Q = np.diag([0, 1e-5, 1e-5, 1e-2])
     # measurement noise covariance
     sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
-    U = np.diag([1.5, 0.5, 1.5])
+    U = np.diag([2, 2, 2])
     sys.R = U @ sys.R @ U.T
 
     # initialize the state
     init = myStruct()
     init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [0]])
-    init.Sigma = np.diag([1e-3, 1e-3, 1e-3, 1e-3])
+    init.Sigma = np.diag([1, 1, 1, 1])
 
     ekf = extended_kalman_filter(sys, init)
     
@@ -595,10 +595,10 @@ def ekf_robustness(kidnap = True):
 
 if __name__ == '__main__':
     subject = 'AB08'
-    trial = 's0x8i10'
+    trial = 's1i0'
     side = 'left'
 
-    ekf_test(subject, trial, side, kidnap = False, plot = True)
+    ekf_test(subject, trial, side, kidnap = [0, 1, 2, 3], plot = True)
     #ekf_bank_test(subject, trial, side, N = 20, kidnap = [0, 1, 2, 3], plot = True)
     #ekf_robustness(kidnap = True)
     #print(np.diag(R[subject]))
