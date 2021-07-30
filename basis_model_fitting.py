@@ -55,6 +55,9 @@ if __name__ == '__main__':
     model_globalThighAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_globalThighAngles = basis_model_fitting(model_globalThighAngles, 'globalThighAngles')
 
+    model_ankleMoment = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    #psi_ankleMoment = basis_model_fitting(model_ankleMoment, 'ankleMoment')
+
     phase_dot_model = Polynomial_Basis(2, 'phase_dot')
     model_globalThighVelocities = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_globalThighAngles = basis_model_fitting(model_globalThighVelocities, 'globalThighVelocities')
@@ -65,9 +68,6 @@ if __name__ == '__main__':
     #model_ankleAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_ankleAngles = basis_model_fitting(model_ankleAngles, 'ankleAngles')
 
-    #model_ankleMoment = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
-    #psi_ankleMoment = basis_model_fitting(model_ankleMoment, 'ankleMoment')
-
     # Atan2 fitting
     phase_model = Fourier_Basis(F, 'phase')
     phase_dot_model = Polynomial_Basis(1, 'phase_dot')
@@ -77,6 +77,6 @@ if __name__ == '__main__':
     model_atan2 = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_atan2 = basis_model_fitting(model_atan2, 'atan2')
 
-    m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities, model_atan2)
-    model_saver(m_model, 'Measurement_model_3.pickle')
+    m_model = Measurement_Model(model_globalThighAngles, model_ankleMoment, model_globalThighVelocities, model_atan2)
+    model_saver(m_model, 'Measurement_model_4.pickle')
     

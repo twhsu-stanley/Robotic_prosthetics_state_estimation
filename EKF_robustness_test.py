@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 #import time
 from EKF import *
 from model_framework import *
-from data_generators import *
 from continuous_data import *
 import csv
 
