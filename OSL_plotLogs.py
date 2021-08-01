@@ -29,7 +29,8 @@ ekfEstimates = {
     "ramp": datatxt["ramp"],
     
     # NOTICE: "_bf" here is for correcting the error in the csv file
-    "thigh_angle_pred": datatxt["thigh_angle_pred"], 
+    "thigh_angle_pred": datatxt["thigh_angle_pred"],
+    "thigh_angle_bandpass": datatxt["thigh_angle_bandpass"], 
     "thigh_angle_vel_pred": datatxt["thigh_angle_vel_pred"],
     "atan2_pred": datatxt["atan2_pred"],
     
@@ -110,7 +111,8 @@ axs[0].set_title("Measurements")
 axs[0].set_ylabel('Global Thigh Angle (deg)')
 axs[0].plot(xindex, actualTrajectory["ThighSagi"][ranA:ranB] * 180 / np.pi, 'k-')
 axs[0].plot(xindex, ekfEstimates["thigh_angle_pred"][ranA:ranB], 'r-')
-axs[0].legend(["Actual", "EKF Predicted"])
+axs[0].plot(xindex, ekfEstimates["thigh_angle_bandpass"][ranA:ranB], 'm-')
+axs[0].legend(["Actual", "EKF Predicted", "band-pass filtered"])
 
 axs[1].set_ylabel('Global Thigh Angle Vel (deg/s)')
 axs[1].plot(xindex, ekfEstimates["thigh_angle_vel"][ranA:ranB], 'k-')

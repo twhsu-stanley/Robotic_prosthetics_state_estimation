@@ -22,7 +22,7 @@ logFile = r"OSL_walking_data/210730_140347_OSL_parallelBar_test.csv"
 # 4) 210714_113523_OSL_benchtop_test
 
 # 5) 210726_102901_OSL_parallelBar_test
-# 6) 210726_104823_OSL_parallelBar_test
+# 6) 210730_140347_OSL_parallelBar_test
 datatxt = np.genfromtxt(logFile , delimiter=',', names = True)
 dataOSL = {
     "Time": datatxt["Time"],
@@ -196,11 +196,11 @@ try:
     walking = False
 
     MD_hist= deque([])
-    global_thigh_angle_hist = np.ones((int(fs*2), 1)) * dataOSL["ThighSagi"][0] * 180 / np.pi # ~ 2seconds window
+    global_thigh_angle_hist = np.ones((int(fs*2.5), 1)) * dataOSL["ThighSagi"][0] * 180 / np.pi # ~ 2seconds window
 
     MD_threshold = 5 # MD
-    global_thigh_angle_max_threshold = 5    # global thigh angle range (deg)
-    global_thigh_angle_min_threshold = 0     # global thigh angle range (deg)
+    global_thigh_angle_max_threshold = 15    # global thigh angle range (deg)
+    global_thigh_angle_min_threshold = 5     # global thigh angle range (deg)
     
     knee_angle_initial = dataOSL['KneeAngle'][0]
     ankle_angle_initial = dataOSL['AnkleAngle'][0]
@@ -229,6 +229,7 @@ try:
         # EKF prediction of measurements/ derived measurements
         "global_thigh_angle_pred": np.zeros((len(dataOSL["Time"]), 1)),
         "global_thigh_angle": np.zeros((len(dataOSL["Time"]), 1)),
+        "global_thigh_angle_bp": np.zeros((len(dataOSL["Time"]), 1)),
         "ankleMoment_pred": np.zeros((len(dataOSL["Time"]), 1)),
         "ankleMoment": np.zeros((len(dataOSL["Time"]), 1)),
         "global_thigh_angle_vel_pred": np.zeros((len(dataOSL["Time"]), 1)),
@@ -306,7 +307,7 @@ try:
             walking = True
         else:
             walking = False
-            Atan2 = 0 
+            Atan2 = 0
 
         measurement = np.array([[global_thigh_angle], [global_thigh_angle_vel_lp], [Atan2]])#, [ankleMoment]])
         measurement = np.squeeze(measurement)
@@ -414,6 +415,7 @@ try:
 
         simulation_log["global_thigh_angle_pred"][indx] = ekf.z_hat[0,0]
         simulation_log["global_thigh_angle"][indx] = global_thigh_angle
+        simulation_log["global_thigh_angle_bp"][indx] = global_thigh_angle_bp
         #simulation_log["ankleMoment_pred"][indx] = ekf.z_hat[1,0]
         simulation_log["ankleMoment"][indx] = ankleMoment
         simulation_log["global_thigh_angle_vel_pred"][indx] = ekf.z_hat[1,0]
@@ -492,6 +494,7 @@ finally:
     plt.title("Measurements")
     plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle"], 'k-')
     plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle_pred"], 'r-')
+    plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle_bp"], 'm--')
     plt.legend(('actual', 'EKF predicted'))
     plt.ylabel("Global Thigh Angle (deg)")
     plt.xlim((t_lower, t_upper))

@@ -31,7 +31,7 @@ def load_Psi(subject = 'Generic'):
         with open('New_Psi/Psi_ankleMoment.pickle', 'rb') as file:
             Psi_ankleMoment = pickle.load(file)
         
-        with open('New_Psi/Psi_globalThighVelocities_withoutPhaseDot.pickle', 'rb') as file:
+        with open('New_Psi/Psi_globalThighVelocities.pickle', 'rb') as file:
             Psi_globalThighVelocities = pickle.load(file)
 
         with open('New_Psi/Psi_atan2.pickle', 'rb') as file:

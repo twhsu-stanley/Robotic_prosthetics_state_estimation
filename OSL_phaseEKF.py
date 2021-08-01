@@ -99,8 +99,9 @@ try:
     cmd_log = {'refAnk': 0.0, 'refKnee': 0.0}
     ekf_log = {'phase': 0.0, 'phase_dot': 0.0, 'stride_length': 0.0, 'ramp': 0.0,
                'thigh_angle_pred': 0.0, 'thigh_angle_vel_pred': 0.0, 'atan2_pred': 0.0,
+               'thigh_angle_bandpass': 0.0,
                'thigh_angle_vel': 0.0, 'atan2': 0.0,
-               'walking': 0, 'MD_movingAverage': 0.0, 'steady_state': 0}
+               'walking': 0, 'MD': 0.0, 'steady_state': 0}
     logger = loco.ini_log({**dataOSL, **cmd_log, **ekf_log}, sensors = "all_sensors", trialName = "OSL_parallelBar_test")
 
     ## Initialize buffers for joints angles =============================================================================
@@ -175,7 +176,7 @@ try:
     #==================================================================================================================
 
     ### Create filters ================================================================================================
-    fs = 74          # sampling rate = 100Hz (actual: dt ~ 0.0135 sec; 74Hz) 
+    fs = 67          # sampling rate = 100Hz (actual: dt ~ 0.0135 sec; 74Hz) 
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
     # configure low-pass filter (1-order)
     normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
@@ -211,7 +212,7 @@ try:
     walking = False
 
     MD_hist= deque([])
-    global_thigh_angle_hist = np.ones((int(fs*2), 1)) * dataOSL["ThighSagi"] * 180 / np.pi # ~ 2seconds window
+    global_thigh_angle_hist = np.ones((int(fs*2.5), 1)) * dataOSL["ThighSagi"] * 180 / np.pi # ~ 2seconds window
 
     #MD_threshold = 5 # MD
     global_thigh_angle_max_threshold = 10    # global thigh angle range (deg)
@@ -290,7 +291,7 @@ try:
 
         # 3) Atan2
         # band-pass filtering
-        global_thigh_angle_bp, z_bp = lfilter(b_bp, a_bp, [global_thigh_angle], zi = z_bp) 
+        global_thigh_angle_bp, z_bp = lfilter(b_bp, a_bp, [global_thigh_angle], zi = z_bp)
         global_thigh_angle_bp = global_thigh_angle_bp[0]
         if ptr == 0:
             global_thigh_angle_vel_blp = 0
@@ -321,6 +322,7 @@ try:
         #==========================================================================================================
         
         ## Steady-State Walking Detection =========================================================================
+        """
         if len(MD_hist) < int(fs * 2.5):
             MD_hist.append(ekf.MD)
         else:
@@ -328,7 +330,6 @@ try:
             MD_hist.popleft()
         MD_movingAverage = np.mean(MD_hist)
         
-        """
         if MD_movingAverage < MD_threshold:
             t_s = t
             t_ns = t_ns_previous
@@ -417,11 +418,12 @@ try:
         ekf_log['thigh_angle_pred'] = ekf.z_hat[0][0]
         ekf_log['thigh_angle_vel_pred'] = ekf.z_hat[1][0]
         ekf_log['atan2_pred'] = ekf.z_hat[2][0]
+        ekf_log['thigh_angle_bandpass'] = global_thigh_angle_bp
         ekf_log['thigh_angle_vel'] = global_thigh_angle_vel_lp
         ekf_log['atan2'] = Atan2
         ekf_log['walking'] = int(walking)
         ekf_log['steady_state'] = int(steady_state)
-        ekf_log['MD_movingAverage'] = MD_movingAverage
+        ekf_log['MD'] = ekf.MD
         loco.log_OSL({**dataOSL,**cmd_log, **ekf_log}, logger)
         #==========================================================================================================
 

@@ -58,7 +58,7 @@ if __name__ == '__main__':
     #model_ankleMoment = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_ankleMoment = basis_model_fitting(model_ankleMoment, 'ankleMoment')
 
-    #phase_dot_model = Polynomial_Basis(2, 'phase_dot')
+    phase_dot_model = Polynomial_Basis(2, 'phase_dot')
     model_globalThighVelocities = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_globalThighAngles = basis_model_fitting(model_globalThighVelocities, 'globalThighVelocities')
 
