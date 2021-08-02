@@ -128,19 +128,24 @@ def plot_Conti_measurement_data(subject, trial, side):
     m_model = model_loader('Measurement_model_4.pickle')
     Psi = load_Psi('Generic')
 
-    globalThighAngles_pred = model_prediction(m_model.models[0], Psi['global_thigh_angle'], phases, phase_dots, step_lengths, ramps)
-    #force_z_ankle_pred = model_prediction(m_model.models[1], Psi['force_Z'], phases, phase_dots, step_lengths, ramps)
-    #force_x_ankle_pred = model_prediction(m_model.models[2], Psi['force_X'], phases, phase_dots, step_lengths, ramps)
+    globalThighAngles_pred = model_prediction(m_model.models[0], Psi['globalThighAngles'], phases, phase_dots, step_lengths, ramps)
     ankleMoment_pred = model_prediction(m_model.models[1], Psi['ankleMoment'], phases, phase_dots, step_lengths, ramps)
-    
-    globalThighVelocity_pred = model_prediction(m_model.models[2], Psi['global_thigh_angle_vel'], phases, phase_dots, step_lengths, ramps)
-    
+    globalThighVelocity_pred = model_prediction(m_model.models[2], Psi['globalThighVelocities'], phases, phase_dots, step_lengths, ramps)
     atan2_pred = model_prediction(m_model.models[3], Psi['atan2'], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
     atan2_pred = wrapTo2pi(atan2_pred)
  
     # compute rmse
     print("subject: ",  subject)
     print("trial: ",  trial)
+
+    residuals_globalThighAngles = globalThighAngles - globalThighAngles_pred
+    residuals_globalThighVelocity = globalThighVelocity - globalThighVelocity_pred
+    residuals_atan2 = atan2 - atan2_pred
+    residuals_atan2 = np.arctan2(np.sin(residuals_atan2), np.cos(residuals_atan2))
+
+    residuals = [residuals_globalThighAngles, residuals_globalThighVelocity, residuals_atan2]
+    R = np.cov(residuals)
+    print("R = \n", R)
 
     plt.figure('State')
     plt.subplot(411)
@@ -164,11 +169,11 @@ def plot_Conti_measurement_data(subject, trial, side):
     plt.subplot(212)
     a1 = atan2[0:1600] - 2*np.pi*phases[0:1600]
     for i in range(len(a1)):
-        a1[i] = np.arctan2(np.sin(a1[i]), np.cos(a1[i])) 
+        a1[i] = np.arctan2(np.sin(a1[i]), np.cos(a1[i]))
     plt.plot(a1)
     a2 = atan2_pred[0:1600] - 2*np.pi*phases[0:1600]
     for i in range(len(a2)):
-        a2[i] = np.arctan2(np.sin(a2[i]), np.cos(a2[i])) 
+        a2[i] = np.arctan2(np.sin(a2[i]), np.cos(a2[i]))
     plt.plot(a2)
     plt.legend(['atan2-phase*2pi', 'least-squares fitting', 'new'])
     
@@ -339,9 +344,9 @@ def plot_Conti_joints_angles(subject, trial, side):
     with open('Psi/Psi_ankle_G.pickle', 'rb') as file:
         Psi_ankle = pickle.load(file)
     
-    with open('New_Psi/Psi_kneeAngles.pickle', 'rb') as file:
+    with open('Psi/Psi_kneeAngles.pickle', 'rb') as file:
         Psi_knee_withoutNan = pickle.load(file)
-    with open('New_Psi/Psi_ankleAngles.pickle', 'rb') as file:
+    with open('Psi/Psi_ankleAngles.pickle', 'rb') as file:
         Psi_ankle_withoutNan = pickle.load(file)
     
     knee_angle_pred = model_prediction(c_model.models[0], Psi_knee, phases, phase_dots, step_lengths, ramps)
@@ -368,9 +373,9 @@ def plot_Conti_joints_angles(subject, trial, side):
 
 def detect_knee_over_extention():
     c_model = model_loader('Control_model.pickle')
-    with open('New_Psi/Psi_kneeAngles.pickle', 'rb') as file:
+    with open('Psi/Psi_kneeAngles.pickle', 'rb') as file:
         Psi_knee = pickle.load(file)
-    #with open('New_Psi/Psi_ankleAngles.pickle', 'rb') as file:
+    #with open('Psi/Psi_ankleAngles.pickle', 'rb') as file:
     #    Psi_ankle = pickle.load(file)
     n = 0
     for subject in Conti_subject_names():
@@ -622,7 +627,7 @@ if __name__ == '__main__':
     ##################################################################
     
     subject = 'AB10'
-    trial = 's0x8d10'
+    trial = 's1d10'
     side = 'left'
 
     #offset_for_atan2(subject, trial, side)

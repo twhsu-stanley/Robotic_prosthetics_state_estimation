@@ -7,14 +7,15 @@ import matplotlib.pyplot as plt
 from EKF import *
 from model_framework import *
 from continuous_data import *
+from basis_model_fitting import measurement_noise_covariance
 import csv
 
 # Dictionary of the sensors
-sensors_dict = {'global_thigh_angle': 0, 'force_z_ankle': 1, 'force_x_ankle': 2,
-                'ankleMoment': 3, 'global_thigh_angle_vel': 4, 'atan2': 5}
+sensors_dict = {'globalThighAngles': 0, 'force_z_ankle': 1, 'force_x_ankle': 2,
+                'ankleMoment': 3, 'globalThighVelocities': 4, 'atan2': 5}
 
 # Determine which sensors to be used
-sensors = ['global_thigh_angle', 'global_thigh_angle_vel', 'atan2']
+sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2']
 sensor_id = [sensors_dict[key] for key in sensors]
 
 arctan2 = False
@@ -96,8 +97,9 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     sys.h = m_model
     sys.Q = np.diag([0, 1e-5, 1e-5, 1e-2])
     # measurement noise covariance
-    sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
-    U = np.diag([2, 2, 2])
+    #sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
+    sys.R = measurement_noise_covariance(*sensors)
+    U = np.diag([1, 1, 1])
     sys.R = U @ sys.R @ U.T
 
     # initialize the state
@@ -141,10 +143,10 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
             ekf.x[kidnap] = state_kidnap[kidnap]
         
         ekf.prediction(dt)
-        #ekf.state_saturation(saturation_range)
+        ekf.state_saturation(saturation_range)
 
         ekf.correction(z[:, i], Psi, arctan2)
-        #ekf.state_saturation(saturation_range)
+        ekf.state_saturation(saturation_range)
 
         x[i,:] = ekf.x.T
         z_pred[i,:] = ekf.z_hat.T

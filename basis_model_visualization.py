@@ -86,9 +86,9 @@ ax.set_ylabel('ramp')
 
 """
 c_model = model_loader('Control_model.pickle')
-with open('New_Psi/Psi_kneeAngles.pickle', 'rb') as file:#_withoutNan
+with open('Psi/Psi_kneeAngles.pickle', 'rb') as file:#_withoutNan
     Psi_knee = pickle.load(file)
-with open('New_Psi/Psi_ankleAngles.pickle', 'rb') as file:
+with open('Psi/Psi_ankleAngles.pickle', 'rb') as file:
     Psi_ankle = pickle.load(file)
 ## C. Visualize Joint Model w.r.t. step_length ===============================================================================================
 phases = np.linspace(0, 1, num = 50)

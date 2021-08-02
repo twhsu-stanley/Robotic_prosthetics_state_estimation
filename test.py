@@ -5,33 +5,20 @@ import numpy as np
 import time
 import pickle
 from continuous_data import *
+from basis_model_fitting import measurement_noise_covariance
 
-a = False
-b = True
-print(a)
-print(int(a))
-print(int(b))
+sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2']
+R = measurement_noise_covariance(*sensors)
+print("R = \n", R)
 
-a = np.array([[1,2,3], [3,4,5], [6,7,8], [4,5,5]])
-print(np.delete(a, [1,2], 0))
+# Dictionary of the sensors
+sensors_dict = {'global_thigh_angle': 0, 'force_z_ankle': 1, 'force_x_ankle': 2,
+                'moment_y_ankle': 3, 'global_thigh_angle_vel': 4, 'atan2': 5}
 
-print(a-1)
+# Determine which sensors to be used
+sensors = ['global_thigh_angle', 'global_thigh_angle_vel', 'atan2']
+sensor_id = [sensors_dict[key] for key in sensors]
 
-a = [0,1,2,3,4]
-b = [0,1,4]
-for z in zip(a,b):
-    print(z)
-
-
-with open('Continuous_data/GlobalThighAngles_with_Nan.pickle', 'rb') as file:
-#with open('Continuous_data/KneeAngles_with_Nan.pickle', 'rb') as file:
-        nan_dict = pickle.load(file)
-    
-for subject in Conti_subject_names():
-        for trial in Conti_trial_names(subject):
-            if trial == 'subjectdetails':
-                continue
-            for side in ['left', 'right']:
-                if nan_dict[subject][trial][side] == False:
-                    print(subject + "/"+ trial + "/"+ side+ ": Trial skipped!")
-                    
+with open('R.pickle', 'rb') as file:
+    R = pickle.load(file)
+print("R = \n", R['Generic'][np.ix_(sensor_id, sensor_id)])

@@ -11,11 +11,12 @@ from EKF import *
 from model_framework import *
 from scipy.signal import butter, lfilter, lfilter_zi
 from incline_experiment_utils import butter_lowpass_filter
+from basis_model_fitting import measurement_noise_covariance
 import sender_test as sender   # for real-time plotting
 
 ### A. Load Ross's pre-recorded walking data / EKF Tests 
 #"""
-logFile = r"OSL_walking_data/210730_140347_OSL_parallelBar_test.csv"
+logFile = r"OSL_walking_data/210726_102901_OSL_parallelBar_test.csv"
 # 1) 210617_113644_PV_Siavash_walk_oscillations in phase
 # 2) 210617_121732_PV_Siavash_walk_300_1600
 # 3) 210617_122334_PV_Siavash_walk_500_2500
@@ -122,11 +123,11 @@ try:
 
     ### Intitialize EKF
     # Dictionary of the sensors
-    sensors_dict = {'global_thigh_angle': 0, 'force_z_ankle': 1, 'force_x_ankle': 2,
-                    'ankleMoment': 3, 'global_thigh_angle_vel': 4, 'atan2': 5}
+    sensors_dict = {'globalThighAngles': 0, 'force_z_ankle': 1, 'force_x_ankle': 2,
+                    'ankleMoment': 3, 'globalThighVelocities': 4, 'atan2': 5}
 
     # Determine which sensors to be used
-    sensors = ['global_thigh_angle', 'global_thigh_angle_vel', 'atan2']
+    sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2']
     sensor_id = [sensors_dict[key] for key in sensors]
 
     arctan2 = False
@@ -148,12 +149,13 @@ try:
     sys.Q = np.diag([0, 1e-5, 1e-5, 0])
     # measurement noise covariance
     sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
+    #sys.R = measurement_noise_covariance(*sensors)
     U = np.diag([2, 2, 2])
     sys.R = U @ sys.R @ U.T
 
     # initialize the state
     init = myStruct()
-    init.x = np.array([[0], [0.4], [1.1], [0]])
+    init.x = np.array([[0], [0.5], [1.1], [0]])
     init.Sigma = np.diag([1, 1, 1, 0])
 
     ekf = extended_kalman_filter(sys, init)
@@ -344,7 +346,7 @@ try:
         
         t_s_previous = t_s[indx]
         t_ns_previous = t_ns[indx]
-        
+        """
         if steady_state == True and steady_state_previous == False:
             ekf.Q = np.diag([0, 1e-5, 1e-5, 0])
             ekf.Sigma = np.diag([1, 1, 1, 0])
@@ -354,7 +356,7 @@ try:
             ekf.Sigma = np.diag([1, 1, 0, 0])
             ekf.x[2, 0] = 1.1
             ekf.x[3, 0] = 0
-        
+        """
         steady_state_previous = steady_state
         
         #=====================================================================================================
@@ -591,7 +593,7 @@ finally:
     #plt.ylabel("Steady-state time (s)")
     #plt.xlim((t_lower, t_upper))
     
-    
+    """
     plt.figure("Kinetics")
     plt.subplot(211)
     plt.plot(dataOSL["Time"], dataOSL['LoadCellFz'])
@@ -614,5 +616,5 @@ finally:
     plt.xlim((t_lower, t_upper))
     #plt.ylim((-2, 3))
     #plt.legend(('Load Cell Mx', 'Load Cell My', 'Ankle Torque', 'Knee Torque'))
-    
+    """
     plt.show()
