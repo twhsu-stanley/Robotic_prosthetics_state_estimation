@@ -81,7 +81,6 @@ def measurement_noise_covariance(*sensors):
         with open(('Basis_model/' + sensor + '_residuals.pickle'), 'rb') as file:
             r = pickle.load(file)
             residuals.append(r)
-    #residuals = np.array(residuals)
     R = np.cov(residuals)
     return R
     

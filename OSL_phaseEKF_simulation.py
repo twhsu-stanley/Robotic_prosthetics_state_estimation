@@ -16,7 +16,7 @@ import sender_test as sender   # for real-time plotting
 
 ### A. Load Ross's pre-recorded walking data / EKF Tests 
 #"""
-logFile = r"OSL_walking_data/210726_102901_OSL_parallelBar_test.csv"
+logFile = r"OSL_walking_data/210730_140347_OSL_parallelBar_test.csv"
 # 1) 210617_113644_PV_Siavash_walk_oscillations in phase
 # 2) 210617_121732_PV_Siavash_walk_300_1600
 # 3) 210617_122334_PV_Siavash_walk_500_2500
@@ -148,9 +148,10 @@ try:
     sys.h = m_model
     sys.Q = np.diag([0, 1e-5, 1e-5, 0])
     # measurement noise covariance
-    sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
-    #sys.R = measurement_noise_covariance(*sensors)
-    U = np.diag([2, 2, 2])
+    #sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
+    sys.R = measurement_noise_covariance(*sensors)
+    sys.R = np.diag(np.diag(sys.R))
+    U = np.diag([1.5, 2, 1])
     sys.R = U @ sys.R @ U.T
 
     # initialize the state
@@ -309,7 +310,7 @@ try:
             walking = True
         else:
             walking = False
-            Atan2 = 0
+            #Atan2 = 0
 
         measurement = np.array([[global_thigh_angle], [global_thigh_angle_vel_lp], [Atan2]])#, [ankleMoment]])
         measurement = np.squeeze(measurement)
