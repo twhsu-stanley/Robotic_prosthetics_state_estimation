@@ -148,10 +148,10 @@ try:
     sys.h = m_model
     sys.Q = np.diag([0, 1e-5, 1e-5, 0])
     # measurement noise covariance
-    #sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
-    sys.R = measurement_noise_covariance(*sensors)
-    sys.R = np.diag(np.diag(sys.R))
-    U = np.diag([1.5, 2, 1])
+    sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
+    #sys.R = measurement_noise_covariance(*sensors)
+    #sys.R = np.diag(np.diag(sys.R))
+    U = np.diag([2, 2, 2])
     sys.R = U @ sys.R @ U.T
 
     # initialize the state
@@ -162,8 +162,9 @@ try:
     ekf = extended_kalman_filter(sys, init)
 
     ########## Create filters ################################################################
-    dtt = np.diff(dataOSL["Time"])
+    
     fs = 1 / np.average(np.diff(dataOSL["Time"]))        # sampling rate = 100 Hz (actual: ~77 Hz)
+    print("Average fs = %4.2f Hz" % fs)
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
     ## configure low-pass filter (1-order)
     normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
@@ -310,7 +311,7 @@ try:
             walking = True
         else:
             walking = False
-            #Atan2 = 0
+            Atan2 = 0
 
         measurement = np.array([[global_thigh_angle], [global_thigh_angle_vel_lp], [Atan2]])#, [ankleMoment]])
         measurement = np.squeeze(measurement)

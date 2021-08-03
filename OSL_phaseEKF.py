@@ -102,7 +102,7 @@ try:
                'thigh_angle_bandpass': 0.0,
                'thigh_angle_vel': 0.0, 'atan2': 0.0,
                'walking': 0, 'MD': 0.0, 'steady_state': 0}
-    logger = loco.ini_log({**dataOSL, **cmd_log, **ekf_log}, sensors = "all_sensors", trialName = "OSL_parallelBar_test")
+    logger = loco.ini_log({**dataOSL, **cmd_log, **ekf_log}, sensors = "all_sensors", trialName = "OSL_parallelBar_Swing_test")
 
     ## Initialize buffers for joints angles =============================================================================
     knee_angle_buffer = []   # in rad
@@ -154,7 +154,7 @@ try:
 
     m_model = model_loader('Measurement_model_' + str(len(sensors)) +'.pickle')
     Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
-    saturation_range = [2, 0, 2, 0.8] 
+    saturation_range = [2, 0, 2, 0.7] 
     
     ## build the system
     sys = myStruct()
@@ -164,12 +164,14 @@ try:
     sys.Q = np.diag([0, 1e-5, 1e-5, 0])
     # measurement noise covariance
     sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
+    #sys.R = measurement_noise_covariance(*sensors)
+    #sys.R = np.diag(np.diag(sys.R))
     U = np.diag([2, 2, 2])
     sys.R = U @ sys.R @ U.T
 
     # initialize the state
     init = myStruct()
-    init.x = np.array([[0], [0.8], [1.1], [0]])
+    init.x = np.array([[0], [0.5], [1.1], [0]])
     init.Sigma = np.diag([1, 1, 1, 0])
 
     ekf = extended_kalman_filter(sys, init)
@@ -215,8 +217,8 @@ try:
     global_thigh_angle_hist = np.ones((int(fs*2.5), 1)) * dataOSL["ThighSagi"] * 180 / np.pi # ~ 2seconds window
 
     #MD_threshold = 5 # MD
-    global_thigh_angle_max_threshold = 10    # global thigh angle range (deg)
-    global_thigh_angle_min_threshold = 5    # global thigh angle range (deg)
+    global_thigh_angle_max_threshold = 20    # global thigh angle range (deg)
+    global_thigh_angle_min_threshold = 8    # global thigh angle range (deg)
 
     # ================================================= MAIN LOOP ====================================================
     
@@ -307,6 +309,7 @@ try:
         if Atan2 < 0:
             Atan2 = Atan2 + 2 * np.pi
         
+        # Set atan2 to zero if the user is not walking
         if walking == False:
             Atan2 = 0
 

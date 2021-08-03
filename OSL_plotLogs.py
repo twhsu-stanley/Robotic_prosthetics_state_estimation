@@ -7,6 +7,9 @@ import csv
 logFile = r"OSL_walking_data/210730_140347_OSL_parallelBar_test.csv"
 datatxt = np.genfromtxt(logFile , delimiter=',', names = True)
 
+fs = 1 / np.average(np.diff(datatxt["Time"]))
+print("Average fs = %4.2f Hz" % fs)
+
 #Actual trajectory obtained from log files
 actualTrajectory = {
     "ThighSagi": datatxt["ThighSagi"],
@@ -28,7 +31,6 @@ ekfEstimates = {
     "stride_length": datatxt["stride_length"],
     "ramp": datatxt["ramp"],
     
-    # NOTICE: "_bf" here is for correcting the error in the csv file
     "thigh_angle_pred": datatxt["thigh_angle_pred"],
     "thigh_angle_bandpass": datatxt["thigh_angle_bandpass"], 
     "thigh_angle_vel_pred": datatxt["thigh_angle_vel_pred"],
@@ -38,7 +40,8 @@ ekfEstimates = {
     "atan2": datatxt["atan2"],
 
     "walking": datatxt["walking"],
-    "MD_movingAverage": datatxt["MD_movingAverage"],
+    #"MD_movingAverage": datatxt["MD_movingAverage"],
+    "MD": datatxt["MD"],
     "steady_state": datatxt["steady_state"]
 }
 
@@ -112,7 +115,7 @@ axs[0].set_ylabel('Global Thigh Angle (deg)')
 axs[0].plot(xindex, actualTrajectory["ThighSagi"][ranA:ranB] * 180 / np.pi, 'k-')
 axs[0].plot(xindex, ekfEstimates["thigh_angle_pred"][ranA:ranB], 'r-')
 axs[0].plot(xindex, ekfEstimates["thigh_angle_bandpass"][ranA:ranB], 'm-')
-axs[0].legend(["Actual", "EKF Predicted", "band-pass filtered"])
+axs[0].legend(["Actual", "EKF Predicted", "Band-pass filtered"])
 
 axs[1].set_ylabel('Global Thigh Angle Vel (deg/s)')
 axs[1].plot(xindex, ekfEstimates["thigh_angle_vel"][ranA:ranB], 'k-')
@@ -134,8 +137,8 @@ axs[0].set_title("Walking Status")
 axs[0].set_ylabel('Walking (T/F)')
 axs[0].plot(xindex, ekfEstimates["walking"][ranA:ranB], 'r-')
 
-axs[1].set_ylabel('Moving Average of MD')
-axs[1].plot(xindex, ekfEstimates["MD_movingAverage"][ranA:ranB], 'r-')
+axs[1].set_ylabel('MD')
+axs[1].plot(xindex, ekfEstimates["MD"][ranA:ranB], 'r-')
 
 axs[2].set_xlabel('Time(s)')
 axs[2].set_ylabel('Steady-state (T/F)')

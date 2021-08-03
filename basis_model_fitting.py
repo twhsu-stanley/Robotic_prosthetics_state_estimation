@@ -119,8 +119,8 @@ if __name__ == '__main__':
 
     model_atan2 = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_atan2 = basis_model_fitting(model_atan2, 'atan2')
-    basis_model_residuals(model_atan2, 'atan2')
+    #basis_model_residuals(model_atan2, 'atan2')
 
-    #m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities, model_atan2)
-    #model_saver(m_model, 'Measurement_model_3.pickle')
+    m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities)
+    model_saver(m_model, 'Measurement_model_2.pickle')
     
