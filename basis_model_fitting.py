@@ -76,16 +76,43 @@ def basis_model_residuals(model, mode):
     	pickle.dump(residuals, file)
 
 def measurement_noise_covariance(*sensors):
-    residuals = []
+    #residuals = []
+    covariance = []
     for sensor in sensors:
         with open(('Basis_model/' + sensor + '_residuals.pickle'), 'rb') as file:
             r = pickle.load(file)
-            residuals.append(r)
-    R = np.cov(residuals)
+            #residuals.append(r)
+            covariance.append(np.cov(r))
+    #R = np.cov(residuals)
+    R = np.diag(covariance)
     return R
+
+def saturation_bounds():
+    with open(('Gait_training_data/globalThighAngles_training_dataset.pickle'), 'rb') as file:
+        gait_training_dataset = pickle.load(file)
+
+    phase_dot = gait_training_dataset['phase_dot']
+    phase_dots_sup = np.max(phase_dot)
+    phase_dots_inf = np.min(phase_dot)
+    phase_dots_std = np.std(phase_dot)
+    phase_dots_mean = np.average(phase_dot)
+
+    step_length = gait_training_dataset['step_length']
+    step_lengths_sup = np.max(step_length)
+    step_lengths_inf = np.min(step_length)
+    step_lengths_std = np.std(step_length)
+    step_lengths_mean = np.average(step_length)
+
+    nu = np.sqrt(6.635)
+    saturation_range = np.array([min(phase_dots_sup, phase_dots_mean + nu * phase_dots_std),\
+                                 max(phase_dots_inf, phase_dots_mean - nu * phase_dots_std),\
+                                 min(step_lengths_sup, step_lengths_mean + nu * step_lengths_std),\
+                                 max(step_lengths_inf, step_lengths_mean - nu * step_lengths_std)])
+    #print(saturation_range)
+    return saturation_range
     
-if __name__ == '__main__':
-    
+if __name__ == '__main__': 
+    saturation_bounds()
     F = 11
     N = 3
     phase_model = Fourier_Basis(F, 'phase')
@@ -97,8 +124,9 @@ if __name__ == '__main__':
     #psi_globalThighAngles = basis_model_fitting(model_globalThighAngles, 'globalThighAngles')
     #basis_model_residuals(model_globalThighAngles, 'globalThighAngles')
 
-    #model_ankleMoment = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    model_ankleMoment = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_ankleMoment = basis_model_fitting(model_ankleMoment, 'ankleMoment')
+    basis_model_residuals(model_ankleMoment, 'ankleMoment')
 
     phase_dot_model = Polynomial_Basis(2, 'phase_dot')
     model_globalThighVelocities = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
@@ -121,6 +149,6 @@ if __name__ == '__main__':
     #psi_atan2 = basis_model_fitting(model_atan2, 'atan2')
     #basis_model_residuals(model_atan2, 'atan2')
 
-    m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities)
-    model_saver(m_model, 'Measurement_model_2.pickle')
+    m_model = Measurement_Model(model_globalThighAngles, model_ankleMoment, model_globalThighVelocities, model_atan2)
+    model_saver(m_model, 'Measurement_model_4.pickle')
     

@@ -3,35 +3,34 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import StrMethodFormatter
 from mpl_toolkits import mplot3d
 from model_framework import *
-from model_fit import *
 from EKF import wrapTo2pi, load_Psi
 
 #"""
 # Dictionary of the sensors
-sensors_dict = {'global_thigh_angle': 0, 'force_z_ankle': 1, 'force_x_ankle': 2,
-                'ankleMoment': 3, 'global_thigh_angle_vel': 4, 'atan2': 5}
+#sensors_dict = {'global_thigh_angle': 0, 'force_z_ankle': 1, 'force_x_ankle': 2,
+#               'ankleMoment': 3, 'global_thigh_angle_vel': 4, 'atan2': 5}
 
 # Determine which sensors to be used
-sensors = ['global_thigh_angle', 'global_thigh_angle_vel', 'atan2']
+sensors = ['globalThighAngles', 'ankleMoment', 'globalThighVelocities', 'atan2']
 
-sensor_id = 2
+sensor_id = 1
 
-m_model = model_loader('Measurement_model_3.pickle')
+m_model = model_loader('Measurement_model_4.pickle')
 Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 
 ## A. Visualize Measurement Model w.r.t. phase_dot ===========================================================================
 phases = np.linspace(0, 1, num = 50)
 phase_dots = np.linspace(0.6, 1.2, num = 50)
 step_lengths = 1.1
-ramps = -10
+ramps = 0
 
 measurement = np.zeros((len(phases), len(phase_dots)))
 
 for i in range(len(phases)):
     for j in range(len(phase_dots)):
         z = m_model.evaluate_h_func(Psi, phases[i], phase_dots[j], step_lengths, ramps)
-        measurement[i,j] = z[sensor_id] + 2*np.pi*phases[i]
-        measurement[i,j] = wrapTo2pi(measurement[i,j])
+        measurement[i,j] = z[sensor_id] #+ 2*np.pi*phases[i]
+        #measurement[i,j] = wrapTo2pi(measurement[i,j])
 
 fig = plt.figure()
 X, Y = np.meshgrid(phases, phase_dots)
@@ -52,7 +51,7 @@ measurement = np.zeros((len(phases), len(step_lengths)))
 for i in range(len(phases)):
     for j in range(len(step_lengths)):
         z = m_model.evaluate_h_func(Psi, phases[i], phase_dots, step_lengths[j], ramps)
-        measurement[i,j] = z[sensor_id] + 2*np.pi*phases[i]
+        measurement[i,j] = z[sensor_id] #+ 2*np.pi*phases[i]
 
 
 fig = plt.figure()
@@ -74,7 +73,7 @@ measurement = np.zeros((len(phases), len(ramps)))
 for i in range(len(phases)):
     for j in range(len(ramps)):
         z = m_model.evaluate_h_func(Psi, phases[i], phase_dots, step_lengths, ramps[j])
-        measurement[i,j] = z[sensor_id] + 2*np.pi*phases[i]
+        measurement[i,j] = z[sensor_id] #+ 2*np.pi*phases[i]
 
 fig = plt.figure()
 X, Y = np.meshgrid(phases, ramps)

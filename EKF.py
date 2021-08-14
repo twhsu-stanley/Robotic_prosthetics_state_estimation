@@ -96,7 +96,8 @@ class extended_kalman_filter:
         #   init:   initial state mean and covariance
         self.f = system.f  # process model
         self.A = system.A  # system matrix Jacobian
-        self.Q = system.Q  # process model noise covariance
+        self.Q_static = system.Q
+        self.Q = self.Q_static    # process model noise covariance
 
         self.h = system.h  # measurement model
         self.R = system.R  # measurement noise covariance
@@ -121,7 +122,7 @@ class extended_kalman_filter:
         # predicted measurements
         self.z_hat = self.h.evaluate_h_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
 
-        ### Jacobian test#########################################################
+        ### Jacobian test #########################################################
         #print("HPH=",  H @ self.Sigma @ H.T)
         #print("R=", self.R)
         #z2 = self.h.evaluate_h_func(Psi, self.x[0,0]-0.01, self.x[1,0]-0.01, self.x[2,0]+0.01, self.x[3,0]-0.01)
@@ -133,27 +134,17 @@ class extended_kalman_filter:
             H[-1, 0] += 2*np.pi
             self.z_hat[-1] += self.x[0,0] * 2 * np.pi
             # wrap to 2pi
-            self.z_hat[-1] = wrapTo2pi(self.z_hat[-1]) #self.z_hat[-1] % (2*np.pi) # 
-                    
+            self.z_hat[-1] = wrapTo2pi(self.z_hat[-1])
+        
         # innovation
         z = np.array([z]).T
         self.v = z - self.z_hat
-        
         if arctan2:
             # wrap to pi
             self.v[-1] = np.arctan2(np.sin(self.v[-1]), np.cos(self.v[-1]))
 
-        R = self.R
-        
-        # Kidnapping detector 
-        self.MD = np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) # Mahalanobis distance
-        #if steady_state_walking:
-        #    if self.MD > np.sqrt(25):
-        #        #self.Sigma += np.diag([2e-5, 2e-4, 4e-3, 4])
-        #        self.Sigma += np.diag([0, 1e-3, 1e-3, 0])
-        
         # innovation covariance
-        S = H @ self.Sigma @ H.T + R
+        S = H @ self.Sigma @ H.T + self.R
 
         # filter gain
         K = self.Sigma @ H.T @ np.linalg.inv(S)
@@ -162,19 +153,36 @@ class extended_kalman_filter:
         self.x = self.x + K @ self.v
         self.x[0, 0] = warpToOne(self.x[0, 0])
 
+        # Compute MD using residuals
+        #"""
+        z_pred = self.h.evaluate_h_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
+        if arctan2:
+            z_pred[-1] += self.x[0,0] * 2 * np.pi
+            z_pred[-1] = wrapTo2pi(z_pred[-1])
+        self.residual = z - z_pred
+        if arctan2:
+            self.residual[-1] = np.arctan2(np.sin(self.residual[-1]), np.cos(self.residual[-1]))
+        self.MD_residual = np.sqrt(self.residual.T @ np.linalg.inv(self.R) @ self.residual) # Mahalanobis distance
+        
+        #if steady_state_walking and self.MD_residual > np.sqrt(25):
+        #    self.Q = self.Q_static #+ self.Q_static * 0.5
+        #else:
+        #    self.Q = self.Q_static
+        #"""
+
+        # Adaptive Q and R
+        #alpha = 0.3
+        #self.Q = alpha * self.Q + (1-alpha)*(K @ self.v @ self.v.T @ K.T)
+        #self.R = alpha * self.R + (1-alpha)*(self.residual @ self.residual.T + H @ self.Sigma @ H.T)
+
         I = np.eye(np.shape(self.x)[0])
         self.Sigma = (I - K @ H) @ self.Sigma
-        
+
     def state_saturation(self, saturation_range):
         phase_dots_max = saturation_range[0]
         phase_dots_min = saturation_range[1]
         step_lengths_max = saturation_range[2]
         step_lengths_min = saturation_range[3]
-        
-        #if self.x[0, 0] > 1:
-        #    self.x[0, 0] = 1
-        #elif self.x[0, 0] < 0:
-        #    self.x[0, 0] = 0
         
         if self.x[1, 0] > phase_dots_max:
             self.x[1, 0] = phase_dots_max

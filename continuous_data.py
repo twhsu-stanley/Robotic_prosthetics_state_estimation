@@ -112,10 +112,9 @@ def load_Conti_measurement_data(subject, trial, side):
     globalThighAngles = Continuous_measurement_data[subject][trial][side]['globalThighAngles'][0, start_index:end_index]
     force_z_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_z'][0, start_index:end_index]
     force_x_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_x'][0, start_index:end_index]
+    ankleMoment = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointmoment'][side]['ankle'][0, start_index:end_index] / 1000 # N-mm to N-m
     globalThighVelocity = Continuous_measurement_data[subject][trial][side]['globalThighVelocity'][start_index:end_index]
     atan2 = Continuous_measurement_data[subject][trial][side]['atan2_s'][start_index:end_index]
-
-    ankleMoment = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointmoment'][side]['ankle'][0, start_index:end_index] / 1000 # N-mm to N-m
 
     return globalThighAngles, force_z_ankle, force_x_ankle, ankleMoment,\
            globalThighVelocity, atan2
@@ -213,7 +212,7 @@ def plot_Conti_measurement_data(subject, trial, side):
     
     plt.show()
 
-def Conti_maxmin(subject, plot = True):
+def Conti_maxmin(plot = True):
     #for subject in Conti_subject_names():
     phase_dots_sup = np.zeros((9,1)) # 9 different ramp angles
     phase_dots_inf = np.zeros((9,1))
@@ -223,56 +222,41 @@ def Conti_maxmin(subject, plot = True):
     step_lengths_mean = np.zeros((9,1))
     ramp_code = ['d10', 'd7x5', 'd5', 'd2x5', 'i0', 'i2x5', 'i5', 'i7x5', 'i10']
     ramp_angles = [-10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10]
-    #for subject in Conti_subject_names():
-    #for subject in ['AB03']:
+
     for r in range(9): # LOOP THROUGH ALL ANGLES!!
-        #phases_max = -1000000
-        #phases_min = 1000000
         phase_dots_max = -1000000
         phase_dots_min = 1000000
         step_lengths_max = -1000000
         step_lengths_min = 1000000
-        #ramps_max = -1000000
-        #ramps_min = 1000000
-        for trial in raw_walking_data['Continuous'][subject].keys():
-            if str(trial)[-3:] == ramp_code[r] or str(trial)[-4:] == ramp_code[r] or str(trial)[-2:] == ramp_code[r]:
-            #if trial == 'subjectdetails':
-            #    continue
-                for side in ['left', 'right']:
-                    phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
-                    #if np.max(phases) > phases_max:
-                    #    phases_max = np.max(phases)
-                    #if np.min(phases) < phases_min:
-                    #    phases_min = np.min(phases)
+        for subject in Conti_subject_names():
+            for trial in raw_walking_data['Continuous'][subject].keys():
+                if str(trial)[-3:] == ramp_code[r] or str(trial)[-4:] == ramp_code[r] or str(trial)[-2:] == ramp_code[r]:
+                    for side in ['left', 'right']:
+                        _, phase_dots, step_lengths, _ = Conti_state_vars(subject, trial, side)
 
-                    phase_dots_mean[r] += np.mean(phase_dots)
+                        phase_dots_mean[r] += np.mean(phase_dots)
 
-                    if np.max(phase_dots) > phase_dots_max:
-                        phase_dots_max = np.max(phase_dots)
-                    if np.min(phase_dots) < phase_dots_min:
-                        phase_dots_min = np.min(phase_dots)
+                        if np.max(phase_dots) > phase_dots_max:
+                            phase_dots_max = np.max(phase_dots)
+                        if np.min(phase_dots) < phase_dots_min:
+                            phase_dots_min = np.min(phase_dots)
 
-                    step_lengths_mean[r] += np.mean(step_lengths)
-                        
-                    if np.max(step_lengths) > step_lengths_max:
-                        step_lengths_max = np.max(step_lengths)
-                    if np.min(step_lengths) < step_lengths_min:
-                        step_lengths_min = np.min(step_lengths)
-                        
-                    #if np.max(ramps) > ramps_max:
-                    #    ramps_max = np.max(ramps)
-                    #if np.min(ramps) < ramps_min:
-            
-                    #    ramps_min = np.min(ramps)
-        phase_dots_mean[r] = phase_dots_mean[r]/6
+                        step_lengths_mean[r] += np.mean(step_lengths)
+                            
+                        if np.max(step_lengths) > step_lengths_max:
+                            step_lengths_max = np.max(step_lengths)
+                        if np.min(step_lengths) < step_lengths_min:
+                            step_lengths_min = np.min(step_lengths)
+                            
+        phase_dots_mean[r] = phase_dots_mean[r]/60
         phase_dots_sup[r] = phase_dots_max
         phase_dots_inf[r] = phase_dots_min
-        step_lengths_mean[r] = step_lengths_mean[r]/6
+        step_lengths_mean[r] = step_lengths_mean[r]/60
         step_lengths_sup[r] = step_lengths_max
         step_lengths_inf[r] = step_lengths_min
     
     saturation_range =np.array([np.max(phase_dots_sup), np.min(phase_dots_inf), np.max(step_lengths_sup), np.min(step_lengths_inf)])
-    
+
     #print("phases_max =", phases_max)
     #print("phases_min =", phases_min)
     #print("phase_dots_max =", saturation_range[0])
@@ -451,7 +435,7 @@ def plot_Conti_kinetics_data(subject, trial, side):
     ptr = raw_walking_data['Gaitcycle'][subject]['subjectdetails'][1][3]
     subject_weight = raw_walking_data[ptr] # kg
     kneeForce = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointforce'][side]['knee'][:, :] * subject_weight
-    ankleMoment = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointmoment'][side]['ankle'][:, :]* subject_weight / 1000 # N-mm to N-m
+    ankleMoment = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointmoment'][side]['ankle'][:, :] #* subject_weight / 1000 # N-mm to N-m
     
     _, force_z_ankle, _, moment_y_ankle, _, _ = load_Conti_measurement_data(subject, trial, side)
 
@@ -461,51 +445,20 @@ def plot_Conti_kinetics_data(subject, trial, side):
     plt.subplot(211)
     #plt.plot(range(np.shape(kneeForce)[1])[start:end], kneeForce[0, start:end])
     #plt.plot(range(np.shape(kneeForce)[1])[start:end], kneeForce[1, start:end])
-    plt.plot(range(np.shape(kneeForce)[1])[start:end], kneeForce[2, start:end])
-    #plt.plot(range(np.shape(kneeForce)[1])[start:end], force_z_ankle[start:end])
+    #plt.plot(range(np.shape(kneeForce)[1])[start:end], kneeForce[2, start:end])
+    plt.plot(range(np.shape(kneeForce)[1])[start:end], force_z_ankle[start:end])
     #plt.legend(('0', '1', '2'))
     plt.xlabel('samples')
     plt.ylabel('Knee Force (N)')
     
     plt.subplot(212)
-    plt.plot(range(np.shape(ankleMoment)[1])[start:end], ankleMoment[0, start:end])
-    #plt.plot(range(np.shape(ankleMoment)[1])[start:end], moment_y_ankle[start:end])
+    #plt.plot(range(np.shape(ankleMoment)[1])[start:end], ankleMoment[0, start:end])
+    plt.plot(range(np.shape(ankleMoment)[1])[start:end], moment_y_ankle[start:end])
     #plt.plot(range(np.shape(ankleMoment)[1])[start:end], ankleMoment[1, start:end])
-    #plt.plot(range(np.shape(ankleMoment)[1]), ankleMoment[2, :])
+    #plt.plot(range(np.shape(ankleMoment)[1])[start:end], ankleMoment[2, start:end])
     #plt.legend(('0', '1', '2'))
     plt.xlabel('samples')
     plt.ylabel('Ankle Moment (N-m)')
-    plt.show()
-
-def offset_for_atan2(subject, trial, side):
-    phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
-    start_index, end_index = Conti_start_end(subject, trial, side)
-    
-    with open('Continuous_data/Continuous_measurement_data.pickle', 'rb') as file:
-        Continuous_measurement_data = pickle.load(file)
-
-    dt = 1/100
-    gt_Y = Continuous_measurement_data[subject][trial][side]['globalThighAngles'][0, start_index:end_index]
-    gt_bp = butter_bandpass_filter(gt_Y, 0.5, 2, 1/dt, order = 2)
-    v_bp = np.diff(gt_bp) / dt
-    gtv_bp = butter_lowpass_filter(np.insert(v_bp, 0, 0), 2, 1/dt, order = 1)
-    atan2 = np.arctan2(-gtv_bp/(2*np.pi*0.8), gt_bp) # scaled
-    for i in range(np.shape(atan2)[0]):
-        if atan2[i] < 0:
-            atan2[i] = atan2[i] + 2 * np.pi
-    
-    m_model = model_loader('Measurement_model_3.pickle') # load new model w/ linear phase_dot
-    Psi = load_Psi('Generic')
-    atan2_pred = model_prediction(m_model.models[2], Psi['atan2'], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
-    atan2_pred = wrapTo2pi(atan2_pred)
-
-    total_step =  np.shape(gt_Y)[0]#int(heel_strike_index[20, 0])+1 #
-    tt = 0.01 * np.arange(total_step)
-    plt.figure()
-    plt.plot(tt, phases)
-    plt.plot(tt, atan2/(2*np.pi))
-    plt.plot(tt, atan2_pred/(2*np.pi), '--')
-    plt.legend(('phase', 'atan2', 'atan2_pred'))
     plt.show()
 
 if __name__ == '__main__':
@@ -630,6 +583,8 @@ if __name__ == '__main__':
     trial = 's1d10'
     side = 'left'
 
+    plot_Conti_kinetics_data(subject, trial, side)
+
     #offset_for_atan2(subject, trial, side)
     #plot_Conti_kinetics_data(subject, trial, side)
     #detect_knee_over_extention()
@@ -650,7 +605,7 @@ if __name__ == '__main__':
     #plot_Conti_joints_angles(subject, trial, side)
     #Conti_globalThighAngles(subject, trial, side)
     #plt.show()
-    plot_Conti_measurement_data(subject, trial, side)
+    #plot_Conti_measurement_data(subject, trial, side)
     #print(Conti_maxmin('AB01', plot = False))
 
     ######## test real0time filters #############

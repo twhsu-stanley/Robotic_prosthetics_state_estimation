@@ -4,7 +4,6 @@ Code to test drive the phase variable for level-ground walking
 import sys, time, os
 from flexsea import flexsea as flex
 from flexsea import fxEnums as fxe
-#import matplotlib.pyplot as plt
 import numpy as np
 
 sys.path.append(r'/home/pi/OSL-master/locoAPI/') # Path to Loco module
@@ -17,6 +16,7 @@ sys.path.append(r'/home/pi/prosthetic_phase_estimation/')
 from EKF import *
 from model_framework import *
 from scipy.signal import butter, lfilter, lfilter_zi
+from basis_model_fitting import measurement_noise_covariance
 from collections import deque
 import sender_test as sender   # for real-time plotting
 
