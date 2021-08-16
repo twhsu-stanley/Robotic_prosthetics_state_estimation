@@ -5,7 +5,7 @@ from mpl_toolkits import mplot3d
 from model_framework import *
 from EKF import wrapTo2pi, load_Psi
 
-#"""
+"""
 # Dictionary of the sensors
 #sensors_dict = {'global_thigh_angle': 0, 'force_z_ankle': 1, 'force_x_ankle': 2,
 #               'ankleMoment': 3, 'global_thigh_angle_vel': 4, 'atan2': 5}
@@ -81,9 +81,10 @@ ax = plt.axes(projection='3d')
 ax.plot_surface(X, Y, measurement.T)
 ax.set_xlabel('phase')
 ax.set_ylabel('ramp')
+"""
 # ==========================================================================================================================
 
-"""
+
 c_model = model_loader('Control_model.pickle')
 with open('Psi/Psi_kneeAngles.pickle', 'rb') as file:#_withoutNan
     Psi_knee = pickle.load(file)
@@ -193,5 +194,5 @@ ax.set_ylabel('phase_dots')
 ax.set_zlabel('knee angle (deg)')
 
 #==============================================================================================================================
-"""
+
 plt.show()

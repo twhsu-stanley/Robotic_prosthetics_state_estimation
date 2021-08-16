@@ -16,7 +16,7 @@ import sender_test as sender   # for real-time plotting
 
 ### A. Load Ross's pre-recorded walking data / EKF Tests 
 #"""
-logFile = r"OSL_walking_data/210730_140347_OSL_parallelBar_test.csv"
+logFile = r"OSL_walking_data/210617_121732_PV_Siavash_walk_300_1600.csv"
 # 1) 210617_113644_PV_Siavash_walk_oscillations in phase
 # 2) 210617_121732_PV_Siavash_walk_300_1600
 # 3) 210617_122334_PV_Siavash_walk_500_2500
@@ -595,7 +595,7 @@ finally:
     #plt.ylabel("Steady-state time (s)")
     #plt.xlim((t_lower, t_upper))
     
-    """
+    
     plt.figure("Kinetics")
     plt.subplot(211)
     plt.plot(dataOSL["Time"], dataOSL['LoadCellFz'])
@@ -618,5 +618,5 @@ finally:
     plt.xlim((t_lower, t_upper))
     #plt.ylim((-2, 3))
     #plt.legend(('Load Cell Mx', 'Load Cell My', 'Ankle Torque', 'Knee Torque'))
-    """
+    
     plt.show()

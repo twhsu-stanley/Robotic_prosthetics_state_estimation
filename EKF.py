@@ -100,8 +100,9 @@ class extended_kalman_filter:
         self.Q = self.Q_static    # process model noise covariance
 
         self.h = system.h  # measurement model
-        self.R = system.R  # measurement noise covariance
-        
+        self.R_static = system.R  # measurement noise covariance
+        self.R = self.R_static
+
         self.x = init.x  # state mean
         self.Sigma = init.Sigma  # state covariance
 
@@ -111,7 +112,7 @@ class extended_kalman_filter:
         self.x[0, 0] = warpToOne(self.x[0, 0]) # wrap to be between 0 and 1
         self.Sigma = self.A(dt) @ self.Sigma @ self.A(dt).T + self.Q  # predicted state covariance
 
-    def correction(self, z, Psi, arctan2 = False, steady_state_walking = False):
+    def correction(self, z, Psi, using_atan2 = False, steady_state_walking = False):
         # EKF correction step
         # Inputs:
         #   z:  measurement
@@ -130,7 +131,7 @@ class extended_kalman_filter:
         #print(H @ np.array([[-0.01], [-0.01], [0.01], [-0.01]]))
         ###########################################################################
 
-        if arctan2:
+        if using_atan2:
             H[-1, 0] += 2*np.pi
             self.z_hat[-1] += self.x[0,0] * 2 * np.pi
             # wrap to 2pi
@@ -139,7 +140,7 @@ class extended_kalman_filter:
         # innovation
         z = np.array([z]).T
         self.v = z - self.z_hat
-        if arctan2:
+        if using_atan2:
             # wrap to pi
             self.v[-1] = np.arctan2(np.sin(self.v[-1]), np.cos(self.v[-1]))
 
@@ -154,21 +155,24 @@ class extended_kalman_filter:
         self.x[0, 0] = warpToOne(self.x[0, 0])
 
         # Compute MD using residuals
-        #"""
+        """
         z_pred = self.h.evaluate_h_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
-        if arctan2:
+        if using_atan2:
             z_pred[-1] += self.x[0,0] * 2 * np.pi
             z_pred[-1] = wrapTo2pi(z_pred[-1])
         self.residual = z - z_pred
-        if arctan2:
+        if using_atan2:
             self.residual[-1] = np.arctan2(np.sin(self.residual[-1]), np.cos(self.residual[-1]))
+        
         self.MD_residual = np.sqrt(self.residual.T @ np.linalg.inv(self.R) @ self.residual) # Mahalanobis distance
         
-        #if steady_state_walking and self.MD_residual > np.sqrt(25):
-        #    self.Q = self.Q_static #+ self.Q_static * 0.5
-        #else:
-        #    self.Q = self.Q_static
-        #"""
+        if steady_state_walking and self.MD_residual > np.sqrt(18.5):
+            #self.Q = self.Q_static + self.Q_static * 0.2
+            self.R = np.diag([2, 1, 2, 1]) @ self.R_static @ np.diag([2, 1, 2, 1]).T
+        else:
+            #self.Q = self.Q_static
+            self.R = self.R_static
+        """
 
         # Adaptive Q and R
         #alpha = 0.3

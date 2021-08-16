@@ -109,19 +109,19 @@ def load_Conti_measurement_data(subject, trial, side):
         Continuous_measurement_data = pickle.load(file)
 
     start_index, end_index = Conti_start_end(subject, trial, side)
-    globalThighAngles = Continuous_measurement_data[subject][trial][side]['globalThighAngles'][0, start_index:end_index]
-    force_z_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_z'][0, start_index:end_index]
-    force_x_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_x'][0, start_index:end_index]
+    globalThighAngle = Continuous_measurement_data[subject][trial][side]['globalThighAngles'][0, start_index:end_index]
+    #force_z_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_z'][0, start_index:end_index]
+    #force_x_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_x'][0, start_index:end_index]
+    tibiaForce = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointforce'][side]['knee'][2, start_index:end_index]
     ankleMoment = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointmoment'][side]['ankle'][0, start_index:end_index] / 1000 # N-mm to N-m
     globalThighVelocity = Continuous_measurement_data[subject][trial][side]['globalThighVelocity'][start_index:end_index]
     atan2 = Continuous_measurement_data[subject][trial][side]['atan2_s'][start_index:end_index]
 
-    return globalThighAngles, force_z_ankle, force_x_ankle, ankleMoment,\
-           globalThighVelocity, atan2
+    return globalThighAngle, ankleMoment, tibiaForce, globalThighVelocity, atan2
 
 def plot_Conti_measurement_data(subject, trial, side):
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
-    globalThighAngles, force_z_ankle, force_x_ankle, ankleMoment, globalThighVelocity, atan2\
+    globalThighAngle, ankleMoment, tibiaForce, globalThighVelocity, atan2\
                                          = load_Conti_measurement_data(subject, trial, side)
     
     m_model = model_loader('Measurement_model_4.pickle')
@@ -137,7 +137,7 @@ def plot_Conti_measurement_data(subject, trial, side):
     print("subject: ",  subject)
     print("trial: ",  trial)
 
-    residuals_globalThighAngles = globalThighAngles - globalThighAngles_pred
+    residuals_globalThighAngles = globalThighAngle - globalThighAngles_pred
     residuals_globalThighVelocity = globalThighVelocity - globalThighVelocity_pred
     residuals_atan2 = atan2 - atan2_pred
     residuals_atan2 = np.arctan2(np.sin(residuals_atan2), np.cos(residuals_atan2))
@@ -434,10 +434,10 @@ def plot_Conti_kinetics_data(subject, trial, side):
 
     ptr = raw_walking_data['Gaitcycle'][subject]['subjectdetails'][1][3]
     subject_weight = raw_walking_data[ptr] # kg
-    kneeForce = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointforce'][side]['knee'][:, :] * subject_weight
-    ankleMoment = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointmoment'][side]['ankle'][:, :] #* subject_weight / 1000 # N-mm to N-m
-    
-    _, force_z_ankle, _, moment_y_ankle, _, _ = load_Conti_measurement_data(subject, trial, side)
+    kneeForce = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointforce'][side]['knee'][:, :] #* subject_weight
+    ankleForce = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointforce'][side]['ankle'][:, :] #* subject_weight
+    ankleMoment = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointmoment'][side]['ankle'][:, :]  / 1000 #* subject_weight
+
 
     start = 1000
     end = 2000
@@ -445,18 +445,18 @@ def plot_Conti_kinetics_data(subject, trial, side):
     plt.subplot(211)
     #plt.plot(range(np.shape(kneeForce)[1])[start:end], kneeForce[0, start:end])
     #plt.plot(range(np.shape(kneeForce)[1])[start:end], kneeForce[1, start:end])
-    #plt.plot(range(np.shape(kneeForce)[1])[start:end], kneeForce[2, start:end])
-    plt.plot(range(np.shape(kneeForce)[1])[start:end], force_z_ankle[start:end])
-    #plt.legend(('0', '1', '2'))
+    plt.plot(range(np.shape(kneeForce)[1])[start:end], kneeForce[2, start:end], 'b-')
+    plt.plot(range(np.shape(kneeForce)[1])[start:end], -ankleForce[0, start:end], 'r-')
+
+    plt.legend(('0', '1', '2'))
     plt.xlabel('samples')
-    plt.ylabel('Knee Force (N)')
+    plt.ylabel('Force Z (N)')
     
     plt.subplot(212)
-    #plt.plot(range(np.shape(ankleMoment)[1])[start:end], ankleMoment[0, start:end])
-    plt.plot(range(np.shape(ankleMoment)[1])[start:end], moment_y_ankle[start:end])
+    plt.plot(range(np.shape(ankleMoment)[1])[start:end], ankleMoment[0, start:end])
     #plt.plot(range(np.shape(ankleMoment)[1])[start:end], ankleMoment[1, start:end])
     #plt.plot(range(np.shape(ankleMoment)[1])[start:end], ankleMoment[2, start:end])
-    #plt.legend(('0', '1', '2'))
+    plt.legend(('ankleMoment', 'moment_y_ankle', '1','2'))
     plt.xlabel('samples')
     plt.ylabel('Ankle Moment (N-m)')
     plt.show()
@@ -579,7 +579,7 @@ if __name__ == '__main__':
     """
     ##################################################################
     
-    subject = 'AB10'
+    subject = 'AB04'
     trial = 's1d10'
     side = 'left'
 
