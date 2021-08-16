@@ -108,7 +108,7 @@ def saturation_bounds():
                                  max(phase_dots_inf, phase_dots_mean - nu * phase_dots_std),\
                                  min(step_lengths_sup, step_lengths_mean + nu * step_lengths_std),\
                                  max(step_lengths_inf, step_lengths_mean - nu * step_lengths_std)])
-    #print(saturation_range)
+    print("Saturation bounds: ", saturation_range)
     return saturation_range
     
 if __name__ == '__main__': 
@@ -127,6 +127,10 @@ if __name__ == '__main__':
     model_ankleMoment = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_ankleMoment = basis_model_fitting(model_ankleMoment, 'ankleMoment')
     #basis_model_residuals(model_ankleMoment, 'ankleMoment')
+
+    model_tibiaForce = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    #psi_tibiaForce = basis_model_fitting(model_tibiaForce, 'tibiaForce')
+    #basis_model_residuals(model_tibiaForce, 'tibiaForce')
 
     model_kneeAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_kneeAngles = basis_model_fitting(model_kneeAngles, 'kneeAngles')
@@ -149,7 +153,7 @@ if __name__ == '__main__':
     #psi_atan2 = basis_model_fitting(model_atan2, 'atan2')
     #basis_model_residuals(model_atan2, 'atan2')
 
-    # sensors_dict = {'globalThighAngles': 0, 'ankleMoment': 1, 'globalThighVelocities': 2, 'atan2': 3}
+    # sensors_dict = {'globalThighAngles': 0, 'globalThighVelocities': 1, 'ankleMoment': 2, 'tibiaForce':3,  'atan2': 4}
     m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities)
-    model_saver(m_model, 'Measurement_model_02.pickle')
+    model_saver(m_model, 'Measurement_model_01.pickle')
     

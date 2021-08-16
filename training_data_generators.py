@@ -348,6 +348,63 @@ def ankleMoment_statistics():
     with open('Gait_data_statistics/ankleMoment_mean_std.pickle', 'wb') as file:
     	pickle.dump(data_mean_std, file)
 
+def tibiaForce_statistics():
+    """ Compute mean and standard deviaton of tibia axial force (normalized w.r.t. subject's weight) across the phase
+    """    
+    subject_names = get_subject_names()
+
+    data_mean_std = dict()
+    
+    for trial in raw_walking_data['Gaitcycle']['AB01'].keys():
+        if trial == 'subjectdetails':
+            continue
+        data_mean_std[trial] = dict()
+        for subject in subject_names:
+            data_left = raw_walking_data['Gaitcycle'][subject][trial]['kinetics']['jointforce']['left']['knee']['z'][:]
+            data_right = raw_walking_data['Gaitcycle'][subject][trial]['kinetics']['jointforce']['right']['knee']['z'][:]
+
+            # Delete additional rows with zeros
+            all_zeros_left = []
+            for i in range(np.shape(data_left)[0]):
+                if np.count_nonzero(data_left[i,:] == 0) > 50:
+                    all_zeros_left.append(i)
+            data_left = np.delete(data_left, all_zeros_left, 0) # remove rows
+
+            all_zeros_right = []
+            for i in range(np.shape(data_right)[0]):
+                if np.count_nonzero(data_right[i,:] == 0) > 50:
+                    all_zeros_right.append(i)
+            data_right = np.delete(data_right, all_zeros_right, 0) # remove rows
+
+
+            if subject == 'AB01':
+                data = data_left
+                data = np.vstack((data, data_right))
+            else:
+                data = np.vstack((data, data_left))
+                data = np.vstack((data, data_right))
+            
+            #if subject == 'AB05' and trial == 's1x2d7x5':
+            #    print(all_zeros_left)
+            #    print(all_zeros_right)
+            #    plt.figure()
+            #    plt.plot(range(150), data_left.T, 'k-')
+            #    plt.show()
+            #    print(" ")
+
+        data_mean_std[trial]['mean'] = np.mean(data, axis = 0)
+        data_mean_std[trial]['std'] = np.std(data, axis = 0)
+
+        plt.figure(trial)
+        plt.plot(range(150), data.T, 'k-', alpha = 0.2)
+        plt.plot(range(150), data_mean_std[trial]['mean'])
+        plt.plot(range(150), data_mean_std[trial]['mean'] + 3 * data_mean_std[trial]['std'])
+        plt.plot(range(150), data_mean_std[trial]['mean'] - 3 * data_mean_std[trial]['std'])
+        plt.show()
+    
+    with open('Gait_data_statistics/tibiaForce_mean_std.pickle', 'wb') as file:
+    	pickle.dump(data_mean_std, file)
+
 def gait_training_data_generator(mode):
 
     """
@@ -384,25 +441,24 @@ def gait_training_data_generator(mode):
             if mode == 'kneeAngles':
                 data_left = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['left']['knee']['x'][:]
                 data_right = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['right']['knee']['x'][:]
-                
                 # Add offset to knee angles if "over extension" (knee angle > 0) occurs
                 if np.max(data_left) > 0:
                     data_left -= np.max(data_left)
                 if np.max(data_right) > 0:
                     data_right -= np.max(data_right)
-
             elif mode == 'ankleAngles':
                 data_left = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['left']['ankle']['x'][:]
                 data_right = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['right']['ankle']['x'][:]
-            
             elif mode == 'globalThighAngles' or mode == 'globalThighVelocities' or mode == 'atan2':
                 data_left = globalThighAngles[trial][subject]['left']
                 data_right = globalThighAngles[trial][subject]['right']
-            
             elif mode == 'ankleMoment':
                 data_left = raw_walking_data['Gaitcycle'][subject][trial]['kinetics']['jointmoment']['left']['ankle']['x'][:] / 1000 # N-mm to N-m
                 data_right = raw_walking_data['Gaitcycle'][subject][trial]['kinetics']['jointmoment']['right']['ankle']['x'][:] / 1000 # N-mm to N-m
-            
+            elif mode == 'tibiaForce':
+                data_left = raw_walking_data['Gaitcycle'][subject][trial]['kinetics']['jointforce']['left']['knee']['z'][:]
+                data_right = raw_walking_data['Gaitcycle'][subject][trial]['kinetics']['jointforce']['right']['knee']['z'][:]
+
             if mode == 'globalThighVelocities':
                 derived_data_left = globalThighVelocities[trial][subject]['left']
                 derived_data_right = globalThighVelocities[trial][subject]['right']
@@ -598,7 +654,7 @@ def gait_training_data_generator(mode):
     	pickle.dump(gait_training_dataset, file)
     
 if __name__ == '__main__':
-
+    #tibiaForce_statistics()
     #derivedMeasurements_statistics()
     
     #jointAngles_statistics('knee')
@@ -614,4 +670,4 @@ if __name__ == '__main__':
     #gait_training_data_generator('atan2')
 
     #ankleMoment_statistics()
-    gait_training_data_generator('ankleMoment')
+    gait_training_data_generator('tibiaForce')

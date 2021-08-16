@@ -22,18 +22,15 @@ def load_Psi(subject = 'Generic'):
         with open('Psi/Psi_globalThighAngles.pickle', 'rb') as file:
             Psi_globalThighAngles = pickle.load(file)
         
-        with open('Psi/Psi_force_Z_G.pickle', 'rb') as file:
-            Psi_force_Z = pickle.load(file)
-        
-        with open('Psi/Psi_force_X_G.pickle', 'rb') as file:
-            Psi_force_X = pickle.load(file)
+        with open('Psi/Psi_globalThighVelocities.pickle', 'rb') as file:
+            Psi_globalThighVelocities = pickle.load(file)
         
         with open('Psi/Psi_ankleMoment.pickle', 'rb') as file:
             Psi_ankleMoment = pickle.load(file)
         
-        with open('Psi/Psi_globalThighVelocities.pickle', 'rb') as file:
-            Psi_globalThighVelocities = pickle.load(file)
-
+        with open('Psi/Psi_tibiaForce.pickle', 'rb') as file:
+            Psi_tibiaForce = pickle.load(file)
+        
         with open('Psi/Psi_atan2.pickle', 'rb') as file:
             Psi_atan2 = pickle.load(file)
     
@@ -60,8 +57,8 @@ def load_Psi(subject = 'Generic'):
             Psi_atan2 = p[subject]
         """
            
-    Psi = {'globalThighAngles': Psi_globalThighAngles, 'force_Z': Psi_force_Z, 'force_X': Psi_force_X, 'ankleMoment': Psi_ankleMoment,
-           'globalThighVelocities': Psi_globalThighVelocities, 'atan2': Psi_atan2}
+    Psi = {'globalThighAngles': Psi_globalThighAngles, 'globalThighVelocities': Psi_globalThighVelocities,
+           'tibiaForce': Psi_tibiaForce, 'ankleMoment': Psi_ankleMoment, 'atan2': Psi_atan2}
     return Psi
 
 def warpToOne(phase):
