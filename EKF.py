@@ -152,7 +152,7 @@ class extended_kalman_filter:
         self.x[0, 0] = warpToOne(self.x[0, 0])
 
         # Compute MD using residuals
-        """
+        
         z_pred = self.h.evaluate_h_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
         if using_atan2:
             z_pred[-1] += self.x[0,0] * 2 * np.pi
@@ -162,7 +162,7 @@ class extended_kalman_filter:
             self.residual[-1] = np.arctan2(np.sin(self.residual[-1]), np.cos(self.residual[-1]))
         
         self.MD_residual = np.sqrt(self.residual.T @ np.linalg.inv(self.R) @ self.residual) # Mahalanobis distance
-        
+        """
         if steady_state_walking and self.MD_residual > np.sqrt(18.5):
             #self.Q = self.Q_static + self.Q_static * 0.2
             self.R = np.diag([2, 1, 2, 1]) @ self.R_static @ np.diag([2, 1, 2, 1]).T

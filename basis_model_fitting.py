@@ -37,7 +37,7 @@ def basis_model_fitting(model, mode):
         Psi = least_squares(model, data.ravel(),\
                             phase.ravel(), phase_dot.ravel(), step_length.ravel(), ramp.ravel())
 
-    with open('Psi/Psi_' + mode + '.pickle', 'wb') as file:
+    with open('Psi/Psi_' + mode + '_r.pickle', 'wb') as file:
         pickle.dump(Psi, file)
 
     print("Finished fitting the basis model!")
@@ -69,8 +69,15 @@ def basis_model_residuals(model, mode):
         residuals = data.ravel() - data_pred
         residuals = np.arctan2(np.sin(residuals), np.cos(residuals))
     else:
+        # Non-heteroscedastic noise model
         data_pred = model_prediction(model, Psi, phase.ravel(), phase_dot.ravel(), step_length.ravel(), ramp.ravel())
         residuals = data.ravel() - data_pred
+
+        # Heteroscedastic noise model
+        #residuals = np.zeros(np.shape(data))
+        #for i in range(np.shape(data)[0]):
+        #    data_pred = model_prediction(model, Psi, phase[i, :], phase_dot[i, :], step_length[i, :], ramp[i, :])
+        #    residuals[i, :] = data[i, :] - data_pred
 
     with open(('Basis_model/' + mode + '_residuals.pickle'), 'wb') as file:
     	pickle.dump(residuals, file)
@@ -86,6 +93,19 @@ def measurement_noise_covariance(*sensors):
     #R = np.cov(residuals)
     R = np.diag(covariance)
     return R
+
+def heteroscedastic_measurement_noise_covariance(*sensors):
+    #residuals = []
+    covariance = np.zeros((150, 1))
+    R = np.zeros((150, len(sensors), len(sensors)))
+    for sensor in sensors:
+        with open(('Basis_model/' + sensor + '_residuals.pickle'), 'rb') as file:
+            r = pickle.load(file)
+            for i in range(150):
+                covariance[i] = np.cov(r[i, :])
+        plt.figure()
+        plt.plot(covariance)
+        plt.show()
 
 def saturation_bounds():
     with open(('Gait_training_data/globalThighAngles_training_dataset.pickle'), 'rb') as file:
@@ -112,7 +132,9 @@ def saturation_bounds():
     return saturation_range
     
 if __name__ == '__main__': 
-    saturation_bounds()
+    #sensors = ['ankleMoment']
+    #heteroscedastic_measurement_noise_covariance(*sensors)
+
     F = 11
     N = 3
     phase_model = Fourier_Basis(F, 'phase')
@@ -126,7 +148,7 @@ if __name__ == '__main__':
 
     model_ankleMoment = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_ankleMoment = basis_model_fitting(model_ankleMoment, 'ankleMoment')
-    #basis_model_residuals(model_ankleMoment, 'ankleMoment')
+    basis_model_residuals(model_ankleMoment, 'ankleMoment')
 
     model_tibiaForce = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_tibiaForce = basis_model_fitting(model_tibiaForce, 'tibiaForce')
@@ -143,6 +165,16 @@ if __name__ == '__main__':
     #psi_globalThighAngles = basis_model_fitting(model_globalThighVelocities, 'globalThighVelocities')
     #basis_model_residuals(model_globalThighVelocities, 'globalThighVelocities')
     
+    # tibiaForce fitting without step_length
+    #phase_model = Fourier_Basis(F, 'phase')
+    #phase_dot_model = Polynomial_Basis(1, 'phase_dot')
+    #step_length_model = Berstein_Basis(0,'step_length')
+    #ramp_model = Berstein_Basis(N, 'ramp')
+    #model_tibiaForce = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    #psi_tibiaForce = basis_model_fitting(model_tibiaForce, 'tibiaForce')
+    #basis_model_residuals(model_tibiaForce, 'tibiaForce')
+
+
     # Atan2 fitting
     phase_model = Fourier_Basis(F, 'phase')
     phase_dot_model = Polynomial_Basis(1, 'phase_dot')
@@ -154,6 +186,6 @@ if __name__ == '__main__':
     #basis_model_residuals(model_atan2, 'atan2')
 
     # sensors_dict = {'globalThighAngles': 0, 'globalThighVelocities': 1, 'ankleMoment': 2, 'tibiaForce':3,  'atan2': 4}
-    m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities)
-    model_saver(m_model, 'Measurement_model_01.pickle')
+    #m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities, model_ankleMoment, model_tibiaForce, model_atan2)
+    #model_saver(m_model, 'Measurement_model_01234.pickle')
     

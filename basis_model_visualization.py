@@ -13,14 +13,14 @@ from EKF import wrapTo2pi, load_Psi
 # Determine which sensors to be used
 sensors = ['globalThighAngles', 'globalThighVelocities', 'ankleMoment', 'tibiaForce',  'atan2']
 
-sensor_id = 3
+sensor_id = 2
 
 m_model = model_loader('Measurement_model_01234.pickle')
 Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 
 ## A. Visualize Measurement Model w.r.t. phase_dot ===========================================================================
 phases = np.linspace(0, 1, num = 50)
-phase_dots = np.linspace(0.6, 1.2, num = 50)
+phase_dots = np.linspace(0.6, 1.12, num = 50)
 step_lengths = 1.1
 ramps = 0
 
@@ -43,7 +43,7 @@ ax.set_ylabel('phase_dot')
 ## B. Visualize Measurement Model w.r.t. stpe_length ===========================================================================
 phases = np.linspace(0, 1, num = 50)
 phase_dots = 0.8
-step_lengths = np.linspace(0.7, 1.6, num = 50)
+step_lengths = np.linspace(0.78, 1.55, num = 50)
 ramps = 0
 
 measurement = np.zeros((len(phases), len(step_lengths)))
