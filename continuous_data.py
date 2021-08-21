@@ -81,6 +81,12 @@ def Conti_state_vars(subject, trial, side):
     walking_speed = raw_walking_data[ptr][:][0, 0]
     ptr = raw_walking_data['Continuous'][subject][trial]['description'][1][1]
     incline = raw_walking_data[ptr][:][0, 0]
+    
+    if side == 'left':
+        ptr_sl = raw_walking_data['Gaitcycle'][subject]['subjectdetails'][1][4]
+    elif side == 'right':
+        ptr_sl = raw_walking_data['Gaitcycle'][subject]['subjectdetails'][1][5]
+    leg_length = raw_walking_data[ptr_sl] # mm
 
     phase = np.zeros((np.size(Conti_time)))
     phase_dot = np.zeros((np.size(Conti_time)))
@@ -93,7 +99,7 @@ def Conti_state_vars(subject, trial, side):
             for k in range(stride_steps):
                 phase[int(heel_strike_index[i]) + k] = k * 1/stride_steps
                 phase_dot[int(heel_strike_index[i]) + k] = 1/stride_steps / dt
-                step_length[int(heel_strike_index[i]) + k] = walking_speed * stride_steps * dt
+                step_length[int(heel_strike_index[i]) + k] = walking_speed * stride_steps * dt / leg_length * 1000
 
     # truncate the signal s.t. it starts and ends at heel strikes
     start_index, end_index = Conti_start_end(subject, trial, side)
@@ -117,14 +123,16 @@ def load_Conti_measurement_data(subject, trial, side):
     globalThighVelocity = Continuous_measurement_data[subject][trial][side]['globalThighVelocity'][start_index:end_index]
     atan2 = Continuous_measurement_data[subject][trial][side]['atan2_s'][start_index:end_index]
 
-    return globalThighAngle, ankleMoment, tibiaForce, globalThighVelocity, atan2
+    globalFootAngles = -raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]['foot'][0,start_index:end_index] - 90
+
+    return globalThighAngle, ankleMoment, tibiaForce, globalThighVelocity, atan2, globalFootAngles
 
 def plot_Conti_measurement_data(subject, trial, side):
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
-    globalThighAngle, ankleMoment, tibiaForce, globalThighVelocity, atan2\
+    globalThighAngle, ankleMoment, tibiaForce, globalThighVelocity, atan2, _\
                                          = load_Conti_measurement_data(subject, trial, side)
     
-    m_model = model_loader('Measurement_model_01234.pickle')
+    m_model = model_loader('Measurement_model_01234_B1.pickle')
     Psi = load_Psi('Generic')
 
     globalThighAngles_pred = model_prediction(m_model.models[0], Psi['globalThighAngles'], phases, phase_dots, step_lengths, ramps)
@@ -457,7 +465,7 @@ def plot_Conti_kinetics_data(subject, trial, side):
     plt.plot(range(np.shape(kneeForce)[1])[start:end], kneeForce[2, start:end], 'b-')
     plt.plot(range(np.shape(kneeForce)[1])[start:end], -ankleForce[0, start:end], 'r-')
 
-    plt.legend(('0', '1', '2'))
+    plt.legend(('tibia', 'ankle'))
     plt.xlabel('samples')
     plt.ylabel('Force Z (N)')
     
@@ -468,9 +476,17 @@ def plot_Conti_kinetics_data(subject, trial, side):
     plt.legend(('ankleMoment', 'kneeMoment', '1','2'))
     plt.xlabel('samples')
     plt.ylabel('Ankle Moment (N-m)')
+    
+    #plt.figure()
+    #plt.plot(range(np.shape(ankleMoment)[1])[start:end], footAngles[0, start:end])
+    #plt.plot(range(np.shape(ankleMoment)[1])[start:end], footAngles[1, start:end])
+    #plt.plot(range(np.shape(ankleMoment)[1])[start:end], footAngles[2, start:end])
+
     plt.show()
 
 if __name__ == '__main__':
+    
+
     """
     with open('Continuous_data/Continuous_measurement_data.pickle', 'rb') as file:
         Continuous_measurement_data = pickle.load(file)
@@ -588,10 +604,15 @@ if __name__ == '__main__':
     """
     ##################################################################
     
-    subject = 'AB10'
-    trial = 's1x2d10'
+    subject = 'AB07'
+    trial = 's1x2i0'
     side = 'left'
+    
 
+    #footAngles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]['foot'][0,:]
+    #plt.figure()
+    #plt.plot(-footAngles-90)
+    #plt.show()
     #plot_Conti_kinetics_data(subject, trial, side)
     #plot_Conti_joints_angles(subject, trial, side)
     plot_Conti_measurement_data(subject, trial, side)

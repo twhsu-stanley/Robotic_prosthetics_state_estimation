@@ -38,6 +38,10 @@ def jointAngles_statistics(joint):
                 
                 if np.max(data_right) > 0:
                     data_right -= np.max(data_right)
+            
+            if joint == 'foot':
+                data_left -= 90
+                data_right -= 90
         
             if subject == 'AB01':
                 data = data_left
@@ -449,6 +453,9 @@ def gait_training_data_generator(mode):
             elif mode == 'ankleAngles':
                 data_left = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['left']['ankle']['x'][:]
                 data_right = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['right']['ankle']['x'][:]
+            elif mode == 'footAngles':
+                data_left = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['left']['foot']['x'][:]-90
+                data_right = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['right']['foot']['x'][:]-90
             elif mode == 'globalThighAngles' or mode == 'globalThighVelocities' or mode == 'atan2':
                 data_left = globalThighAngles[trial][subject]['left']
                 data_right = globalThighAngles[trial][subject]['right']
@@ -486,18 +493,23 @@ def gait_training_data_generator(mode):
                         
             # 3) Step lengths
             ptr = raw_walking_data['Gaitcycle'][subject][trial]['description'][1][0]
-            walking_speed = raw_walking_data[ptr]
+            walking_speed = raw_walking_data[ptr] # m/s
+
+            ptr = raw_walking_data['Gaitcycle'][subject]['subjectdetails'][1][4]
+            leg_length_left = raw_walking_data[ptr] # mm
+            ptr = raw_walking_data['Gaitcycle'][subject]['subjectdetails'][1][5]
+            leg_length_right = raw_walking_data[ptr] # mm
 
             step_length_left = []
             for step_left in time_info_left:
                 delta_time_left = step_left[149] - step_left[0]
-                step_length_left.append(np.full((1, 150), walking_speed * delta_time_left)) 
+                step_length_left.append(np.full((1, 150), walking_speed * delta_time_left / leg_length_left * 1000)) # normalized step length
             step_length_left = np.squeeze(np.array(step_length_left))
 
             step_length_right = []
             for step_right in time_info_right:
                 delta_time_right = step_right[149] - step_right[0]
-                step_length_right.append(np.full((1,150), walking_speed * delta_time_right))
+                step_length_right.append(np.full((1,150), walking_speed * delta_time_right / leg_length_right * 1000))
             step_length_right = np.squeeze(np.array(step_length_right))
 
             # 4) Ramp angles
@@ -650,7 +662,7 @@ def gait_training_data_generator(mode):
     print("Total # of used trials: ", num_trials)
     print("Total # of trials with errors: ", error_trials)
 
-    with open(('Gait_training_data/' + mode + '_training_dataset.pickle'), 'wb') as file:
+    with open(('Gait_training_data/' + mode + '_NSL_training_dataset.pickle'), 'wb') as file:
     	pickle.dump(gait_training_dataset, file)
     
 if __name__ == '__main__':
@@ -659,15 +671,17 @@ if __name__ == '__main__':
     
     #jointAngles_statistics('knee')
     #jointAngles_statistics('ankle')
+    #jointAngles_statistics('foot')
     #globalThighAngles_statistics()
 
     #time.sleep(3)
 
     #gait_training_data_generator('kneeAngles')
     #gait_training_data_generator('ankleAngles')
+    gait_training_data_generator('footAngles')
     #gait_training_data_generator('globalThighAngles')
     #gait_training_data_generator('globalThighVelocities')
     #gait_training_data_generator('atan2')
 
     #ankleMoment_statistics()
-    gait_training_data_generator('tibiaForce')
+    #gait_training_data_generator('tibiaForce')

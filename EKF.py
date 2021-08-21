@@ -11,29 +11,32 @@ def process_model(x, dt):
 
 ## Load control model & coefficients (for OSL implementation)
 c_model = model_loader('Control_model.pickle')
-with open('Psi/Psi_kneeAngles.pickle', 'rb') as file:
+with open('Psi/Psi_kneeAngles_B3.pickle', 'rb') as file:
     Psi_knee = pickle.load(file)
-with open('Psi/Psi_ankleAngles.pickle', 'rb') as file:
+with open('Psi/Psi_ankleAngles_B3.pickle', 'rb') as file:
     Psi_ankle = pickle.load(file)
 
 ## Load model coefficients
 def load_Psi(subject = 'Generic'):
     if subject == 'Generic':
-        with open('Psi/Psi_globalThighAngles.pickle', 'rb') as file:
+        with open('Psi/Psi_globalThighAngles_NSL_B1.pickle', 'rb') as file:
             Psi_globalThighAngles = pickle.load(file)
         
-        with open('Psi/Psi_globalThighVelocities.pickle', 'rb') as file:
+        with open('Psi/Psi_globalThighVelocities_NSL_B1.pickle', 'rb') as file:
             Psi_globalThighVelocities = pickle.load(file)
         
-        with open('Psi/Psi_ankleMoment.pickle', 'rb') as file:
+        with open('Psi/Psi_ankleMoment_B1.pickle', 'rb') as file:
             Psi_ankleMoment = pickle.load(file)
         
-        with open('Psi/Psi_tibiaForce.pickle', 'rb') as file:
+        with open('Psi/Psi_tibiaForce_B1.pickle', 'rb') as file:
             Psi_tibiaForce = pickle.load(file)
         
-        with open('Psi/Psi_atan2.pickle', 'rb') as file:
+        with open('Psi/Psi_atan2_NSL.pickle', 'rb') as file:
             Psi_atan2 = pickle.load(file)
-    
+
+        with open('Psi/Psi_footAngles_NSL_B1.pickle', 'rb') as file:
+            Psi_footAngles = pickle.load(file)
+
     else:
         print("Subject-specific model is not available at this time.")
         """
@@ -58,7 +61,7 @@ def load_Psi(subject = 'Generic'):
         """
            
     Psi = {'globalThighAngles': Psi_globalThighAngles, 'globalThighVelocities': Psi_globalThighVelocities,
-           'tibiaForce': Psi_tibiaForce, 'ankleMoment': Psi_ankleMoment, 'atan2': Psi_atan2}
+           'tibiaForce': Psi_tibiaForce, 'ankleMoment': Psi_ankleMoment, 'atan2': Psi_atan2, 'footAngles': Psi_footAngles}
     return Psi
 
 def warpToOne(phase):

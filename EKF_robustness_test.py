@@ -20,21 +20,21 @@ sensor_id = [sensors_dict[key] for key in sensors]
 sensor_id_str = ""
 for i in range(len(sensor_id)):
     sensor_id_str += str(sensor_id[i])
-m_model = model_loader('Measurement_model_' + sensor_id_str +'.pickle')
+m_model = model_loader('Measurement_model_' + sensor_id_str +'_B1.pickle')
 
 using_atan2 = False
 if sensors[-1] == 'atan2':
     using_atan2 = True
 
-tibiaForce_threshold = 10
+tibiaForce_threshold = -2.5
 
 Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 
 dt = 1/100
-inital_Sigma = np.diag([1e-6, 1e-6, 1e-6, 1e-6])
+inital_Sigma = np.diag([1e-6, 1e-6, 1e-6, 0])
 #Q = np.diag([0, 2e-3, 1e-3, 2e-1]) * dt
-Q = np.diag([0, 1e-3, 1e-2, 4]) * dt
-U = np.diag([3, 3, 3, 3, 3])
+Q = np.diag([0, 5e-4, 1e-3, 0]) * dt
+U = np.diag([1, 1, 1, 1, 1])
 R = U @ measurement_noise_covariance(*sensors) @ U.T
 saturation_range = saturation_bounds()
 
@@ -57,7 +57,7 @@ if using_ankleMoment or using_tibiaForce:
     for i in range(len(sensor_swing_id)):
         sensor_swing_id_str += str(sensor_swing_id[i])
     Psi_swing = np.array([load_Psi('Generic')[key] for key in sensors_swing], dtype = object)
-    m_model_swing = model_loader('Measurement_model_' + sensor_swing_id_str +'.pickle')
+    m_model_swing = model_loader('Measurement_model_' + sensor_swing_id_str +'_B1.pickle')
     U_swing = np.diag(np.diag(U)[sensor_swing_id])
     R_swing = U_swing @ measurement_noise_covariance(*sensors_swing) @ U_swing.T
 
@@ -97,10 +97,11 @@ def loadTrajectory(trajectory = 'walking'):
     return trajectory
 
 def ekf_test(subject, trial, side, kidnap = False, plot = False):
+    print("EKF Test: ", subject, "/", trial, '/', side)
     # load ground truth
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
     # load measurements
-    globalThighAngle, ankleMoment, tibiaForce, globalThighVelocity, atan2 = load_Conti_measurement_data(subject, trial, side)
+    globalThighAngle, ankleMoment, tibiaForce, globalThighVelocity, atan2, globalFootAngles = load_Conti_measurement_data(subject, trial, side)
 
     #### Joint Control ############################################################
     knee_angle, ankle_angle = load_Conti_joints_angles(subject, trial, side)
@@ -124,8 +125,8 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
 
     # initialize the state
     init = myStruct()
-    init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
-    #init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [0]])
+    #init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
+    init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [0]])
     init.Sigma = inital_Sigma
 
     ekf = extended_kalman_filter(sys, init)
@@ -150,7 +151,8 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
 
     x = np.zeros((total_step, 4))  # state estimate
     z_pred = np.zeros((total_step, len(sensors)))
-    
+    directRampAngles = np.zeros((total_step, 1))
+    directRampAngles_mean = np.zeros((total_step, 1))
     #Q_diag = np.zeros((total_step, 4))
     #Sigma_diag = np.zeros((total_step, 4))
     
@@ -163,6 +165,8 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     knee_angle_cmd = np.zeros((total_step, 1))
     ankle_angle_cmd = np.zeros((total_step, 1))
     
+    stance = False
+    stance_prev = False
     for i in range(total_step):
         if kidnap != False:
             if i == kidnap_index:
@@ -172,17 +176,35 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         ekf.state_saturation(saturation_range)
 
         if using_ankleMoment or using_tibiaForce:
-            if tibiaForce[i] <= tibiaForce_threshold:# and z[-1, i]/(2*np.pi) < 0.4: # stance
+            if tibiaForce[i] <= tibiaForce_threshold:
+                stance = True
+                if stance_prev == False:
+                    stance_idxs = i
+                stance_prev = stance
+
                 ekf.h = m_model
                 ekf.R = R
                 ekf.correction(z[:, i], Psi, using_atan2, steady_state_walking = True)
                 z_pred[i,:] = ekf.z_hat.T
 
             else: # swing
+                stance = False
+                if stance_prev == True:
+                    stance_idx2 = i
+                    stance_idx1 = stance_idxs
+                stance_prev = stance
+
                 ekf.h = m_model_swing
                 ekf.R = R_swing
                 ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, steady_state_walking = True)
                 z_pred[i, sensor_swing_id] = ekf.z_hat.T
+            
+            directRampAngles[i] = globalFootAngles[i]
+            try:
+                directRampAngles_mean[i] = np.mean(globalFootAngles[stance_idx1:stance_idx2])
+            except:
+                directRampAngles_mean[i] = 0
+
         else:
             ekf.correction(z[:, i], Psi, using_atan2, steady_state_walking = True)
             z_pred[i,:] = ekf.z_hat.T
@@ -238,14 +260,17 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         RMSE_phase_dot = np.sqrt((estimate_error[start_check_idx:, 1] ** 2).mean()) 
         RMSE_step_length = np.sqrt((estimate_error[start_check_idx:, 2] ** 2).mean()) 
         RMSE_ramp = np.sqrt((estimate_error[start_check_idx:, 3] ** 2).mean()) 
-        print("RMSE phase = %5.3f" % RMSE_phase)
-        print("RMSE phase_dot = %5.3f" % RMSE_phase_dot)
-        print("RMSE step_length = %5.3f" % RMSE_step_length)
-        print("RMSE ramp = %5.3f" % RMSE_ramp)
-        
-        result = RMSE_phase
+        RMSE_directRamp = np.sqrt(((directRampAngles_mean[start_check_idx:-1] - ramps[start_check_idx:-1]) ** 2).mean()) 
+        result = (RMSE_phase, RMSE_phase_dot, RMSE_step_length, RMSE_ramp)
 
     if plot == True:
+        if kidnap == False:
+            print("RMSE phase = %5.3f" % RMSE_phase)
+            print("RMSE phase_dot = %5.3f" % RMSE_phase_dot)
+            print("RMSE step_length = %5.3f" % RMSE_step_length)
+            print("RMSE ramp = %5.3f" % RMSE_ramp)
+            print("RMSE direct ramp = %5.3f" % RMSE_directRamp)
+        
         #th = heel_strike_index[0:25, 0].astype(int) # time step of heel strikes
         nu = np.sqrt(18.5)
         # plot results
@@ -282,6 +307,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         plt.subplot(414)
         plt.plot(tt, ramps, 'k-')
         plt.plot(tt, x[:, 3], 'r--')
+        
         #plt.plot(tt, x[:, 3] + Sigma_diag[:, 3]*nu, 'b-')
         #plt.plot(tt, x[:, 3] - Sigma_diag[:, 3]*nu, 'g-')
         plt.ylabel('$\\alpha~(deg)$')
@@ -384,14 +410,24 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         plt.xlim([0, tt[-1]+0.1])
         plt.xlabel("time (s)")
 
-        
         plt.figure("Kinetics")
-        plt.subplot(211)
+        plt.subplot(311)
         plt.title("Kinetics")
         plt.plot(tt, tibiaForce[0:total_step], 'k-')
+        plt.plot(tt, tibiaForce_threshold*np.ones((len(tt),1)), 'b--')
         plt.xlim([0, tt[-1]+0.1])
-        plt.subplot(212)
+        plt.ylabel('Tibia Axial Force')
+        plt.subplot(312)
         plt.plot(tt, z[1, 0:total_step], 'k-')
+        plt.xlim([0, tt[-1]+0.1])
+        plt.ylabel('Ankle Moment')
+        plt.subplot(313)
+        plt.plot(tt, ramps, 'k-')
+        plt.plot(tt, x[:, 3], 'r--')
+        plt.plot(tt,  directRampAngles, 'm-')
+        plt.plot(tt,  directRampAngles_mean, 'g-')
+        plt.legend(('Ground truth ramp', 'EKF ramp est','foot angles','backup ramp'))
+        plt.ylabel('Ramp Est & Foot Angle')
         plt.xlim([0, tt[-1]+0.1])
         
         plt.show()
@@ -553,15 +589,17 @@ def ekf_bank_test(subject, trial, side, N = 30, kidnap = [0, 1, 2, 3], plot = Tr
 
 def ekf_robustness(kidnap = True):
     total_trials = 0
-    RMSerror_phase = []
-
     robustness = 0
+
+    RMSE_phase_mean = []
+    RMSE_step_length_mean = []
+    RMSE_ramp_mean = []
 
     with open('Continuous_data/GlobalThighAngles_with_Nan.pickle', 'rb') as file:
         nan_dict = pickle.load(file)
 
     #for subject in Conti_subject_names():
-    for subject in ['AB05', 'AB08', 'AB09', 'AB10']: # , 'AB02', 'AB03', 'AB08', 'AB09', 'AB10'
+    for subject in ['AB10']: # , 'AB02', 'AB03', 'AB08', 'AB09', 'AB10'
         #print("subject: ", subject)
         for trial in Conti_trial_names(subject):
             if trial == 'subjectdetails':
@@ -577,36 +615,35 @@ def ekf_robustness(kidnap = True):
                 if kidnap == True:
                     robustness += ekf_bank_test(subject, trial, side, N = 1, plot = False)
                 else:
-                    RMSE_phase = ekf_test(subject, trial, side, kidnap, plot = False)
-                    RMSerror_phase.append([RMSE_phase])
+                    RMSE_phase, _, RMSE_step_length, RMSE_ramp = ekf_test(subject, trial, side, kidnap, plot = False)
+                    RMSE_phase_mean.append(RMSE_phase)
+                    RMSE_step_length_mean.append(RMSE_step_length)
+                    RMSE_ramp_mean.append(RMSE_ramp)
+                    if RMSE_phase > 0.05 or RMSE_step_length > 0.1 or RMSE_ramp > 2:
+                        print(subject, "/", trial, '/', side)
+                        print("RMSE phase = %5.3f" % np.mean(RMSE_phase_mean))
+                        print("RMSE step_length = %5.3f" % np.mean(RMSE_step_length_mean))
+                        print("RMSE ramp = %5.3f" % np.mean(RMSE_ramp_mean))
 
-    robustness = robustness / total_trials
-    print("==========================================")
-    print("Overall Average Robustness (%) = ", robustness)
-
-    """
     if kidnap == True:
-        RMSerror_phase = np.array(RMSerror_phase).reshape(-1, 3)
-        RMSerror_phase_df = pd.DataFrame(RMSerror_phase, columns = ['RMSE', 'x', 'y'])
-        sns.heatmap(RMSerror_phase_df.pivot('y', 'x', 'RMSE'))
-        plt.title("RMSE of phase")
-        plt.xlabel("step_length")
-        plt.ylabel("ramp")
-        plt.ylim((-10, 10))
-        plt.gca().xaxis.set_major_formatter(StrMethodFormatter('{x:,.2f}'))
-        plt.show()
+        robustness = robustness / total_trials
+        print("==========================================")
+        print("Overall Average Robustness (%) = ", robustness)
     else:
-        pass
-        # heatmap for normal test
-    """
-    return robustness
+        print("Average RMSE phase = %5.3f" % np.mean(RMSE_phase_mean))
+        print("Average RMSE step_length = %5.3f" % np.mean(RMSE_step_length_mean))
+        print("Average RMSE ramp = %5.3f" % np.mean(RMSE_ramp_mean))
+
+        print("Max RMSE phase = %5.3f" % np.max(RMSE_phase_mean))
+        print("Max RMSE step_length = %5.3f" % np.max(RMSE_step_length_mean))
+        print("Max RMSE ramp = %5.3f" % np.max(RMSE_ramp_mean))
 
 if __name__ == '__main__':
-    subject = 'AB10'
-    trial = 's1x2d2x5'
+    subject = 'AB05'
+    trial = 's1x2d7x5'
     side = 'left'
 
-    ekf_test(subject, trial, side, kidnap = [0, 1, 2, 3], plot = True)
+    ekf_test(subject, trial, side, kidnap = False, plot = True)
     #ekf_bank_test(subject, trial, side, N = 10, kidnap = [0, 1, 2, 3], plot = True)
     #ekf_robustness(kidnap = True)
     #ekf_robustness(kidnap = False)
