@@ -11,44 +11,39 @@ from basis_model_fitting import measurement_noise_covariance, saturation_bounds
 import csv
 
 # Dictionary of all sensors
-sensors_dict = {'globalThighAngles': 0, 'globalThighVelocities': 1, 'ankleMoment': 2, 'tibiaForce':3,  'atan2': 4}
+sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2, 'globalFootAngles':3, 'ankleMoment':4, 'tibiaForce':5}
 
 # Determine which sensors to be used
-sensors = ['globalThighAngles', 'globalThighVelocities', 'ankleMoment', 'tibiaForce',  'atan2']
+sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2', 'ankleMoment', 'tibiaForce']
 sensor_id = [sensors_dict[key] for key in sensors]
 
 sensor_id_str = ""
 for i in range(len(sensor_id)):
     sensor_id_str += str(sensor_id[i])
-m_model = model_loader('Measurement_model_' + sensor_id_str +'_B1.pickle')
+m_model = model_loader('Measurement_model_' + sensor_id_str +'_NSL.pickle')
 
 using_atan2 = False
-if sensors[-1] == 'atan2':
-    using_atan2 = True
+using_atan2 = np.any(np.array(sensors) == 'atan2')
 
-tibiaForce_threshold = -2.5
+tibiaForce_threshold = -2
 
 Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 
 dt = 1/100
-inital_Sigma = np.diag([1e-6, 1e-6, 1e-6, 0])
-#Q = np.diag([0, 2e-3, 1e-3, 2e-1]) * dt
-Q = np.diag([0, 5e-4, 1e-3, 0]) * dt
+inital_Sigma = np.diag([1e-6, 1e-6, 1e-6, 1e-6])
+Q = np.diag([0, 1e-3, 1e-3, 1e-1]) * dt
 U = np.diag([1, 1, 1, 1, 1])
 R = U @ measurement_noise_covariance(*sensors) @ U.T
 saturation_range = saturation_bounds()
 
-using_ankleMoment = False
-if sensors[2] == 'ankleMoment':
-    using_ankleMoment = True
-using_tibiaForce = False
-if sensors[3] == 'tibiaForce':
-    using_tibiaForce = True
+using_ankleMoment = np.any(np.array(sensors) == 'ankleMoment')
+using_tibiaForce = np.any(np.array(sensors) == 'tibiaForce')
+using_footAngles = np.any(np.array(sensors) == 'globalFootAngles')
 
-if using_ankleMoment or using_tibiaForce:
+if using_ankleMoment or using_tibiaForce or using_footAngles:
     sensors_swing = []
     for i in range(len(sensors)):
-        if sensors[i] == 'ankleMoment' or sensors[i] == 'tibiaForce':
+        if sensors[i] == 'ankleMoment' or sensors[i] == 'tibiaForce':# or sensors[i] == 'globalFootAngles':
             continue
         else:
             sensors_swing.append(sensors[i])
@@ -57,7 +52,7 @@ if using_ankleMoment or using_tibiaForce:
     for i in range(len(sensor_swing_id)):
         sensor_swing_id_str += str(sensor_swing_id[i])
     Psi_swing = np.array([load_Psi('Generic')[key] for key in sensors_swing], dtype = object)
-    m_model_swing = model_loader('Measurement_model_' + sensor_swing_id_str +'_B1.pickle')
+    m_model_swing = model_loader('Measurement_model_' + sensor_swing_id_str +'_NSL.pickle')
     U_swing = np.diag(np.diag(U)[sensor_swing_id])
     R_swing = U_swing @ measurement_noise_covariance(*sensors_swing) @ U_swing.T
 
@@ -101,7 +96,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     # load ground truth
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
     # load measurements
-    globalThighAngle, ankleMoment, tibiaForce, globalThighVelocity, atan2, globalFootAngles = load_Conti_measurement_data(subject, trial, side)
+    globalThighAngle, globalThighVelocity, atan2, globalFootAngle, ankleMoment, tibiaForce = load_Conti_measurement_data(subject, trial, side)
 
     #### Joint Control ############################################################
     knee_angle, ankle_angle = load_Conti_joints_angles(subject, trial, side)
@@ -111,7 +106,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     refKne = refTrajectory["knee"]
     ################################################################################
 
-    z_full = np.array([[globalThighAngle], [globalThighVelocity], [ankleMoment], [tibiaForce], [atan2]])
+    z_full = np.array([[globalThighAngle], [globalThighVelocity], [atan2], [globalFootAngle], [ankleMoment], [tibiaForce]])
     z_full = np.squeeze(z_full)
     z = z_full[sensor_id, :]
 
@@ -125,8 +120,8 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
 
     # initialize the state
     init = myStruct()
-    #init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
-    init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [0]])
+    init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
+    #init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [0]])
     init.Sigma = inital_Sigma
 
     ekf = extended_kalman_filter(sys, init)
@@ -150,9 +145,9 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     ramps = ramps[0 : total_step]
 
     x = np.zeros((total_step, 4))  # state estimate
-    z_pred = np.zeros((total_step, len(sensors)))
-    directRampAngles = np.zeros((total_step, 1))
-    directRampAngles_mean = np.zeros((total_step, 1))
+    z_pred = np.zeros((total_step, len(sensors)+1))
+    directRamp = np.zeros((total_step, 1))
+    L_cop = np.zeros((total_step, 1))
     #Q_diag = np.zeros((total_step, 4))
     #Sigma_diag = np.zeros((total_step, 4))
     
@@ -167,6 +162,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     
     stance = False
     stance_prev = False
+    stance_idxs = 0
     for i in range(total_step):
         if kidnap != False:
             if i == kidnap_index:
@@ -175,35 +171,46 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         ekf.prediction(dt)
         ekf.state_saturation(saturation_range)
 
-        if using_ankleMoment or using_tibiaForce:
+        if using_ankleMoment or using_tibiaForce or using_footAngles:
             if tibiaForce[i] <= tibiaForce_threshold:
-                stance = True
-                if stance_prev == False:
+                # Location of the centoer of pressure
+                L_cop[i] = -ankleMoment[i] / tibiaForce[i]
+                if stance_prev == False and L_cop[i] > -0.05 and L_cop[i] <= 0.1 and (i - stance_idxs) > 0.5/dt:
                     stance_idxs = i
-                stance_prev = stance
-
-                ekf.h = m_model
-                ekf.R = R
-                ekf.correction(z[:, i], Psi, using_atan2, steady_state_walking = True)
-                z_pred[i,:] = ekf.z_hat.T
-
-            else: # swing
-                stance = False
+                    stance = True
+                    stance_prev = stance
+                    
+                elif stance_prev == True and L_cop[i] > 0.2:
+                    stance_idx2 = i
+                    stance_idx1 = stance_idxs
+                    stance = False
+                    stance_prev = stance
+            else:
+                L_cop[i] = -1 # arbitraty number
                 if stance_prev == True:
                     stance_idx2 = i
                     stance_idx1 = stance_idxs
+                stance = False
                 stance_prev = stance
-
-                ekf.h = m_model_swing
-                ekf.R = R_swing
-                ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, steady_state_walking = True)
-                z_pred[i, sensor_swing_id] = ekf.z_hat.T
             
-            directRampAngles[i] = globalFootAngles[i]
             try:
-                directRampAngles_mean[i] = np.mean(globalFootAngles[stance_idx1:stance_idx2])
+                directRamp[i] = np.mean(globalFootAngle[stance_idx1:stance_idx2])
             except:
-                directRampAngles_mean[i] = 0
+                directRamp[i] = 0.001
+            
+            if stance == True:
+                ekf.h = m_model
+                ekf.R = np.diag(np.append(np.diag(R), 2))
+                ekf.correction(z[:, i], Psi, using_atan2, steady_state_walking = True, direct_ramp = directRamp[i])
+                z_pred[i,:] = ekf.z_hat.T
+            else: # swing
+                ekf.h = m_model_swing
+                ekf.R = np.diag(np.append(np.diag(R_swing), 2))
+                ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, steady_state_walking = True, direct_ramp = directRamp[i])
+                #print(ekf.z_hat.T)
+                #print(sensor_swing_id)
+                z_pred[i, [0,1,2,5]] = ekf.z_hat.T
+        #==============================================================================================================
 
         else:
             ekf.correction(z[:, i], Psi, using_atan2, steady_state_walking = True)
@@ -214,7 +221,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
 
         #Q_diag[i,:] = np.diag(ekf.Q)
         #Sigma_diag[i, :] = np.diag(ekf.Sigma)
-        MD_residual[i] = ekf.MD_residual
+        #MD_residual[i] = ekf.MD_residual
 
         estimate_error[i, :] = (ekf.x - np.array([[phases[i]], [phase_dots[i]], [step_lengths[i]], [ramps[i]]])).reshape(-1)
         estimate_error[i, 0] = phase_error(ekf.x[0, 0], phases[i])
@@ -260,7 +267,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         RMSE_phase_dot = np.sqrt((estimate_error[start_check_idx:, 1] ** 2).mean()) 
         RMSE_step_length = np.sqrt((estimate_error[start_check_idx:, 2] ** 2).mean()) 
         RMSE_ramp = np.sqrt((estimate_error[start_check_idx:, 3] ** 2).mean()) 
-        RMSE_directRamp = np.sqrt(((directRampAngles_mean[start_check_idx:-1] - ramps[start_check_idx:-1]) ** 2).mean()) 
+        RMSE_directRamp = np.sqrt(((directRamp[start_check_idx:-1] - ramps[start_check_idx:-1]) ** 2).mean()) 
         result = (RMSE_phase, RMSE_phase_dot, RMSE_step_length, RMSE_ramp)
 
     if plot == True:
@@ -386,46 +393,38 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         plt.xlabel('time (s)')
 
         plt.figure("Measurements")
-        plt.subplot(511)
-        plt.title("Measurements")
-        plt.plot(tt, z[0, 0:total_step], 'k-')
-        plt.plot(tt, z_pred[:, 0], 'r--')
-        plt.legend(('actual', 'predicted'))
-        plt.xlim([0, tt[-1]+0.1])
-        plt.subplot(512)
-        plt.plot(tt, z[1, 0:total_step], 'k-')
-        plt.plot(tt, z_pred[:, 1], 'r--')
-        plt.xlim([0, tt[-1]+0.1])
-        plt.subplot(513)
-        plt.plot(tt, z[2, 0:total_step], 'k-')
-        plt.plot(tt, z_pred[:, 2], 'r--')
-        plt.xlim([0, tt[-1]+0.1])
-        plt.subplot(514)
-        plt.plot(tt, z[3, 0:total_step], 'k-')
-        plt.plot(tt, z_pred[:, 3], 'r--')
-        plt.xlim([0, tt[-1]+0.1])
-        plt.subplot(515)
-        plt.plot(tt, z[4, 0:total_step], 'k-')
-        plt.plot(tt, z_pred[:, 4], 'r--')
-        plt.xlim([0, tt[-1]+0.1])
-        plt.xlabel("time (s)")
+        for i in range(len(sensors)):
+            plt.subplot(int(str(len(sensors)) + "1" + str(i+1)))
+            plt.plot(tt, z[i, 0:total_step], 'k-')
+            plt.plot(tt, z_pred[:, i], 'r--')
+            plt.xlim([0, tt[-1]+0.1])
+
+            if i == 0:
+                plt.title("Measurements")
+                plt.legend(('actual', 'predicted'))
+            elif i == len(sensors)-1:
+                plt.xlabel("time (s)")
 
         plt.figure("Kinetics")
-        plt.subplot(311)
+        plt.subplot(411)
         plt.title("Kinetics")
         plt.plot(tt, tibiaForce[0:total_step], 'k-')
         plt.plot(tt, tibiaForce_threshold*np.ones((len(tt),1)), 'b--')
         plt.xlim([0, tt[-1]+0.1])
         plt.ylabel('Tibia Axial Force')
-        plt.subplot(312)
-        plt.plot(tt, z[1, 0:total_step], 'k-')
+        plt.subplot(412)
+        plt.plot(tt, ankleMoment[0:total_step], 'k-')
         plt.xlim([0, tt[-1]+0.1])
         plt.ylabel('Ankle Moment')
-        plt.subplot(313)
+        plt.subplot(413)
+        plt.plot(tt, L_cop[0:total_step], 'k-')
+        plt.xlim([0, tt[-1]+0.1])
+        plt.ylabel('L cop')
+        plt.subplot(414)
         plt.plot(tt, ramps, 'k-')
         plt.plot(tt, x[:, 3], 'r--')
-        plt.plot(tt,  directRampAngles, 'm-')
-        plt.plot(tt,  directRampAngles_mean, 'g-')
+        plt.plot(tt, globalFootAngle[0:total_step], 'm-')
+        plt.plot(tt, directRamp, 'g-')
         plt.legend(('Ground truth ramp', 'EKF ramp est','foot angles','backup ramp'))
         plt.ylabel('Ramp Est & Foot Angle')
         plt.xlim([0, tt[-1]+0.1])
@@ -440,7 +439,7 @@ def ekf_bank_test(subject, trial, side, N = 30, kidnap = [0, 1, 2, 3], plot = Tr
     # load ground truth
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
     # load measurements
-    globalThighAngle, ankleMoment, tibiaForce, globalThighVelocity, atan2 = load_Conti_measurement_data(subject, trial, side)
+    globalThighAngle, globalThighVelocity, atan2, globalFootAngle, ankleMoment, tibiaForce = load_Conti_measurement_data(subject, trial, side)
 
     z_full = np.array([[globalThighAngle], [globalThighVelocity], [ankleMoment], [tibiaForce], [atan2]])
     z_full = np.squeeze(z_full)
@@ -491,7 +490,7 @@ def ekf_bank_test(subject, trial, side, N = 30, kidnap = [0, 1, 2, 3], plot = Tr
             ekf.prediction(dt)
             ekf.state_saturation(saturation_range)
 
-            if using_ankleMoment or using_tibiaForce:
+            if using_ankleMoment or using_tibiaForce or using_footAngles:
                 if tibiaForce[i] <= tibiaForce_threshold:
                     ekf.h = m_model
                     ekf.R = R
@@ -639,11 +638,11 @@ def ekf_robustness(kidnap = True):
         print("Max RMSE ramp = %5.3f" % np.max(RMSE_ramp_mean))
 
 if __name__ == '__main__':
-    subject = 'AB05'
-    trial = 's1x2d7x5'
+    subject = 'AB10'
+    trial = 's1x2i10'
     side = 'left'
 
-    ekf_test(subject, trial, side, kidnap = False, plot = True)
+    ekf_test(subject, trial, side, kidnap = [0, 1, 2, 3], plot = True)
     #ekf_bank_test(subject, trial, side, N = 10, kidnap = [0, 1, 2, 3], plot = True)
     #ekf_robustness(kidnap = True)
     #ekf_robustness(kidnap = False)

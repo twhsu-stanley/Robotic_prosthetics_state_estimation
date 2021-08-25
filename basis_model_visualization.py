@@ -6,16 +6,12 @@ from model_framework import *
 from EKF import wrapTo2pi, load_Psi
 
 
-# Dictionary of the sensors
-#sensors_dict = {'global_thigh_angle': 0, 'force_z_ankle': 1, 'force_x_ankle': 2,
-#               'ankleMoment': 3, 'global_thigh_angle_vel': 4, 'atan2': 5}
-
 # Determine which sensors to be used
-sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2', 'footAngles']
+sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2','globalFootAngles','ankleMoment', 'tibiaForce']
 
-sensor_id = 3
+sensor_id = 0
 
-m_model = model_loader('Measurement_model_0145_NSL_B1.pickle')
+m_model = model_loader('Measurement_model_012345_NSL.pickle')
 Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 
 ## A. Visualize Measurement Model w.r.t. phase_dot ===========================================================================
@@ -83,12 +79,12 @@ ax.set_xlabel('phase')
 ax.set_ylabel('ramp')
 
 # ==========================================================================================================================
-"""
+
 
 c_model = model_loader('Control_model.pickle')
-with open('Psi/Psi_kneeAngles.pickle', 'rb') as file:#_withoutNan
+with open('Psi/Psi_kneeAngles_B3.pickle', 'rb') as file:#_withoutNan
     Psi_knee = pickle.load(file)
-with open('Psi/Psi_ankleAngles.pickle', 'rb') as file:
+with open('Psi/Psi_ankleAngles_B3.pickle', 'rb') as file:
     Psi_ankle = pickle.load(file)
 ## C. Visualize Joint Model w.r.t. step_length ===============================================================================================
 phases = np.linspace(0, 1, num = 50)
@@ -194,5 +190,5 @@ ax.set_ylabel('phase_dots')
 ax.set_zlabel('knee angle (deg)')
 
 #==============================================================================================================================
-"""
+
 plt.show()

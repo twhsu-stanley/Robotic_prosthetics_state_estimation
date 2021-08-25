@@ -116,59 +116,62 @@ def load_Conti_measurement_data(subject, trial, side):
 
     start_index, end_index = Conti_start_end(subject, trial, side)
     globalThighAngle = Continuous_measurement_data[subject][trial][side]['globalThighAngles'][0, start_index:end_index]
-    #force_z_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_z'][0, start_index:end_index]
-    #force_x_ankle = Continuous_measurement_data[subject][trial][side]['force_ankle_x'][0, start_index:end_index]
-    tibiaForce = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointforce'][side]['knee'][2, start_index:end_index]
-    ankleMoment = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointmoment'][side]['ankle'][0, start_index:end_index] / 1000 # N-mm to N-m
     globalThighVelocity = Continuous_measurement_data[subject][trial][side]['globalThighVelocity'][start_index:end_index]
     atan2 = Continuous_measurement_data[subject][trial][side]['atan2_s'][start_index:end_index]
-
-    globalFootAngles = -raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]['foot'][0,start_index:end_index] - 90
-
-    return globalThighAngle, ankleMoment, tibiaForce, globalThighVelocity, atan2, globalFootAngles
+    globalFootAngle = -raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]['foot'][0,start_index:end_index] - 90
+    ankleMoment = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointmoment'][side]['ankle'][0, start_index:end_index] / 1000 # N-mm to N-m
+    ankleMoment = butter_lowpass_filter(ankleMoment, 7, 100, order = 1)
+    tibiaForce = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointforce'][side]['knee'][2, start_index:end_index]
+    
+    return globalThighAngle, globalThighVelocity, atan2, globalFootAngle, ankleMoment, tibiaForce
 
 def plot_Conti_measurement_data(subject, trial, side):
+    print("subject: ",  subject, "| trial: ",  trial, " | side: ", side)
+
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
-    globalThighAngle, ankleMoment, tibiaForce, globalThighVelocity, atan2, _\
-                                         = load_Conti_measurement_data(subject, trial, side)
+    globalThighAngle, globalThighVelocity, atan2, globalFootAngle, ankleMoment, tibiaForce = load_Conti_measurement_data(subject, trial, side)
     
-    m_model = model_loader('Measurement_model_01234_B1.pickle')
+    m_model = model_loader('Measurement_model_012345_NSL.pickle')
     Psi = load_Psi('Generic')
 
-    globalThighAngles_pred = model_prediction(m_model.models[0], Psi['globalThighAngles'], phases, phase_dots, step_lengths, ramps)
+    globalThighAngle_pred = model_prediction(m_model.models[0], Psi['globalThighAngles'], phases, phase_dots, step_lengths, ramps)
     globalThighVelocity_pred = model_prediction(m_model.models[1], Psi['globalThighVelocities'], phases, phase_dots, step_lengths, ramps)
-    ankleMoment_pred = model_prediction(m_model.models[2], Psi['ankleMoment'], phases, phase_dots, step_lengths, ramps)
-    tibiaForce_pred = model_prediction(m_model.models[3], Psi['tibiaForce'], phases, phase_dots, step_lengths, ramps)
     
-    atan2_pred = model_prediction(m_model.models[4], Psi['atan2'], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
+    ankleMoment_pred = model_prediction(m_model.models[4], Psi['ankleMoment'], phases, phase_dots, step_lengths, ramps)
+    tibiaForce_pred = model_prediction(m_model.models[5], Psi['tibiaForce'], phases, phase_dots, step_lengths, ramps)
+    
+    atan2_pred = model_prediction(m_model.models[2], Psi['atan2'], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
     atan2_pred = wrapTo2pi(atan2_pred)
- 
-    # compute rmse
-    print("subject: ",  subject)
-    print("trial: ",  trial)
-
-    #residuals_globalThighAngles = globalThighAngle - globalThighAngles_pred
-    #residuals_globalThighVelocity = globalThighVelocity - globalThighVelocity_pred
-    #residuals_atan2 = atan2 - atan2_pred
-    #residuals_atan2 = np.arctan2(np.sin(residuals_atan2), np.cos(residuals_atan2))
-
-    #residuals = [residuals_globalThighAngles, residuals_globalThighVelocity, residuals_atan2]
-    #R = np.cov(residuals)
-    #print("R = \n", R)
+    residuals_atan2 = atan2 - atan2_pred
+    residuals_atan2 = np.arctan2(np.sin(residuals_atan2), np.cos(residuals_atan2))
+    
+    globalFootAngle_pred = model_prediction(m_model.models[3], Psi['globalFootAngles'], phases, phase_dots, step_lengths, ramps)
+    
+    L_cop = np.zeros(len(tibiaForce))
+    for i in range(len(tibiaForce)):
+        if tibiaForce[i] < -3:
+            L_cop[i] = -ankleMoment[i] / tibiaForce[i]
+    
+    print("Cov(globalThighAngle) = ", np.cov(globalThighAngle - globalThighAngle_pred))
+    print("Cov(globalThighVelocity) = ", np.cov(globalThighVelocity - globalThighVelocity_pred))
+    print("Cov(ankleMoment) = ", np.cov(ankleMoment - ankleMoment_pred))
+    print("Cov(tibiaForce) = ", np.cov(tibiaForce - tibiaForce_pred))
+    print("Cov(atan2) = ", np.cov(residuals_atan2))
+    print("Cov(globalFootAngle) = ", np.cov(globalFootAngle - globalFootAngle_pred))
 
     plt.figure('State')
     plt.subplot(411)
     plt.plot(phases)
-    plt.ylabel('phase')
+    plt.ylabel('Phase')
     plt.subplot(412)
     plt.plot(phase_dots)
-    plt.ylabel('phase dot')
+    plt.ylabel('Phase dot')
     plt.subplot(413)
     plt.plot(step_lengths)
-    plt.ylabel('step length')
+    plt.ylabel('Normalized step length')
     plt.subplot(414)
     plt.plot(ramps)
-    plt.ylabel('ramp')
+    plt.ylabel('Ramp')
 
     plt.figure('atan2')
     plt.subplot(211)
@@ -187,46 +190,69 @@ def plot_Conti_measurement_data(subject, trial, side):
     plt.legend(['atan2-phase*2pi', 'least-squares fitting', 'new'])
     
     #heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
-    total_step =  np.shape(globalThighAngle)[0]
+    total_step =  int(np.shape(globalThighAngle)[0] / 4)
     tt = 0.01 * np.arange(total_step)
     plt.figure('Measurements')
-    plt.subplot(511)
+    plt.subplot(611)
     plt.plot(tt, globalThighAngle[0:total_step], 'k-')
-    plt.plot(tt, globalThighAngles_pred[0:total_step],'b--')
+    plt.plot(tt, globalThighAngle_pred[0:total_step],'b--')
     #plt.xlim([0, 13.6])
     plt.legend(('actual', 'least squares'))
     #plt.legend(('actual', 'least squares'), bbox_to_anchor=(1, 1.05))
     plt.ylabel('$\\theta_{th}~(deg)$')
 
-    plt.subplot(512)
+    plt.subplot(612)
     plt.plot(tt, globalThighVelocity[0:total_step],'k-')
     plt.plot(tt, globalThighVelocity_pred[0:total_step], 'b--')
     plt.ylabel('$\dot{\\theta}_{Y_{2Hz}} ~(deg/s)$')
     #plt.xlim([0, 13.6])
 
-    plt.subplot(513)
+    plt.subplot(613)
     plt.plot(tt, ankleMoment[0:total_step], 'k-')
     plt.plot(tt, ankleMoment_pred[0:total_step], 'b--')
     plt.ylabel('$m_Y~(N \cdot m)$')
     #plt.xlim([0, 13.6])
     plt.xlabel('time (s)')
     
-    plt.subplot(514)
+    plt.subplot(614)
     plt.plot(tt, tibiaForce[0:total_step], 'k-')
     plt.plot(tt, tibiaForce_pred[0:total_step], 'b--')
     plt.ylabel('$f_Z~(N \cdot m)$')
     #plt.xlim([0, 13.6])
     plt.xlabel('time (s)')
 
-    plt.subplot(515)
+    plt.subplot(615)
     plt.plot(tt, atan2[0:total_step],'k-')
     plt.plot(tt, atan2_pred[0:total_step], 'b--')
     plt.ylabel('$atan2~(rad)$')
     plt.xlabel('time (s)')
     plt.ylim([0, 7.5])
     #plt.xlim([0, 13.6])
-    plt.legend(('actual', 'least squares'))
-    
+
+    plt.subplot(616)
+    plt.plot(tt, globalFootAngle[0:total_step], 'k-')
+    plt.plot(tt, globalFootAngle_pred[0:total_step], 'b--')
+    plt.ylabel('$\\theta_{f}~(deg)$')
+    plt.xlabel('time (s)')
+
+    plt.figure('L COP')
+    plt.subplot(411)
+    plt.plot(tt, ankleMoment[0:total_step], 'k-')
+    plt.plot(tt, ankleMoment_pred[0:total_step], 'b--')
+    plt.ylabel('$m_Y~(N \cdot m)$')
+    plt.subplot(412)
+    plt.plot(tt, tibiaForce[0:total_step], 'k-')
+    plt.plot(tt, tibiaForce_pred[0:total_step], 'b--')
+    plt.ylabel('$f_Z~(N \cdot m)$')
+    plt.subplot(413)
+    plt.plot(tt, L_cop[0:total_step], 'k-')
+    plt.ylabel('L cop (m)')
+    plt.subplot(414)
+    plt.plot(tt, globalFootAngle[0:total_step], 'k-')
+    plt.plot(tt, globalFootAngle_pred[0:total_step], 'b--')
+    plt.ylabel('$\\theta_{f}~(deg)$')
+    plt.xlabel('time (s)')
+
     plt.show()
 
 def Conti_maxmin(plot = True):
@@ -485,7 +511,6 @@ def plot_Conti_kinetics_data(subject, trial, side):
     plt.show()
 
 if __name__ == '__main__':
-    
 
     """
     with open('Continuous_data/Continuous_measurement_data.pickle', 'rb') as file:
@@ -604,11 +629,10 @@ if __name__ == '__main__':
     """
     ##################################################################
     
-    subject = 'AB07'
+    subject = 'AB10'
     trial = 's1x2i0'
     side = 'left'
     
-
     #footAngles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]['foot'][0,:]
     #plt.figure()
     #plt.plot(-footAngles-90)
@@ -616,7 +640,6 @@ if __name__ == '__main__':
     #plot_Conti_kinetics_data(subject, trial, side)
     #plot_Conti_joints_angles(subject, trial, side)
     plot_Conti_measurement_data(subject, trial, side)
-    
 
     ######## test real0time filters #############
     """

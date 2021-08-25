@@ -19,16 +19,16 @@ with open('Psi/Psi_ankleAngles_B3.pickle', 'rb') as file:
 ## Load model coefficients
 def load_Psi(subject = 'Generic'):
     if subject == 'Generic':
-        with open('Psi/Psi_globalThighAngles_NSL_B1.pickle', 'rb') as file:
+        with open('Psi/Psi_globalThighAngles_NSL_B3.pickle', 'rb') as file:
             Psi_globalThighAngles = pickle.load(file)
         
-        with open('Psi/Psi_globalThighVelocities_NSL_B1.pickle', 'rb') as file:
+        with open('Psi/Psi_globalThighVelocities_NSL_B3.pickle', 'rb') as file:
             Psi_globalThighVelocities = pickle.load(file)
         
-        with open('Psi/Psi_ankleMoment_B1.pickle', 'rb') as file:
+        with open('Psi/Psi_ankleMoment_NSL_B3.pickle', 'rb') as file:
             Psi_ankleMoment = pickle.load(file)
         
-        with open('Psi/Psi_tibiaForce_B1.pickle', 'rb') as file:
+        with open('Psi/Psi_tibiaForce_NSL_B3.pickle', 'rb') as file:
             Psi_tibiaForce = pickle.load(file)
         
         with open('Psi/Psi_atan2_NSL.pickle', 'rb') as file:
@@ -61,7 +61,7 @@ def load_Psi(subject = 'Generic'):
         """
            
     Psi = {'globalThighAngles': Psi_globalThighAngles, 'globalThighVelocities': Psi_globalThighVelocities,
-           'tibiaForce': Psi_tibiaForce, 'ankleMoment': Psi_ankleMoment, 'atan2': Psi_atan2, 'footAngles': Psi_footAngles}
+           'tibiaForce': Psi_tibiaForce, 'ankleMoment': Psi_ankleMoment, 'atan2': Psi_atan2, 'globalFootAngles': Psi_footAngles}
     return Psi
 
 def warpToOne(phase):
@@ -112,7 +112,7 @@ class extended_kalman_filter:
         self.x[0, 0] = warpToOne(self.x[0, 0]) # wrap to be between 0 and 1
         self.Sigma = self.A(dt) @ self.Sigma @ self.A(dt).T + self.Q  # predicted state covariance
 
-    def correction(self, z, Psi, using_atan2 = False, steady_state_walking = False):
+    def correction(self, z, Psi, using_atan2 = False, steady_state_walking = False, direct_ramp = False):
         # EKF correction step
         # Inputs:
         #   z:  measurement
@@ -131,18 +131,24 @@ class extended_kalman_filter:
         #print(H @ np.array([[-0.01], [-0.01], [0.01], [-0.01]]))
         ###########################################################################
 
+        if direct_ramp != False:
+            # add the direct ramp as the last element of the measurement vector
+            H = np.vstack((H, np.array([0, 0, 0, 1])))
+            self.z_hat = np.vstack((self.z_hat, np.array([self.x[3,0]])))
+            z = np.concatenate((z, direct_ramp))
+
         if using_atan2:
-            H[-1, 0] += 2*np.pi
-            self.z_hat[-1] += self.x[0,0] * 2 * np.pi
+            H[2, 0] += 2*np.pi
+            self.z_hat[2] += self.x[0,0] * 2 * np.pi
             # wrap to 2pi
-            self.z_hat[-1] = wrapTo2pi(self.z_hat[-1])
+            self.z_hat[2] = wrapTo2pi(self.z_hat[2])
         
         # innovation
         z = np.array([z]).T
         self.v = z - self.z_hat
         if using_atan2:
             # wrap to pi
-            self.v[-1] = np.arctan2(np.sin(self.v[-1]), np.cos(self.v[-1]))
+            self.v[2] = np.arctan2(np.sin(self.v[2]), np.cos(self.v[2]))
 
         # innovation covariance
         S = H @ self.Sigma @ H.T + self.R
@@ -155,16 +161,17 @@ class extended_kalman_filter:
         self.x[0, 0] = warpToOne(self.x[0, 0])
 
         # Compute MD using residuals
-        
         z_pred = self.h.evaluate_h_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
+        if direct_ramp != False:
+            z_pred =  np.append(z_pred, self.x[3,0])
         if using_atan2:
-            z_pred[-1] += self.x[0,0] * 2 * np.pi
-            z_pred[-1] = wrapTo2pi(z_pred[-1])
+            z_pred[2] += self.x[0,0] * 2 * np.pi
+            z_pred[2] = wrapTo2pi(z_pred[2])
         self.residual = z - z_pred
         if using_atan2:
-            self.residual[-1] = np.arctan2(np.sin(self.residual[-1]), np.cos(self.residual[-1]))
+            self.residual[2] = np.arctan2(np.sin(self.residual[2]), np.cos(self.residual[2]))
         
-        self.MD_residual = np.sqrt(self.residual.T @ np.linalg.inv(self.R) @ self.residual) # Mahalanobis distance
+        #self.MD_residual = np.sqrt(self.residual.T @ np.linalg.inv(self.R) @ self.residual) # Mahalanobis distance
         """
         if steady_state_walking and self.MD_residual > np.sqrt(18.5):
             #self.Q = self.Q_static + self.Q_static * 0.2

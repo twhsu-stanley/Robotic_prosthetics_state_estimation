@@ -7,6 +7,7 @@ import pickle
 from continuous_data import *
 from basis_model_fitting import measurement_noise_covariance
 
-a = np.array([-12,22,-13,4,-5,-6,-27])
-print(abs(a)>13)
-print(np.all(abs(a)<13))
+a = ['2','3','ff']
+print(int(str(len(a))+'1'+str(1)))
+plt.figure()
+plt.subplot(int(str(len(a))+'1'+str(1)))

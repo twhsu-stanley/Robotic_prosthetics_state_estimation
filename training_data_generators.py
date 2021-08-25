@@ -573,11 +573,16 @@ def gait_training_data_generator(mode):
             #===================================================================================================================
                 
             # Step 2: Remove strides with NaN values
+            if mode == 'footAngles':
+                nan_val = -90
+            else:
+                nan_val = 0
+
             remove_left = []
             for i in range(np.shape(data_left)[0]):
                 has_nan = False
                 for p in range(3, np.shape(data_left)[1]): # 150
-                    if data_left[i, p] == 0 and data_left[i, p-1] == 0 and data_left[i, p-2] == 0 and data_left[i, p-3] == 0:
+                    if data_left[i, p] == nan_val and data_left[i, p-1] == nan_val and data_left[i, p-2] == nan_val and data_left[i, p-3] == nan_val:
                         has_nan = True
                         break
                 if has_nan == True:
@@ -594,7 +599,7 @@ def gait_training_data_generator(mode):
             for i in range(np.shape(data_right)[0]):
                 has_nan = False
                 for p in range(3, np.shape(data_right)[1]): # 150
-                    if data_right[i, p] == 0 and data_right[i, p-1] == 0 and data_right[i, p-2] == 0 and data_right[i, p-3] == 0:
+                    if data_right[i, p] == nan_val and data_right[i, p-1] == nan_val and data_right[i, p-2] == nan_val and data_right[i, p-3] == nan_val:
                         has_nan = True
                         break
                 if has_nan == True:
@@ -684,4 +689,5 @@ if __name__ == '__main__':
     #gait_training_data_generator('atan2')
 
     #ankleMoment_statistics()
+    #gait_training_data_generator('ankleMoment')
     #gait_training_data_generator('tibiaForce')
