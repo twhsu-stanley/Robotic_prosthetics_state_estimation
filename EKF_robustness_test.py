@@ -15,33 +15,33 @@ import csv
 sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2,
                 'globalFootAngles':3, 'ankleMoment':4, 'tibiaForce':5}
 
-# Determine which sensors to be used
+# Determine what sensors to be used
+# 1) measurements that use the basis model
 sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2', 'globalFootAngles', 'ankleMoment', 'tibiaForce']
-using_directRamp = True
-R_directRamp = 1
-
-using_ankleMoment = np.any(np.array(sensors) == 'ankleMoment')
-using_tibiaForce = np.any(np.array(sensors) == 'tibiaForce')
-using_footAngles = np.any(np.array(sensors) == 'globalFootAngles')
-
-
 sensor_id = [sensors_dict[key] for key in sensors]
-
 sensor_id_str = ""
 for i in range(len(sensor_id)):
     sensor_id_str += str(sensor_id[i])
 m_model = model_loader('Measurement_model_' + sensor_id_str +'_NSL.pickle')
 
-using_atan2 = False
 using_atan2 = np.any(np.array(sensors) == 'atan2')
+using_ankleMoment = np.any(np.array(sensors) == 'ankleMoment')
+using_tibiaForce = np.any(np.array(sensors) == 'tibiaForce')
+using_footAngles = np.any(np.array(sensors) == 'globalFootAngles')
 
 tibiaForce_threshold = -2
+
+# 2) direct measurement
+using_directRamp = True
+R_directRamp = 6
+L_cop_lower = 0
+L_cop_upper = 0.15
 
 Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 
 dt = 1/100
 inital_Sigma = np.diag([1e-6, 1e-6, 1e-6, 1e-6])
-Q = np.diag([0, 1e-3, 1e-3, 1e-1]) * dt
+Q = np.diag([0, 1e-3, 2e-3, 1e-1]) * dt
 U = np.diag([1, 1, 1, 1, 1, 1])
 R = U @ measurement_noise_covariance(*sensors) @ U.T
 if using_directRamp == True:
@@ -49,7 +49,7 @@ if using_directRamp == True:
 
 saturation_range = saturation_bounds()
 
-if using_ankleMoment or using_tibiaForce or using_footAngles:
+if using_ankleMoment or using_tibiaForce or using_footAngles or using_directRamp:
     sensors_swing = []
     for i in range(len(sensors)):
         if sensors[i] == 'ankleMoment' or sensors[i] == 'tibiaForce' or sensors[i] == 'globalFootAngles':
@@ -186,12 +186,12 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
             if tibiaForce[i] <= tibiaForce_threshold:
                 # Location of the centoer of pressure
                 L_cop[i] = -ankleMoment[i] / tibiaForce[i]
-                if stance_prev == False and L_cop[i] > -0.05 and L_cop[i] <= 0.1 and (i - stance_idxs) > 0.5/dt:
+                if stance_prev == False and L_cop[i] > L_cop_lower and L_cop[i] <= L_cop_upper and (i - stance_idxs) > 0.5/dt:
                     stance_idxs = i
                     stance = True
                     stance_prev = stance
                     
-                elif stance_prev == True and L_cop[i] > 0.2:
+                elif stance_prev == True and L_cop[i] > L_cop_upper:
                     stance_idx2 = i
                     stance_idx1 = stance_idxs
                     stance = False
@@ -238,7 +238,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
 
         #Q_diag[i,:] = np.diag(ekf.Q)
         #Sigma_diag[i, :] = np.diag(ekf.Sigma)
-        #MD_residual[i] = ekf.MD_residual
+        MD_residual[i] = ekf.MD_residual
 
         estimate_error[i, :] = (ekf.x - np.array([[phases[i]], [phase_dots[i]], [step_lengths[i]], [ramps[i]]])).reshape(-1)
         estimate_error[i, 0] = phase_error(ekf.x[0, 0], phases[i])
@@ -461,7 +461,7 @@ def ekf_bank_test(subject, trial, side, N = 30, kidnap = [0, 1, 2, 3], plot = Tr
     # load measurements
     globalThighAngle, globalThighVelocity, atan2, globalFootAngle, ankleMoment, tibiaForce = load_Conti_measurement_data(subject, trial, side)
 
-    z_full = np.array([[globalThighAngle], [globalThighVelocity], [ankleMoment], [tibiaForce], [atan2]])
+    z_full = np.array([[globalThighAngle], [globalThighVelocity], [atan2], [globalFootAngle], [ankleMoment], [tibiaForce]])
     z_full = np.squeeze(z_full)
     z = z_full[sensor_id, :]
 
@@ -502,6 +502,12 @@ def ekf_bank_test(subject, trial, side, N = 30, kidnap = [0, 1, 2, 3], plot = Tr
         ramp_kidnap = np.random.uniform(-45, 45)
         state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
 
+        directRamp = np.zeros((total_step, 1))
+        L_cop = np.zeros((total_step, 1))
+        stance = False
+        stance_prev = False
+        stance_idxs = 0
+
         for i in range(total_step):
             # kidnap
             if i == kidnap_index:
@@ -510,15 +516,48 @@ def ekf_bank_test(subject, trial, side, N = 30, kidnap = [0, 1, 2, 3], plot = Tr
             ekf.prediction(dt)
             ekf.state_saturation(saturation_range)
 
-            if using_ankleMoment or using_tibiaForce or using_footAngles:
+            if using_ankleMoment or using_tibiaForce or using_footAngles or using_directRamp:
                 if tibiaForce[i] <= tibiaForce_threshold:
+                    # Location of the centoer of pressure
+                    L_cop[i] = -ankleMoment[i] / tibiaForce[i]
+                    if stance_prev == False and L_cop[i] > L_cop_lower and L_cop[i] <= L_cop_upper and (i - stance_idxs) > 0.5/dt:
+                        stance_idxs = i
+                        stance = True
+                        stance_prev = stance
+                        
+                    elif stance_prev == True and L_cop[i] > L_cop_upper:
+                        stance_idx2 = i
+                        stance_idx1 = stance_idxs
+                        stance = False
+                        stance_prev = stance
+                else:
+                    L_cop[i] = -1 # arbitraty number
+                    if stance_prev == True:
+                        stance_idx2 = i
+                        stance_idx1 = stance_idxs
+                    stance = False
+                    stance_prev = stance
+                
+                try:
+                    directRamp[i] = np.mean(globalFootAngle[stance_idx1:stance_idx2])
+                except:
+                    directRamp[i] = 1e-4
+                
+                if stance == True:
                     ekf.h = m_model
                     ekf.R = R
-                    ekf.correction(z[:, i], Psi, using_atan2, steady_state_walking = True)
-                else:
+                    if using_directRamp:
+                        ekf.correction(z[:, i], Psi, using_atan2, steady_state_walking = True, direct_ramp = directRamp[i])
+                    else:
+                        ekf.correction(z[:, i], Psi, using_atan2, steady_state_walking = True, direct_ramp = False)
+                else: # swing
                     ekf.h = m_model_swing
                     ekf.R = R_swing
-                    ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, steady_state_walking = True)
+                    if using_directRamp:
+                        ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, steady_state_walking = True, direct_ramp = directRamp[i])
+                    else:
+                        ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, steady_state_walking = True, direct_ramp = False)       
+
             else:
                 ekf.correction(z[:, i], Psi, using_atan2, steady_state_walking = True)
             ekf.state_saturation(saturation_range)
@@ -529,8 +568,8 @@ def ekf_bank_test(subject, trial, side, N = 30, kidnap = [0, 1, 2, 3], plot = Tr
             estimate_error[n, i, 0] = phase_error(ekf.x[0, 0], phases[i])
 
         phase_recover = np.all(abs(estimate_error[n, int(kidnap_index + 1/np.average(phase_dots)/dt):, 0]) < 0.15)
-        step_length_recover = np.all(abs(estimate_error[n, int(kidnap_index + 1/np.average(phase_dots)/dt):, 2]) < 0.3)
-        ramp_recover = np.all(abs(estimate_error[n, int(kidnap_index + 3/np.average(phase_dots)/dt):, 3]) < 5)
+        step_length_recover = np.all(abs(estimate_error[n, int(kidnap_index + 1/np.average(phase_dots)/dt):, 2]) < 0.2)
+        ramp_recover = np.all(abs(estimate_error[n, int(kidnap_index + 1/np.average(phase_dots)/dt):, 3]) < 3)
 
         #RMSE_start_idx = int(kidnap_index + 3/np.average(phase_dots)/dt)
         #RMSE_end_idx = int(kidnap_index + 13/np.average(phase_dots)/dt)
@@ -659,10 +698,10 @@ def ekf_robustness(kidnap = True):
 
 if __name__ == '__main__':
     subject = 'AB10'
-    trial = 's1x2i10'
+    trial = 's1x2i7x5'
     side = 'left'
 
-    ekf_test(subject, trial, side, kidnap = [0, 1, 2, 3], plot = True)
-    #ekf_bank_test(subject, trial, side, N = 10, kidnap = [0, 1, 2, 3], plot = True)
+    #ekf_test(subject, trial, side, kidnap = [0, 1, 2, 3], plot = True)
+    ekf_bank_test(subject, trial, side, N = 2, kidnap = [0, 1, 2, 3], plot = True)
     #ekf_robustness(kidnap = True)
     #ekf_robustness(kidnap = False)

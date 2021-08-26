@@ -77,21 +77,21 @@ def basis_model_residuals(model, mode):
         # residuals during stance
         residuals = []
         for i in range(np.shape(data)[0]):
-            data_pred = model_prediction(model, Psi, phase[i, 0:90], phase_dot[i, 0:90], step_length[i, 0:90], ramp[i, 0:90])
-            residuals.append(data[i, 0:90] - data_pred)
+            data_pred = model_prediction(model, Psi, phase[i, 0:60], phase_dot[i, 0:60], step_length[i, 0:60], ramp[i, 0:60])
+            residuals.append(data[i, 0:60] - data_pred)
         residuals = np.array(residuals)
         residuals = residuals.ravel()
         with open(('Basis_model/' + mode + '_NSL_B3_stance_residuals.pickle'), 'wb') as file:
             pickle.dump(residuals, file)
 
-    elif mode == 'footAngles':
+    elif mode == 'globalFootAngles':
         with open('Psi/Psi_' + mode + '_NSL_B1.pickle', 'rb') as file:
             Psi = pickle.load(file)
         # residuals during stance
         residuals = []
         for i in range(np.shape(data)[0]):
-            data_pred = model_prediction(model, Psi, phase[i, 0:90], phase_dot[i, 0:90], step_length[i, 0:90], ramp[i, 0:90])
-            residuals.append(data[i, 0:90] - data_pred)
+            data_pred = model_prediction(model, Psi, phase[i, 0:60], phase_dot[i, 0:60], step_length[i, 0:60], ramp[i, 0:60])
+            residuals.append(data[i, 0:60] - data_pred)
         residuals = np.array(residuals)
         residuals = residuals.ravel()
         with open(('Basis_model/' + mode + '_NSL_B1_stance_residuals.pickle'), 'wb') as file:
@@ -118,17 +118,22 @@ def measurement_noise_covariance(*sensors):
         if sensor == 'globalThighAngles' or sensor == 'globalThighVelocities':
             with open(('Basis_model/' + sensor + '_NSL_B3_residuals.pickle'), 'rb') as file:
                 r = pickle.load(file)
+                covariance.append(np.cov(r))
         elif sensor == 'atan2':
             with open(('Basis_model/' + sensor + '_NSL_residuals.pickle'), 'rb') as file:
                 r = pickle.load(file)
+                covariance.append(np.cov(r))
         elif sensor == 'ankleMoment' or sensor == 'tibiaForce':
             with open(('Basis_model/' + sensor + '_NSL_B3_stance_residuals.pickle'), 'rb') as file:
                 r = pickle.load(file)
-        elif sensor == 'footAngles':
+                covariance.append(np.cov(r))
+        elif sensor == 'globalFootAngles':
             with open(('Basis_model/' + sensor + '_NSL_B1_stance_residuals.pickle'), 'rb') as file:
                 r = pickle.load(file)
-        covariance.append(np.cov(r))
+                covariance.append(np.cov(r))
     R = np.diag(covariance)
+    if len(covariance) != len(sensors):
+        print("ERROR: SIZE NOT MATCH!!")
     return R
 
 def F_test(sensor, order1 = 1, order2 = 2):
@@ -190,7 +195,6 @@ if __name__ == '__main__':
     print(np.diag(measurement_noise_covariance(*sensors)))
     
     #heteroscedastic_measurement_noise_covariance(*sensors)
-    #print(np.diag(measurement_noise_covariance(*sensors)))
     #F_test('globalThighAngles', 1, 2)
     #F_test('globalThighAngles', 2, 3)
 
@@ -228,8 +232,8 @@ if __name__ == '__main__':
     step_length_model = Berstein_Basis(0,'step_length')
     ramp_model = Berstein_Basis(1, 'ramp')
     model_footAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
-    #psi_footAngles = basis_model_fitting(model_footAngles, 'footAngles')
-    #basis_model_residuals(model_footAngles, 'footAngles')
+    #psi_footAngles = basis_model_fitting(model_footAngles, 'globalFootAngles')
+    #basis_model_residuals(model_footAngles, 'globalFootAngles')
 
     # Atan2 fitting
     phase_model = Fourier_Basis(F, 'phase')
@@ -242,6 +246,6 @@ if __name__ == '__main__':
     #basis_model_residuals(model_atan2, 'atan2')
 
     # sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2, 'globalFootAngles':3, 'ankleMoment':4, 'tibiaForce':5}
-    m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities, model_atan2, model_tibiaForce)
-    model_saver(m_model, 'Measurement_model_0125_NSL.pickle')
+    #m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities, model_atan2, model_tibiaForce)
+    #model_saver(m_model, 'Measurement_model_0125_NSL.pickle')
     

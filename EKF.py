@@ -34,7 +34,7 @@ def load_Psi(subject = 'Generic'):
         with open('Psi/Psi_atan2_NSL.pickle', 'rb') as file:
             Psi_atan2 = pickle.load(file)
 
-        with open('Psi/Psi_footAngles_NSL_B1.pickle', 'rb') as file:
+        with open('Psi/Psi_globalFootAngles_NSL_B1.pickle', 'rb') as file:
             Psi_footAngles = pickle.load(file)
 
     else:
@@ -163,7 +163,7 @@ class extended_kalman_filter:
         # Compute MD using residuals
         z_pred = self.h.evaluate_h_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
         if direct_ramp != False:
-            z_pred =  np.append(z_pred, self.x[3,0])
+            z_pred = np.vstack((z_pred, np.array([self.x[3,0]])))
         if using_atan2:
             z_pred[2] += self.x[0,0] * 2 * np.pi
             z_pred[2] = wrapTo2pi(z_pred[2])
@@ -171,7 +171,7 @@ class extended_kalman_filter:
         if using_atan2:
             self.residual[2] = np.arctan2(np.sin(self.residual[2]), np.cos(self.residual[2]))
         
-        #self.MD_residual = np.sqrt(self.residual.T @ np.linalg.inv(self.R) @ self.residual) # Mahalanobis distance
+        self.MD_residual = np.sqrt(self.residual.T @ np.linalg.inv(self.R) @ self.residual) # Mahalanobis distance
         """
         if steady_state_walking and self.MD_residual > np.sqrt(18.5):
             #self.Q = self.Q_static + self.Q_static * 0.2
