@@ -190,7 +190,7 @@ def plot_Conti_measurement_data(subject, trial, side):
     plt.legend(['atan2-phase*2pi', 'least-squares fitting', 'new'])
     
     #heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
-    total_step =  int(np.shape(globalThighAngle)[0] / 4)
+    total_step =  int(np.shape(globalThighAngle)[0] / 1)
     tt = 0.01 * np.arange(total_step)
     plt.figure('Measurements')
     plt.subplot(711)
@@ -332,10 +332,9 @@ def Conti_maxmin(plot = True):
     
     return saturation_range
 
-def detect_nan_in_globalThighAngle():
+def detect_nan_in_measurements():
     nan_dict = dict()
     for subject in Conti_subject_names():
-    #for subject in ['AB03']:
         nan_dict[subject] = dict()
         for trial in Conti_trial_names(subject):
             if trial == 'subjectdetails':
@@ -343,14 +342,26 @@ def detect_nan_in_globalThighAngle():
             nan_dict[subject][trial] = dict()
             for side in ['left', 'right']:
                 nan_dict[subject][trial][side] = True
-                globalThighAngles, _, _, _, _, _, _, _ = load_Conti_measurement_data(subject, trial, side)
-                for i in range(3, len(globalThighAngles)):
-                    if globalThighAngles[i] == 0 and globalThighAngles[i-1] == 0 and globalThighAngles[i-2] == 0\
-                        and globalThighAngles[i-3] == 0:
+                globalThighAngle, _, _, globalFootAngle, ankleMoment, tibiaForce= load_Conti_measurement_data(subject, trial, side)
+                for i in range(3, len(globalThighAngle)):
+                    if globalThighAngle[i] == 0 and globalThighAngle[i-1] == 0 and globalThighAngle[i-2] == 0 and globalThighAngle[i-3] == 0:
                         nan_dict[subject][trial][side] = False
-                        print(subject + "/"+ trial + "/"+ side)
-                        break    
-    with open('Continuous_data/GlobalThighAngles_with_Nan.pickle', 'wb') as file:
+                        print(subject + "/"+ trial + "/"+ side, ": globalThighAngle")
+                        break  
+                    if globalFootAngle[i] == -90 and globalFootAngle[i-1] == -90 and globalFootAngle[i-2] == -90:
+                        nan_dict[subject][trial][side] = False
+                        print(subject + "/"+ trial + "/"+ side, ": globalFootAngle")
+                      
+                        break
+                    if ankleMoment[i] == 0 and ankleMoment[i-1] == 0 and ankleMoment[i-2] == 0 and ankleMoment[i-3] == 0:
+                        nan_dict[subject][trial][side] = False
+                        print(subject + "/"+ trial + "/"+ side, ": ankleMoment")
+                        break
+                    if tibiaForce[i] == 0 and tibiaForce[i-1] == 0 and tibiaForce[i-2] == 0 and tibiaForce[i-3] == 0:
+                        nan_dict[subject][trial][side] = False
+                        print(subject + "/"+ trial + "/"+ side, ": tibiaForce")
+                        break
+    with open('Continuous_data/Measurements_with_Nan.pickle', 'wb') as file:
     	pickle.dump(nan_dict, file)
 
 def load_Conti_joints_angles(subject, trial, side):
@@ -514,7 +525,7 @@ def plot_Conti_kinetics_data(subject, trial, side):
     plt.show()
 
 if __name__ == '__main__':
-
+    #detect_nan_in_measurements()
     """
     with open('Continuous_data/Continuous_measurement_data.pickle', 'rb') as file:
         Continuous_measurement_data = pickle.load(file)
@@ -633,8 +644,8 @@ if __name__ == '__main__':
     ##################################################################
     
     subject = 'AB10'
-    trial = 's1x2i0'
-    side = 'left'
+    trial = 's1i0'
+    side = 'right'
     
     #footAngles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]['foot'][0,:]
     #plt.figure()

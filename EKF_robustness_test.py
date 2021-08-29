@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from EKF import *
 from model_framework import *
 from continuous_data import *
-from basis_model_fitting import measurement_noise_covariance, saturation_bounds
+from basis_model_fitting import measurement_noise_covariance, heteroscedastic_measurement_noise_covariance, saturation_bounds
 import csv
 
 # Dictionary of all sensors
@@ -17,7 +17,7 @@ sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2,
 
 # Determine what sensors to be used
 # 1) measurements that use the basis model
-sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2', 'globalFootAngles', 'ankleMoment', 'tibiaForce']
+sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2', 'globalFootAngles', 'ankleMoment', 'tibiaForce']#
 sensor_id = [sensors_dict[key] for key in sensors]
 sensor_id_str = ""
 for i in range(len(sensor_id)):
@@ -34,18 +34,20 @@ tibiaForce_threshold = -2
 # 2) direct measurement
 using_directRamp = True
 R_directRamp = 6
-L_cop_lower = 0
-L_cop_upper = 0.15
+L_cop_lower = -0.05
+L_cop_upper = 0.1
 
 Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 
 dt = 1/100
 inital_Sigma = np.diag([1e-6, 1e-6, 1e-6, 1e-6])
-Q = np.diag([0, 1e-3, 2e-3, 1e-1]) * dt
+Q = np.diag([0, 1e-3, 1e-3, 1]) * dt
 U = np.diag([1, 1, 1, 1, 1, 1])
 R = U @ measurement_noise_covariance(*sensors) @ U.T
 if using_directRamp == True:
     R = np.diag(np.append(np.diag(R), R_directRamp))
+
+hetero_cov = heteroscedastic_measurement_noise_covariance(*sensors)
 
 saturation_range = saturation_bounds()
 
@@ -66,6 +68,10 @@ if using_ankleMoment or using_tibiaForce or using_footAngles or using_directRamp
     R_swing = U_swing @ measurement_noise_covariance(*sensors_swing) @ U_swing.T
     if using_directRamp == True:
         R_swing = np.diag(np.append(np.diag(R_swing), R_directRamp))
+
+# Skip trials with problematic measurements
+with open('Continuous_data/Measurements_with_Nan.pickle', 'rb') as file:
+    nan_dict = pickle.load(file)
 
 ## From loco_OSL.py: Load referenced trajectories
 def loadTrajectory(trajectory = 'walking'):
@@ -102,7 +108,7 @@ def loadTrajectory(trajectory = 'walking'):
 
     return trajectory
 
-def ekf_test(subject, trial, side, kidnap = False, plot = False):
+def ekf_test(subject, trial, side, heteroscedastic = False, kidnap = False, plot = False):
     print("EKF Test: ", subject, "/", trial, '/', side)
     # load ground truth
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
@@ -140,7 +146,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
     heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
     
     if kidnap != False:
-        kidnap_index = np.random.randint(heel_strike_index[4, 0], heel_strike_index[5, 0]) # step at which kidnapping occurs
+        kidnap_index = np.random.randint(heel_strike_index[6, 0], heel_strike_index[7, 0]) # step at which kidnapping occurs
         #print("kidnap_index(%) = ", (kidnap_index - heel_strike_index[3, 0])/(heel_strike_index[4, 0]- heel_strike_index[3, 0])*100)
         phase_kidnap =  np.random.uniform(0, 1)
         phase_dot_kidnap = np.random.uniform(0, 5)
@@ -181,7 +187,7 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
         
         ekf.prediction(dt)
         ekf.state_saturation(saturation_range)
-
+        
         if using_ankleMoment or using_tibiaForce or using_footAngles or using_directRamp:
             if tibiaForce[i] <= tibiaForce_threshold:
                 # Location of the centoer of pressure
@@ -211,7 +217,13 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
             
             if stance == True:
                 ekf.h = m_model
-                ekf.R = R
+                if heteroscedastic == True:
+                    ekf.R = np.diag(hetero_cov[:, int(ekf.x[0, 0]*150)])
+                    if using_directRamp:
+                        ekf.R = np.diag(np.append(np.diag(ekf.R), R_directRamp))
+                else:
+                    ekf.R = R
+
                 if using_directRamp:
                     ekf.correction(z[:, i], Psi, using_atan2, steady_state_walking = True, direct_ramp = directRamp[i])
                 else:
@@ -219,7 +231,13 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
                 z_pred[i,:] = ekf.z_hat.T
             else: # swing
                 ekf.h = m_model_swing
-                ekf.R = R_swing
+                if heteroscedastic == True:
+                    ekf.R = np.diag(hetero_cov[sensor_swing_id, int(ekf.x[0, 0]*150)])
+                    if using_directRamp:
+                        ekf.R = np.diag(np.append(np.diag(ekf.R), R_directRamp))
+                else:
+                    ekf.R = R_swing
+                
                 if using_directRamp:
                     ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, steady_state_walking = True, direct_ramp = directRamp[i])
                     z_pred[i, np.append(sensor_swing_id, len(sensors))] = ekf.z_hat.T
@@ -227,9 +245,12 @@ def ekf_test(subject, trial, side, kidnap = False, plot = False):
                     ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, steady_state_walking = True, direct_ramp = False)
                     z_pred[i, sensor_swing_id] = ekf.z_hat.T
                 
-        #==============================================================================================================
-
+                #==============================================================================================================
         else:
+            if heteroscedastic == True:
+                ekf.R = np.diag(hetero_cov[:, int(ekf.x[0, 0]*150)])
+            else:
+                ekf.R = R
             ekf.correction(z[:, i], Psi, using_atan2, steady_state_walking = True)
             z_pred[i,:] = ekf.z_hat.T
         ekf.state_saturation(saturation_range)
@@ -653,11 +674,8 @@ def ekf_robustness(kidnap = True):
     RMSE_step_length_mean = []
     RMSE_ramp_mean = []
 
-    with open('Continuous_data/GlobalThighAngles_with_Nan.pickle', 'rb') as file:
-        nan_dict = pickle.load(file)
-
     #for subject in Conti_subject_names():
-    for subject in ['AB10']: # , 'AB02', 'AB03', 'AB08', 'AB09', 'AB10'
+    for subject in ['AB01','AB10']: # , 'AB02', 'AB03', 'AB08', 'AB09', 'AB10'
         #print("subject: ", subject)
         for trial in Conti_trial_names(subject):
             if trial == 'subjectdetails':
@@ -678,10 +696,11 @@ def ekf_robustness(kidnap = True):
                     RMSE_step_length_mean.append(RMSE_step_length)
                     RMSE_ramp_mean.append(RMSE_ramp)
                     if RMSE_phase > 0.05 or RMSE_step_length > 0.1 or RMSE_ramp > 2:
-                        print(subject, "/", trial, '/', side)
-                        print("RMSE phase = %5.3f" % np.mean(RMSE_phase_mean))
-                        print("RMSE step_length = %5.3f" % np.mean(RMSE_step_length_mean))
-                        print("RMSE ramp = %5.3f" % np.mean(RMSE_ramp_mean))
+                        print(subject, "/", trial, '/', side, ": RMSE exceeds the threshold!")
+                        print("RMSE phase = %5.3f" % RMSE_phase)
+                        print("RMSE step_length = %5.3f" % RMSE_step_length)
+                        print("RMSE ramp = %5.3f" % RMSE_ramp)
+                        print("==================================================")
 
     if kidnap == True:
         robustness = robustness / total_trials
@@ -698,10 +717,13 @@ def ekf_robustness(kidnap = True):
 
 if __name__ == '__main__':
     subject = 'AB10'
-    trial = 's1x2i7x5'
+    trial = 's1x2i0'
     side = 'left'
 
-    #ekf_test(subject, trial, side, kidnap = [0, 1, 2, 3], plot = True)
-    ekf_bank_test(subject, trial, side, N = 2, kidnap = [0, 1, 2, 3], plot = True)
+    if nan_dict[subject][trial][side] == False:
+        print(subject + "/"+ trial + "/"+ side+ ": This trial should be skipped!") 
+
+    ekf_test(subject, trial, side, heteroscedastic = False, kidnap = False, plot = True)
+    #ekf_bank_test(subject, trial, side, N = 10, kidnap = [0, 1, 2, 3], plot = True)
     #ekf_robustness(kidnap = True)
     #ekf_robustness(kidnap = False)
