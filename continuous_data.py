@@ -380,35 +380,25 @@ def plot_Conti_joints_angles(subject, trial, side):
     
     c_model = model_loader('Control_model.pickle')
 
-    with open('Psi/Psi_knee_G.pickle', 'rb') as file:
+    with open('Psi/Psi_kneeAngles_NSL_B3.pickle', 'rb') as file:
         Psi_knee = pickle.load(file)
-    with open('Psi/Psi_ankle_G.pickle', 'rb') as file:
+    with open('Psi/Psi_ankleAngles_NSL_B3.pickle', 'rb') as file:
         Psi_ankle = pickle.load(file)
-    
-    with open('Psi/Psi_kneeAngles.pickle', 'rb') as file:
-        Psi_knee_withoutNan = pickle.load(file)
-    with open('Psi/Psi_ankleAngles.pickle', 'rb') as file:
-        Psi_ankle_withoutNan = pickle.load(file)
     
     knee_angle_pred = model_prediction(c_model.models[0], Psi_knee, phases, phase_dots, step_lengths, ramps)
     ankle_angle_pred = model_prediction(c_model.models[1], Psi_ankle, phases, phase_dots, step_lengths, ramps)
     
-    knee_angle_pred_withoutNan = model_prediction(c_model.models[0], Psi_knee_withoutNan, phases, phase_dots, step_lengths, ramps)
-    ankle_angle_pred_withoutNan = model_prediction(c_model.models[1], Psi_ankle_withoutNan, phases, phase_dots, step_lengths, ramps)
-
     plt.figure("Joint Angle Control")
     start = 0
     end = 2500
     plt.subplot(211)
     plt.plot(knee_angle[start:end], 'k-')
-    plt.plot(knee_angle_pred[start:end], 'b-')
-    plt.plot(knee_angle_pred_withoutNan[start:end], 'm-')
+    plt.plot(knee_angle_pred[start:end], 'b--')
     plt.ylabel('knee angle')
-    plt.legend(('actual', 'least squares'))
+    plt.legend(('actual', 'pred'))
     plt.subplot(212)
     plt.plot(ankle_angle[start:end], 'k-')
-    plt.plot(ankle_angle_pred[start:end], 'b-') 
-    plt.plot(ankle_angle_pred_withoutNan[start:end], 'm-')
+    plt.plot(ankle_angle_pred[start:end], 'b--') 
     plt.ylabel('ankle angle')
     plt.show()
 
@@ -652,8 +642,8 @@ if __name__ == '__main__':
     #plt.plot(-footAngles-90)
     #plt.show()
     #plot_Conti_kinetics_data(subject, trial, side)
-    #plot_Conti_joints_angles(subject, trial, side)
-    plot_Conti_measurement_data(subject, trial, side)
+    plot_Conti_joints_angles(subject, trial, side)
+    #plot_Conti_measurement_data(subject, trial, side)
 
     ######## test real0time filters #############
     """

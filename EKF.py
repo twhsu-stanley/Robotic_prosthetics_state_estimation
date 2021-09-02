@@ -11,9 +11,9 @@ def process_model(x, dt):
 
 ## Load control model & coefficients (for OSL implementation)
 c_model = model_loader('Control_model.pickle')
-with open('Psi/Psi_kneeAngles_B3.pickle', 'rb') as file:
+with open('Psi/Psi_kneeAngles_NSL_B3.pickle', 'rb') as file:
     Psi_knee = pickle.load(file)
-with open('Psi/Psi_ankleAngles_B3.pickle', 'rb') as file:
+with open('Psi/Psi_ankleAngles_NSL_B3.pickle', 'rb') as file:
     Psi_ankle = pickle.load(file)
 
 ## Load model coefficients
@@ -75,11 +75,22 @@ def wrapTo2pi(ang):
     return ang
 
 def phase_error(phase_est, phase_truth):
-    # measure error between estimated and ground-truth phase
-    if abs(phase_est - phase_truth) < 0.5:
-        return abs(phase_est - phase_truth)
+    if len(phase_est) == len(phase_truth):
+        data_len = len(phase_est)
+
     else:
-        return 1 - abs(phase_est - phase_truth)
+        exit("Error in phase_error(phase_est, phase_truth): lengths of input data did not match.")
+    
+    phase_error = np.zeros(data_len)
+    for i in range(data_len):
+        # measure error between estimated and ground-truth phase
+        if abs(phase_est[i] - phase_truth[i]) < 0.5:
+            #return abs(phase_est - phase_truth)
+            phase_error[i] = abs(phase_est[i] - phase_truth[i])
+        else:
+            #return 1 - abs(phase_est - phase_truth)
+            phase_error[i] = 1 - abs(phase_est[i] - phase_truth[i])
+    return phase_error
 
 def joints_control(phases, phase_dots, step_lengths, ramps):
     joint_angles = c_model.evaluate_h_func([Psi_knee, Psi_ankle], phases, phase_dots, step_lengths, ramps)
@@ -171,7 +182,7 @@ class extended_kalman_filter:
         if using_atan2:
             self.residual[2] = np.arctan2(np.sin(self.residual[2]), np.cos(self.residual[2]))
         
-        self.MD_residual = np.sqrt(self.residual.T @ np.linalg.inv(self.R) @ self.residual) # Mahalanobis distance
+        #self.MD_residual = np.sqrt(self.residual.T @ np.linalg.inv(self.R) @ self.residual) # Mahalanobis distance
         """
         if steady_state_walking and self.MD_residual > np.sqrt(18.5):
             #self.Q = self.Q_static + self.Q_static * 0.2

@@ -38,7 +38,7 @@ def basis_model_fitting(model, mode):
         Psi = least_squares(model, data.ravel(),\
                             phase.ravel(), phase_dot.ravel(), step_length.ravel(), ramp.ravel())
 
-    with open('Psi/Psi_' + mode + '_NSL_B1.pickle', 'wb') as file:
+    with open('Psi/Psi_' + mode + '_NSL_B3.pickle', 'wb') as file:
         pickle.dump(Psi, file)
 
     print("Finished fitting the basis model!")
@@ -249,8 +249,8 @@ def saturation_bounds():
 if __name__ == '__main__': 
     #sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2', 'globalFootAngles', 'ankleMoment', 'tibiaForce']
     #print(np.diag(measurement_noise_covariance(*sensors)))
-    sensors = ['tibiaForce']
-    heteroscedastic_measurement_noise_covariance(*sensors)
+    #sensors = ['tibiaForce']
+    #heteroscedastic_measurement_noise_covariance(*sensors)
     #F_test('globalThighAngles', 1, 2)
     #F_test('globalThighAngles', 2, 3)
 
@@ -273,10 +273,10 @@ if __name__ == '__main__':
     #psi_tibiaForce = basis_model_fitting(model_tibiaForce, 'tibiaForce')
     #basis_model_residuals(model_tibiaForce, 'tibiaForce', heteroscedastic = True)
 
-    #model_kneeAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    model_kneeAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_kneeAngles = basis_model_fitting(model_kneeAngles, 'kneeAngles')
 
-    #model_ankleAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    model_ankleAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_ankleAngles = basis_model_fitting(model_ankleAngles, 'ankleAngles')
     
     phase_dot_model = Polynomial_Basis(2, 'phase_dot')
@@ -302,6 +302,6 @@ if __name__ == '__main__':
     #basis_model_residuals(model_atan2, 'atan2', heteroscedastic = True)
 
     # sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2, 'globalFootAngles':3, 'ankleMoment':4, 'tibiaForce':5}
-    #m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities, model_atan2, model_ankleMoment)
-    #model_saver(m_model, 'Measurement_model_0124_NSL.pickle')
+    m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities, model_atan2, model_footAngles, model_ankleMoment, model_tibiaForce)
+    model_saver(m_model, 'Measurement_model_012345_NSL.pickle')
     
