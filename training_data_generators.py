@@ -20,7 +20,6 @@ def jointAngles_statistics(joint):
     #   joint = 'knee' or 'ankle'
     
     subject_names = get_subject_names()
-
     data_mean_std = dict()
     
     for trial in raw_walking_data['Gaitcycle']['AB01'].keys():
@@ -35,7 +34,6 @@ def jointAngles_statistics(joint):
             if joint == 'knee':
                 if np.max(data_left) > 0:
                     data_left -= np.max(data_left)
-                
                 if np.max(data_right) > 0:
                     data_right -= np.max(data_right)
             
@@ -49,7 +47,7 @@ def jointAngles_statistics(joint):
             else:
                 data = np.vstack((data, data_left))
                 data = np.vstack((data, data_right))
-
+        
         data_mean_std[trial]['mean'] = np.mean(data, axis = 0)
         data_mean_std[trial]['std'] = np.std(data, axis = 0)
     
@@ -58,8 +56,8 @@ def jointAngles_statistics(joint):
         #plt.plot(range(150), data_mean_std[trial]['mean'])
         #plt.plot(range(150), data_mean_std[trial]['mean'] + 3 * data_mean_std[trial]['std'])
         #plt.plot(range(150), data_mean_std[trial]['mean'] - 3 * data_mean_std[trial]['std'])
+        #plt.grid()
         #plt.show()
-
     with open(('Gait_data_statistics/' + joint + 'Angles_mean_std.pickle'), 'wb') as file:
     	pickle.dump(data_mean_std, file)
 
@@ -670,19 +668,49 @@ def gait_training_data_generator(mode):
     with open(('Gait_training_data/' + mode + '_NSL_training_dataset.pickle'), 'wb') as file:
     	pickle.dump(gait_training_dataset, file)
     
+def globalFootAngle_offset():
+    subject_names = get_subject_names()
+    offset = dict()
+    
+    for subject in subject_names:
+        offset[subject] = dict()
+        for trial in raw_walking_data['Gaitcycle']['AB01'].keys():
+            if trial == 'subjectdetails':
+                continue
+            
+            footAngle_left = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['left']['foot']['x'][:] - 90
+            footAngle_right = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['right']['foot']['x'][:] - 90
+            
+            if subject == 'AB01':
+                data = footAngle_left
+                data = np.vstack((data, footAngle_right))
+            else:
+                data = np.vstack((data, footAngle_left))
+                data = np.vstack((data, footAngle_right))
+        
+            offset[subject][trial] = 0
+    
+        #plt.figure(trial)
+        #plt.plot(range(150), data.T, 'k-', alpha = 0.2)
+        #plt.plot(range(150), data_mean_std[trial]['mean'])
+        #plt.plot(range(150), data_mean_std[trial]['mean'] + 3 * data_mean_std[trial]['std'])
+        #plt.plot(range(150), data_mean_std[trial]['mean'] - 3 * data_mean_std[trial]['std'])
+        #plt.grid()
+        #plt.show()
+
 if __name__ == '__main__':
     #tibiaForce_statistics()
     #derivedMeasurements_statistics()
     
     #jointAngles_statistics('knee')
     #jointAngles_statistics('ankle')
-    #jointAngles_statistics('foot')
+    jointAngles_statistics('foot')
     #globalThighAngles_statistics()
 
     #time.sleep(3)
 
-    gait_training_data_generator('kneeAngles')
-    gait_training_data_generator('ankleAngles')
+    #gait_training_data_generator('kneeAngles')
+    #gait_training_data_generator('ankleAngles')
     #gait_training_data_generator('footAngles')
     #gait_training_data_generator('globalThighAngles')
     #gait_training_data_generator('globalThighVelocities')

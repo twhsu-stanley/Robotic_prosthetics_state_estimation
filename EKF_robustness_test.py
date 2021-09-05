@@ -17,7 +17,7 @@ sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2,
 
 # Determine what sensors to be used
 # 1) measurements that use the basis model
-sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2', 'globalFootAngles', 'ankleMoment', 'tibiaForce']
+sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2', 'ankleMoment', 'tibiaForce']
 
 sensor_id = [sensors_dict[key] for key in sensors]
 sensor_id_str = ""
@@ -45,7 +45,7 @@ Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 dt = 1/100
 inital_Sigma = np.diag([1e-6, 1e-6, 1e-6, 1e-6])
 Q = np.diag([0, 1e-3, 3e-3, 5e-1]) * dt
-U = np.diag([1, 1, 0.8, 1, 1, 1])
+U = np.diag([1, 1, 0.8, 1, 1])
 R = U @ measurement_noise_covariance(*sensors) @ U.T
 if using_directRamp == True:
     R = np.diag(np.append(np.diag(R), R_directRamp))
@@ -77,8 +77,8 @@ with open('Continuous_data/Measurements_with_Nan.pickle', 'rb') as file:
     nan_dict = pickle.load(file)
 
 # Stride in which kidnapping occurs
-kidnap_stride = 4
-total_strides = 15
+kidnap_stride = 3
+total_strides = 12
 
 # Roecover Criteria
 phase_recover_thr = 0.05
@@ -295,7 +295,6 @@ def ekf_test(subject, trial, side, heteroscedastic = False, kidnap = False, plot
         pv = int(ekf.x[0, 0] * 998)  # phase variable conversion (scaling)
         ankle_angle_cmd[i] = refAnk[pv]
         knee_angle_cmd[i] = refKne[pv]
-
 
     if kidnap == False:
         start_check_idx = int(3/np.average(phase_dots)/dt)
@@ -708,7 +707,7 @@ def ekf_bank_test(subject, trial, side, N = 30, heteroscedastic = False, kidnap 
     robustness_55 = r55 / N * 100
 
     print("R_11(%) = ", robustness_11, "|| R_13(%) = ", robustness_13, "|| R_15(%) = ",
-          robustness_15, "R_33(%) = ", robustness_33, "|| R_55(%) = ", robustness_55)
+          robustness_15, "|| R_33(%) = ", robustness_33, "|| R_55(%) = ", robustness_55)
     print("---------------------------------------------------------------------------")
 
     if plot == True:
@@ -839,7 +838,7 @@ def ekf_robustness(kidnap = True, heteroscedastic = False):
     poor_task_est = 0
 
     #for subject in Conti_subject_names(): 
-    for subject in ['AB09', 'AB05', 'AB01', 'AB10']:
+    for subject in ['AB09', 'AB07', 'AB05', 'AB01', 'AB10']:
         for trial in Conti_trial_names(subject):
         #for trial in ['s1x2i10', 's1i0']:
             if trial == 'subjectdetails':
@@ -920,14 +919,14 @@ def ekf_robustness(kidnap = True, heteroscedastic = False):
         plt.show()
 
 if __name__ == '__main__':
-    subject = 'AB10'
-    trial = 's1x2i0'
-    side = 'left'
+    subject = 'AB01'
+    trial = 's0x8d5'
+    side = 'right'
 
     if nan_dict[subject][trial][side] == False:
         print(subject + "/"+ trial + "/"+ side+ ": This trial should be skipped!")
 
-    #ekf_test(subject, trial, side, heteroscedastic = False, kidnap = [0, 1, 2, 3], plot = True)
-    #ekf_bank_test(subject, trial, side, N = 3, heteroscedastic = False, kidnap = [0, 1, 2, 3], plot = True)
-    ekf_robustness(kidnap = True, heteroscedastic = False)
+    ekf_test(subject, trial, side, heteroscedastic = False, kidnap = False, plot = True)
+    #ekf_bank_test(subject, trial, side, N = 10, heteroscedastic = False, kidnap = [0, 1, 2, 3], plot = True)
+    #ekf_robustness(kidnap = True, heteroscedastic = False)
     #ekf_robustness(kidnap = False, heteroscedastic = False)

@@ -114,11 +114,18 @@ def load_Conti_measurement_data(subject, trial, side):
     with open('Continuous_data/Continuous_measurement_data.pickle', 'rb') as file:
         Continuous_measurement_data = pickle.load(file)
 
+    with open('Continuous_data/globalFootAngle_offset.pickle', 'rb') as file:
+        offset_dict = pickle.load(file)
+
     start_index, end_index = Conti_start_end(subject, trial, side)
     globalThighAngle = Continuous_measurement_data[subject][trial][side]['globalThighAngles'][0, start_index:end_index]
     globalThighVelocity = Continuous_measurement_data[subject][trial][side]['globalThighVelocity'][start_index:end_index]
     atan2 = Continuous_measurement_data[subject][trial][side]['atan2_s'][start_index:end_index]
     globalFootAngle = -raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]['foot'][0,start_index:end_index] - 90
+    try:
+        globalFootAngle -= offset_dict[subject][trial][side]
+    except:
+        pass
     ankleMoment = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointmoment'][side]['ankle'][0, start_index:end_index] / 1000 # N-mm to N-m
     ankleMoment = butter_lowpass_filter(ankleMoment, 7, 100, order = 1)
     tibiaForce = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointforce'][side]['knee'][2, start_index:end_index]
@@ -351,7 +358,6 @@ def detect_nan_in_measurements():
                     if globalFootAngle[i] == -90 and globalFootAngle[i-1] == -90 and globalFootAngle[i-2] == -90:
                         nan_dict[subject][trial][side] = False
                         print(subject + "/"+ trial + "/"+ side, ": globalFootAngle")
-                      
                         break
                     if ankleMoment[i] == 0 and ankleMoment[i-1] == 0 and ankleMoment[i-2] == 0 and ankleMoment[i-3] == 0:
                         nan_dict[subject][trial][side] = False
@@ -514,8 +520,112 @@ def plot_Conti_kinetics_data(subject, trial, side):
 
     plt.show()
 
+def globalFootAngle_offset():
+    with open('Continuous_data/Measurements_with_Nan.pickle', 'rb') as file:
+        nan_dict = pickle.load(file)
+    
+    dt = 1/100
+    tibiaForce_threshold = -1.2
+
+    #speeds = [0.8, 1, 1.2]
+    #ramp_angles = [-10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10]
+
+    #offset = np.zeros((3, 9))
+    offset_dict = dict()
+    for subject in Conti_subject_names():
+        offset_dict[subject] = dict()
+        for trial in raw_walking_data['Gaitcycle']['AB01'].keys():
+            if trial == 'subjectdetails':
+                continue
+            offset_dict[subject][trial] = dict()
+
+            """
+            ptr = raw_walking_data['Continuous'][subject][trial]['description'][1][0]
+            speed = raw_walking_data[ptr][:][0, 0]
+            s, = np.where(speeds == speed)
+            s = s[0]
+            """
+            ptr = raw_walking_data['Continuous'][subject][trial]['description'][1][1]
+            ramp = raw_walking_data[ptr][:][0, 0]
+            """
+            r, = np.where(ramp_angles == ramp)
+            r = r[0]
+
+            offset_side = 0
+            k = 0
+            """
+            for side in ['left', 'right']:
+                if nan_dict[subject][trial][side] == False:
+                    print(subject + "/"+ trial + "/"+ side+ ": Trial skipped!")
+                    continue
+                start_index, end_index = Conti_start_end(subject, trial, side)
+                globalFootAngle = -raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]\
+                                    ['foot'][0,start_index:end_index] - 90
+                globalFootAngle_Vel = np.insert(np.diff(globalFootAngle)/dt, 0, 0)
+                globalFootAngle_Vel = butter_lowpass_filter(globalFootAngle_Vel, 5, 1/dt, order = 1)
+                
+                tibiaForce = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointforce'][side]['knee'][2, start_index:end_index]
+                    
+                directRamp = np.zeros(np.size(globalFootAngle))
+                stance = False
+                stance_prev = False
+                stance_idxs = 0
+                stance_idx1 = 0
+                stance_idx2 = 0
+                for i in range(len(globalFootAngle)):
+                    if tibiaForce[i] <= tibiaForce_threshold: 
+                        if stance_prev == False:
+                            stance_idxs = i
+                        stance = True
+                        stance_prev = stance
+                    else:
+                        if stance_prev == True:
+                            stance_idx2 = i
+                            stance_idx1 = stance_idxs
+                        stance = False
+                        stance_prev = stance
+                        
+                    if stance_idx1 < stance_idx2:
+                        idx = np.argmin(abs(globalFootAngle_Vel[stance_idx1:stance_idx2]))
+                        directRamp[i] = globalFootAngle[stance_idx1 + idx]
+                    else:
+                        directRamp[i] = 1e-4
+                
+                offset_dict[subject][trial][side] = np.mean(directRamp[200:]) - ramp
+                
+                #offset_side += np.mean(directRamp[200:]) - ramp
+                #k += 1
+                
+                """
+                plt.figure(subject + "/"+ trial + "/"+ side)
+                plt.subplot(211)
+                plt.plot(directRamp)
+                plt.plot(globalFootAngle)
+                plt.grid()
+                plt.subplot(212)
+                plt.plot(globalFootAngle_Vel)
+                plt.grid()
+                plt.show()
+                """
+            """
+            if k > 0:
+                offset[s, r] = offset_side / k
+            else:
+                offset[s, r] = numpy.NAN
+            """
+
+        #plt.figure(subject)
+        #plt.plot(np.linspace(-10, 10, 9), offset.T)
+        #plt.grid()
+        #plt.show()
+        
+    with open('Continuous_data/globalFootAngle_offset.pickle', 'wb') as file:
+    	pickle.dump(offset_dict, file)
+
+
 if __name__ == '__main__':
     #detect_nan_in_measurements()
+    globalFootAngle_offset()
     """
     with open('Continuous_data/Continuous_measurement_data.pickle', 'rb') as file:
         Continuous_measurement_data = pickle.load(file)
@@ -642,7 +752,7 @@ if __name__ == '__main__':
     #plt.plot(-footAngles-90)
     #plt.show()
     #plot_Conti_kinetics_data(subject, trial, side)
-    plot_Conti_joints_angles(subject, trial, side)
+    #plot_Conti_joints_angles(subject, trial, side)
     #plot_Conti_measurement_data(subject, trial, side)
 
     ######## test real0time filters #############
