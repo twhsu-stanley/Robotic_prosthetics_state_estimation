@@ -17,7 +17,7 @@ sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2,
 
 # Determine what sensors to be used
 # 1) measurements that use the basis model
-sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2', 'ankleMoment', 'tibiaForce']
+sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2', 'ankleMoment', 'tibiaForce']#, 'atan2'
 
 sensor_id = [sensors_dict[key] for key in sensors]
 sensor_id_str = ""
@@ -33,8 +33,8 @@ using_footAngles = np.any(np.array(sensors) == 'globalFootAngles')
 tibiaForce_threshold = -1.2
 
 # 2) direct measurement
-using_directRamp = True
-R_directRamp = 6
+using_directRamp = False
+R_directRamp = 8
 L_cop_lower = 0.03
 L_cop_upper = 0.07
 
@@ -44,8 +44,8 @@ Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 
 dt = 1/100
 inital_Sigma = np.diag([1e-6, 1e-6, 1e-6, 1e-6])
-Q = np.diag([0, 1e-3, 3e-3, 5e-1]) * dt
-U = np.diag([1, 1, 0.8, 1, 1])
+Q = np.diag([0, 5e-3, 5e-3, 5e-1]) * dt
+U = np.diag([1, 1, 0.5, 1, 1])
 R = U @ measurement_noise_covariance(*sensors) @ U.T
 if using_directRamp == True:
     R = np.diag(np.append(np.diag(R), R_directRamp))
@@ -298,11 +298,18 @@ def ekf_test(subject, trial, side, heteroscedastic = False, kidnap = False, plot
 
     if kidnap == False:
         start_check_idx = int(3/np.average(phase_dots)/dt)
-        RMSE_phase = np.sqrt((estimate_error[start_check_idx:, 0] ** 2).mean()) 
-        RMSE_phase_dot = np.sqrt((estimate_error[start_check_idx:, 1] ** 2).mean()) 
-        RMSE_step_length = np.sqrt((estimate_error[start_check_idx:, 2] ** 2).mean()) 
-        RMSE_ramp = np.sqrt((estimate_error[start_check_idx:, 3] ** 2).mean()) 
-        RMSE_directRamp = np.sqrt(((directRamp[start_check_idx:-1] - ramps[start_check_idx:-1]) ** 2).mean()) 
+        SE_phase = np.sum(estimate_error[start_check_idx:, 0] ** 2)
+        SE_phase_dot = np.sum(estimate_error[start_check_idx:, 1] ** 2)
+        SE_step_length = np.sum(estimate_error[start_check_idx:, 2] ** 2)
+        SE_ramp = np.sum(estimate_error[start_check_idx:, 3] ** 2)
+        SE_directRamp = np.sum((directRamp[start_check_idx:, 0] - ramps[start_check_idx:]) ** 2)
+        T = len(estimate_error[start_check_idx:, 0])
+
+        RMSE_phase = np.sqrt(SE_phase/T)
+        RMSE_phase_dot = np.sqrt(SE_phase_dot/T)
+        RMSE_step_length = np.sqrt(SE_step_length/T)
+        RMSE_ramp = np.sqrt(SE_ramp/T)
+        RMSE_directRamp = np.sqrt(SE_directRamp/T) 
         
         print("RMSE phase = %5.3f" % RMSE_phase)
         print("RMSE phase_dot = %5.3f" % RMSE_phase_dot)
@@ -310,7 +317,7 @@ def ekf_test(subject, trial, side, heteroscedastic = False, kidnap = False, plot
         print("RMSE ramp = %5.3f" % RMSE_ramp)
         print("RMSE direct ramp = %5.3f" % RMSE_directRamp)
         
-        result = (RMSE_phase, RMSE_phase_dot, RMSE_step_length, RMSE_ramp)
+        result = (SE_phase, SE_phase_dot, SE_step_length, SE_ramp, SE_directRamp, T)
 
     if plot == True:
         #th = heel_strike_index[0:25, 0].astype(int) # time step of heel strikes
@@ -829,16 +836,18 @@ def ekf_robustness(kidnap = True, heteroscedastic = False):
     robustness_15 = 0
     robustness_55 = 0
 
-    RMSE_phase_list = []
-    RMSE_step_length_list = []
-    RMSE_ramp_list = []
+    SE_phase_total = 0
+    SE_step_length_total = 0
+    SE_ramp_total = 0
+    SE_directRamp_total = 0
+    T_total = 0
 
     poor_step_length_est = 0
     poor_ramp_est = 0
     poor_task_est = 0
 
-    #for subject in Conti_subject_names(): 
-    for subject in ['AB09', 'AB07', 'AB05', 'AB01', 'AB10']:
+    for subject in Conti_subject_names(): 
+    #for subject in ['AB09', 'AB07', 'AB05', 'AB01', 'AB10']:
         for trial in Conti_trial_names(subject):
         #for trial in ['s1x2i10', 's1i0']:
             if trial == 'subjectdetails':
@@ -849,23 +858,27 @@ def ekf_robustness(kidnap = True, heteroscedastic = False):
                     continue
                 total_trials = total_trials + 1
                 
-                if kidnap == True:
+                if kidnap != False:
                     (R_11, R_13, R_33, R_15, R_55) = ekf_bank_test(subject, trial, side, 1, heteroscedastic, kidnap, plot = False)
                     robustness_11 += R_11
                     robustness_13 += R_13
                     robustness_33 += R_33
                     robustness_15 += R_15
                     robustness_55 += R_55
-                    print("**Current Average R_11(%) = ", robustness_11 / total_trials, 
-                          "|| R_13(%) = ", robustness_13 / total_trials,
-                          "|| R_33(%) = ", robustness_33 / total_trials,
-                          "|| R_15(%) = ", robustness_15 / total_trials,
-                          "|| R_55(%) = ", robustness_55 / total_trials)
+                    print("**Current Average R_11 = %4.1f %%" % (robustness_11 / total_trials), 
+                          "|| R_13 = %4.1f %%" % (robustness_13 / total_trials),
+                          "|| R_33 = %4.1f %%" % (robustness_33 / total_trials),
+                          "|| R_15 = %4.1f %%" % (robustness_15 / total_trials),
+                          "|| R_55 = %4.1f %%" % (robustness_55 / total_trials))
                 else:
-                    RMSE_phase, _, RMSE_step_length, RMSE_ramp = ekf_test(subject, trial, side, heteroscedastic, kidnap, plot = False)
-                    RMSE_phase_list.append(RMSE_phase)
-                    RMSE_step_length_list.append(RMSE_step_length)
-                    RMSE_ramp_list.append(RMSE_ramp)
+                    SE_phase, _, SE_step_length, SE_ramp, SE_directRamp, T = ekf_test(subject, trial, side, heteroscedastic, kidnap, plot = False)
+                    SE_phase_total += SE_phase
+                    SE_step_length_total += SE_step_length
+                    SE_ramp_total += SE_ramp
+                    SE_directRamp_total += SE_directRamp
+                    T_total += T
+
+                    """
                     if RMSE_phase > 0.05 or RMSE_step_length > 0.1 or RMSE_ramp > 2:
                         print(subject, "/", trial, '/', side, ": RMSE exceeds the threshold!")
                         print("RMSE phase = %5.3f" % RMSE_phase)
@@ -880,6 +893,7 @@ def ekf_robustness(kidnap = True, heteroscedastic = False):
                         poor_ramp_est += 1
                     if RMSE_step_length > 0.1 and RMSE_ramp > 2:
                         poor_task_est += 1
+                    """
 
     if kidnap == True:
         robustness_11 = robustness_11 / total_trials
@@ -889,16 +903,18 @@ def ekf_robustness(kidnap = True, heteroscedastic = False):
         robustness_55 = robustness_55 / total_trials
 
         print("==========================================")
-        print("Overall Average Robustness_11 = %5.2f %%" % robustness_11)
-        print("Overall Average Robustness_13 = %5.2f %%" % robustness_13)
-        print("Overall Average Robustness_33 = %5.2f %%" % robustness_33)
-        print("Overall Average Robustness_15 = %5.2f %%" % robustness_15)
-        print("Overall Average Robustness_55 = %5.2f %%" % robustness_55)
+        print("Overall Robustness_11 = %4.1f %%" % robustness_11)
+        print("Overall Robustness_13 = %4.1f %%" % robustness_13)
+        print("Overall Robustness_33 = %4.1f %%" % robustness_33)
+        print("Overall Robustness_15 = %4.1f %%" % robustness_15)
+        print("Overall Robustness_55 = %4.1f %%" % robustness_55)
     else:
-        print("Average RMSE phase = %5.3f" % np.mean(RMSE_phase_list))
-        print("Average RMSE step_length = %5.3f" % np.mean(RMSE_step_length_list))
-        print("Average RMSE ramp = %5.3f" % np.mean(RMSE_ramp_list))
+        print("Total RMSE phase = %5.3f" % np.sqrt(SE_phase_total/T_total))
+        print("Total RMSE step_length = %5.3f" % np.sqrt(SE_step_length_total/T_total))
+        print("Total RMSE ramp = %5.3f" % np.sqrt(SE_ramp_total/T_total))
+        print("Total RMSE directRamp = %5.3f" % np.sqrt(SE_directRamp_total/T_total))
 
+        """
         print("Max RMSE phase = %5.3f" % np.max(RMSE_phase_list))
         print("Max RMSE step_length = %5.3f" % np.max(RMSE_step_length_list))
         print("Max RMSE ramp = %5.3f" % np.max(RMSE_ramp_list))
@@ -917,16 +933,17 @@ def ekf_robustness(kidnap = True, heteroscedastic = False):
         plt.ylabel("RMSE ramp")
         plt.grid()
         plt.show()
+        """
 
 if __name__ == '__main__':
-    subject = 'AB01'
-    trial = 's0x8d5'
+    subject = 'AB10'
+    trial = 's1x2d2x5'
     side = 'right'
 
     if nan_dict[subject][trial][side] == False:
         print(subject + "/"+ trial + "/"+ side+ ": This trial should be skipped!")
 
-    ekf_test(subject, trial, side, heteroscedastic = False, kidnap = False, plot = True)
-    #ekf_bank_test(subject, trial, side, N = 10, heteroscedastic = False, kidnap = [0, 1, 2, 3], plot = True)
-    #ekf_robustness(kidnap = True, heteroscedastic = False)
+    #ekf_test(subject, trial, side, heteroscedastic = False, kidnap = [0, 1, 2, 3], plot = True)
+    #ekf_bank_test(subject, trial, side, N = 5, heteroscedastic = False, kidnap = [0, 1, 2, 3], plot = True)
+    ekf_robustness(kidnap = True, heteroscedastic = False)
     #ekf_robustness(kidnap = False, heteroscedastic = False)

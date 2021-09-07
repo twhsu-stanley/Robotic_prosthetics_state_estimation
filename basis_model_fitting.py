@@ -302,6 +302,6 @@ if __name__ == '__main__':
     #basis_model_residuals(model_atan2, 'atan2', heteroscedastic = True)
 
     # sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2, 'globalFootAngles':3, 'ankleMoment':4, 'tibiaForce':5}
-    m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities, model_atan2, model_footAngles, model_ankleMoment, model_tibiaForce)
-    model_saver(m_model, 'Measurement_model_012345_NSL.pickle')
+    m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities)
+    model_saver(m_model, 'Measurement_model_01_NSL.pickle')
     
