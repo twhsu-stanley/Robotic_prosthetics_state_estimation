@@ -17,7 +17,7 @@ sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2,
 
 # Determine what sensors to be used
 # 1) measurements that use the basis model
-sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2', 'ankleMoment', 'tibiaForce']#, 'atan2'
+sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2']#, 'ankleMoment', 'tibiaForce'
 
 sensor_id = [sensors_dict[key] for key in sensors]
 sensor_id_str = ""
@@ -44,8 +44,8 @@ Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 
 dt = 1/100
 inital_Sigma = np.diag([1e-6, 1e-6, 1e-6, 1e-6])
-Q = np.diag([0, 5e-3, 5e-3, 5e-1]) * dt
-U = np.diag([1, 1, 0.5, 1, 1])
+Q = np.diag([0, 1e-3, 4e-2, 0]) * dt 
+U = np.diag([1, 1, 1])
 R = U @ measurement_noise_covariance(*sensors) @ U.T
 if using_directRamp == True:
     R = np.diag(np.append(np.diag(R), R_directRamp))
@@ -314,8 +314,8 @@ def ekf_test(subject, trial, side, heteroscedastic = False, kidnap = False, plot
         print("RMSE phase = %5.3f" % RMSE_phase)
         print("RMSE phase_dot = %5.3f" % RMSE_phase_dot)
         print("RMSE step_length = %5.3f" % RMSE_step_length)
-        print("RMSE ramp = %5.3f" % RMSE_ramp)
-        print("RMSE direct ramp = %5.3f" % RMSE_directRamp)
+        #print("RMSE ramp = %5.3f" % RMSE_ramp)
+        #print("RMSE direct ramp = %5.3f" % RMSE_directRamp)
         
         result = (SE_phase, SE_phase_dot, SE_step_length, SE_ramp, SE_directRamp, T)
 
@@ -539,6 +539,7 @@ def ekf_bank_test(subject, trial, side, N = 30, heteroscedastic = False, kidnap 
         # n = 0: normal test w/0 kidnapping
         # initialize the state
         init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
+        #init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [0]])
         init.Sigma = inital_Sigma
         # build EKF
         ekf = extended_kalman_filter(sys, init)
@@ -847,7 +848,7 @@ def ekf_robustness(kidnap = True, heteroscedastic = False):
     poor_task_est = 0
 
     for subject in Conti_subject_names(): 
-    #for subject in ['AB09', 'AB07', 'AB05', 'AB01', 'AB10']:
+    #for subject in ['AB09']:
         for trial in Conti_trial_names(subject):
         #for trial in ['s1x2i10', 's1i0']:
             if trial == 'subjectdetails':
@@ -867,8 +868,8 @@ def ekf_robustness(kidnap = True, heteroscedastic = False):
                     robustness_55 += R_55
                     print("**Current Average R_11 = %4.1f %%" % (robustness_11 / total_trials), 
                           "|| R_13 = %4.1f %%" % (robustness_13 / total_trials),
-                          "|| R_33 = %4.1f %%" % (robustness_33 / total_trials),
                           "|| R_15 = %4.1f %%" % (robustness_15 / total_trials),
+                          "|| R_33 = %4.1f %%" % (robustness_33 / total_trials),
                           "|| R_55 = %4.1f %%" % (robustness_55 / total_trials))
                 else:
                     SE_phase, _, SE_step_length, SE_ramp, SE_directRamp, T = ekf_test(subject, trial, side, heteroscedastic, kidnap, plot = False)
@@ -877,6 +878,12 @@ def ekf_robustness(kidnap = True, heteroscedastic = False):
                     SE_ramp_total += SE_ramp
                     SE_directRamp_total += SE_directRamp
                     T_total += T
+
+                    print("Current RMSE phase = %5.3f" % np.sqrt(SE_phase_total/T_total))
+                    print("Current RMSE step_length = %5.3f" % np.sqrt(SE_step_length_total/T_total))
+                    print("----------------------------------------------------------------")
+                    #print("Current RMSE ramp = %5.3f" % np.sqrt(SE_ramp_total/T_total))
+                    #print("Current RMSE directRamp = %5.3f" % np.sqrt(SE_directRamp_total/T_total))
 
                     """
                     if RMSE_phase > 0.05 or RMSE_step_length > 0.1 or RMSE_ramp > 2:
@@ -895,7 +902,7 @@ def ekf_robustness(kidnap = True, heteroscedastic = False):
                         poor_task_est += 1
                     """
 
-    if kidnap == True:
+    if kidnap != False:
         robustness_11 = robustness_11 / total_trials
         robustness_13 = robustness_13 / total_trials
         robustness_33 = robustness_33 / total_trials
@@ -937,13 +944,13 @@ def ekf_robustness(kidnap = True, heteroscedastic = False):
 
 if __name__ == '__main__':
     subject = 'AB10'
-    trial = 's1x2d2x5'
+    trial = 's1x2d5'
     side = 'right'
 
     if nan_dict[subject][trial][side] == False:
         print(subject + "/"+ trial + "/"+ side+ ": This trial should be skipped!")
 
-    #ekf_test(subject, trial, side, heteroscedastic = False, kidnap = [0, 1, 2, 3], plot = True)
-    #ekf_bank_test(subject, trial, side, N = 5, heteroscedastic = False, kidnap = [0, 1, 2, 3], plot = True)
-    ekf_robustness(kidnap = True, heteroscedastic = False)
+    ekf_test(subject, trial, side, heteroscedastic = False, kidnap = False, plot = True)
+    #ekf_bank_test(subject, trial, side, N = 5, heteroscedastic = False, kidnap = [0, 1, 2], plot = True)
+    #ekf_robustness(kidnap = [0, 1, 2], heteroscedastic = False)
     #ekf_robustness(kidnap = False, heteroscedastic = False)

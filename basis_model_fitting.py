@@ -38,10 +38,10 @@ def basis_model_fitting(model, mode):
         Psi = least_squares(model, data.ravel(),\
                             phase.ravel(), phase_dot.ravel(), step_length.ravel(), ramp.ravel())
 
-    with open('Psi/Psi_' + mode + '_NSL_B3.pickle', 'wb') as file:
+    with open('Psi/Psi_' + mode + '_NSL_B10.pickle', 'wb') as file:
         pickle.dump(Psi, file)
 
-    print("Finished fitting the basis model!")
+    print("Finished fitting the basis model for " + mode + "!")
 
     return Psi
 
@@ -109,7 +109,7 @@ def basis_model_residuals(model, mode, heteroscedastic = False):
                 pickle.dump(residuals, file)
 
     elif mode == 'globalFootAngles':
-        with open('Psi/Psi_' + mode + '_NSL_B1.pickle', 'rb') as file:
+        with open('Psi/Psi_' + mode + '_NSL_B01.pickle', 'rb') as file:
             Psi = pickle.load(file)
         
         if heteroscedastic == False:
@@ -120,7 +120,7 @@ def basis_model_residuals(model, mode, heteroscedastic = False):
                 residuals.append(data[i, 0:60] - data_pred)
             residuals = np.array(residuals)
             residuals = residuals.ravel()
-            with open(('Basis_model/' + mode + '_NSL_B1_stance_residuals.pickle'), 'wb') as file:
+            with open(('Basis_model/' + mode + '_NSL_B01_stance_residuals.pickle'), 'wb') as file:
                 pickle.dump(residuals, file)
         
         elif heteroscedastic == True:
@@ -129,18 +129,18 @@ def basis_model_residuals(model, mode, heteroscedastic = False):
             for i in range(np.shape(data)[0]):
                 data_pred = model_prediction(model, Psi, phase[i, :], phase_dot[i, :], step_length[i, :], ramp[i, :])
                 residuals[i, :] = data[i, :] - data_pred
-            with open(('Basis_model/' + mode + '_NSL_B1_hetero_residuals.pickle'), 'wb') as file:
+            with open(('Basis_model/' + mode + '_NSL_B01_hetero_residuals.pickle'), 'wb') as file:
                 pickle.dump(residuals, file)
     
     else:
-        with open('Psi/Psi_' + mode + '_NSL_B3.pickle', 'rb') as file:
+        with open('Psi/Psi_' + mode + '_NSL_B30.pickle', 'rb') as file:
             Psi = pickle.load(file)
         
         if heteroscedastic == False:
             # Non-heteroscedastic noise model
             data_pred = model_prediction(model, Psi, phase.ravel(), phase_dot.ravel(), step_length.ravel(), ramp.ravel())
             residuals = data.ravel() - data_pred
-            with open(('Basis_model/' + mode + '_NSL_B3_residuals.pickle'), 'wb') as file:
+            with open(('Basis_model/' + mode + '_NSL_B30_residuals.pickle'), 'wb') as file:
                 pickle.dump(residuals, file)
 
         elif heteroscedastic == True:
@@ -149,14 +149,14 @@ def basis_model_residuals(model, mode, heteroscedastic = False):
             for i in range(np.shape(data)[0]):
                 data_pred = model_prediction(model, Psi, phase[i, :], phase_dot[i, :], step_length[i, :], ramp[i, :])
                 residuals[i, :] = data[i, :] - data_pred
-            with open(('Basis_model/' + mode + '_NSL_B3_hetero_residuals.pickle'), 'wb') as file:
+            with open(('Basis_model/' + mode + '_NSL_B30_hetero_residuals.pickle'), 'wb') as file:
                 pickle.dump(residuals, file)
 
 def measurement_noise_covariance(*sensors):
     covariance = []
     for sensor in sensors:
         if sensor == 'globalThighAngles' or sensor == 'globalThighVelocities':
-            with open(('Basis_model/' + sensor + '_NSL_B3_residuals.pickle'), 'rb') as file:
+            with open(('Basis_model/' + sensor + '_NSL_B30_residuals.pickle'), 'rb') as file:
                 r = pickle.load(file)
                 covariance.append(np.cov(r))
         elif sensor == 'atan2':
@@ -164,11 +164,11 @@ def measurement_noise_covariance(*sensors):
                 r = pickle.load(file)
                 covariance.append(np.cov(r))
         elif sensor == 'ankleMoment' or sensor == 'tibiaForce':
-            with open(('Basis_model/' + sensor + '_NSL_B3_stance_residuals.pickle'), 'rb') as file:
+            with open(('Basis_model/' + sensor + '_NSL_B33_stance_residuals.pickle'), 'rb') as file:
                 r = pickle.load(file)
                 covariance.append(np.cov(r))
         elif sensor == 'globalFootAngles':
-            with open(('Basis_model/' + sensor + '_NSL_B1_stance_residuals.pickle'), 'rb') as file:
+            with open(('Basis_model/' + sensor + '_NSL_B01_stance_residuals.pickle'), 'rb') as file:
                 r = pickle.load(file)
                 covariance.append(np.cov(r))
     R = np.diag(covariance)
@@ -185,10 +185,10 @@ def heteroscedastic_measurement_noise_covariance(*sensors):
             with open(('Basis_model/' + sensor + '_NSL_hetero_residuals.pickle'), 'rb') as file:
                 r = pickle.load(file)
         elif sensor == 'globalFootAngles':
-            with open(('Basis_model/' + sensor + '_NSL_B1_hetero_residuals.pickle'), 'rb') as file:
+            with open(('Basis_model/' + sensor + '_NSL_B01_hetero_residuals.pickle'), 'rb') as file:
                 r = pickle.load(file)
         else:
-            with open(('Basis_model/' + sensor + '_NSL_B3_hetero_residuals.pickle'), 'rb') as file:
+            with open(('Basis_model/' + sensor + '_NSL_B33_hetero_residuals.pickle'), 'rb') as file:
                 r = pickle.load(file)
         
         for i in range(150):
@@ -255,15 +255,15 @@ if __name__ == '__main__':
     #F_test('globalThighAngles', 2, 3)
 
     F = 11
-    N = 3
+    B = 3
     phase_model = Fourier_Basis(F, 'phase')
     phase_dot_model = Polynomial_Basis(1, 'phase_dot')
-    step_length_model = Berstein_Basis(N,'step_length')
-    ramp_model = Berstein_Basis(N, 'ramp')
+    step_length_model = Berstein_Basis(B,'step_length')
+    ramp_model = Berstein_Basis(0, 'ramp')
 
     model_globalThighAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_globalThighAngles = basis_model_fitting(model_globalThighAngles, 'globalThighAngles')
-    #basis_model_residuals(model_globalThighAngles, 'globalThighAngles', heteroscedastic = True)
+    #basis_model_residuals(model_globalThighAngles, 'globalThighAngles', heteroscedastic = False)
 
     model_ankleMoment = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_ankleMoment = basis_model_fitting(model_ankleMoment, 'ankleMoment')
@@ -282,7 +282,7 @@ if __name__ == '__main__':
     phase_dot_model = Polynomial_Basis(2, 'phase_dot')
     model_globalThighVelocities = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_globalThighAngles = basis_model_fitting(model_globalThighVelocities, 'globalThighVelocities')
-    #basis_model_residuals(model_globalThighVelocities, 'globalThighVelocities', heteroscedastic = True)
+    #basis_model_residuals(model_globalThighVelocities, 'globalThighVelocities', heteroscedastic = False)
 
     phase_dot_model = Polynomial_Basis(1, 'phase_dot')
     step_length_model = Berstein_Basis(0,'step_length')
@@ -304,4 +304,6 @@ if __name__ == '__main__':
     # sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2, 'globalFootAngles':3, 'ankleMoment':4, 'tibiaForce':5}
     m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities)
     model_saver(m_model, 'Measurement_model_01_NSL.pickle')
+    #c_model = Measurement_Model(model_kneeAngles, model_ankleAngles)
+    #model_saver(c_model, 'Control_model_NSL_B10.pickle')
     

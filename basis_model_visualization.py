@@ -5,13 +5,13 @@ from mpl_toolkits import mplot3d
 from model_framework import *
 from EKF import wrapTo2pi, load_Psi
 
-"""
+
 # Determine which sensors to be used
-sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2','globalFootAngles','ankleMoment', 'tibiaForce']
+sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2']#,'globalFootAngles','ankleMoment', 'tibiaForce']
 
-sensor_id = 4
+sensor_id = 0
 
-m_model = model_loader('Measurement_model_012345_NSL.pickle')
+m_model = model_loader('Measurement_model_01_NSL.pickle')
 Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 
 ## A. Visualize Measurement Model w.r.t. phase_dot ===========================================================================
@@ -39,7 +39,7 @@ ax.set_ylabel('phase_dot')
 ## B. Visualize Measurement Model w.r.t. stpe_length ===========================================================================
 phases = np.linspace(0, 1, num = 50)
 phase_dots = 0.8
-step_lengths = np.linspace(0.78, 1.55, num = 50)
+step_lengths = np.linspace(0.8, 1.8, num = 50)
 ramps = 0
 
 measurement = np.zeros((len(phases), len(step_lengths)))
@@ -79,17 +79,17 @@ ax.set_xlabel('phase')
 ax.set_ylabel('ramp')
 
 # ==========================================================================================================================
-"""
 
-c_model = model_loader('Control_model.pickle')
-with open('Psi/Psi_kneeAngles_NSL_B3.pickle', 'rb') as file:#_withoutNan
+"""
+c_model = model_loader('Control_model_NSL_B10.pickle')
+with open('Psi/Psi_kneeAngles_NSL_B10.pickle', 'rb') as file:#_withoutNan
     Psi_knee = pickle.load(file)
-with open('Psi/Psi_ankleAngles_NSL_B3.pickle', 'rb') as file:
+with open('Psi/Psi_ankleAngles_NSL_B10.pickle', 'rb') as file:
     Psi_ankle = pickle.load(file)
 ## C. Visualize Joint Model w.r.t. step_length ===============================================================================================
 phases = np.linspace(0, 1, num = 50)
 phase_dots = 0.8
-step_lengths = np.linspace(0.9, 1.8, num = 50)
+step_lengths = np.linspace(0, 1.8, num = 50)
 ramps = 0
 
 knee_angle_model = np.zeros((len(phases), len(step_lengths)))
@@ -188,6 +188,6 @@ ax.plot_surface(X, Y, -knee_angle_model.T)
 ax.set_xlabel('phase')
 ax.set_ylabel('phase_dots')
 ax.set_zlabel('knee angle (deg)')
-
+"""
 #==============================================================================================================================
 plt.show()

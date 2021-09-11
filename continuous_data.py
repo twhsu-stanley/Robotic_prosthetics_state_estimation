@@ -384,11 +384,11 @@ def plot_Conti_joints_angles(subject, trial, side):
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
     knee_angle, ankle_angle = load_Conti_joints_angles(subject, trial, side)
     
-    c_model = model_loader('Control_model.pickle')
+    c_model = model_loader('Control_model_NSL_B10.pickle')
 
-    with open('Psi/Psi_kneeAngles_NSL_B3.pickle', 'rb') as file:
+    with open('Psi/Psi_kneeAngles_NSL_B10.pickle', 'rb') as file:
         Psi_knee = pickle.load(file)
-    with open('Psi/Psi_ankleAngles_NSL_B3.pickle', 'rb') as file:
+    with open('Psi/Psi_ankleAngles_NSL_B10.pickle', 'rb') as file:
         Psi_ankle = pickle.load(file)
     
     knee_angle_pred = model_prediction(c_model.models[0], Psi_knee, phases, phase_dots, step_lengths, ramps)
@@ -625,7 +625,7 @@ def globalFootAngle_offset():
 
 if __name__ == '__main__':
     #detect_nan_in_measurements()
-    globalFootAngle_offset()
+    #globalFootAngle_offset()
     """
     with open('Continuous_data/Continuous_measurement_data.pickle', 'rb') as file:
         Continuous_measurement_data = pickle.load(file)
@@ -744,7 +744,7 @@ if __name__ == '__main__':
     ##################################################################
     
     subject = 'AB10'
-    trial = 's1i0'
+    trial = 's1d10'
     side = 'right'
     
     #footAngles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]['foot'][0,:]
@@ -752,7 +752,7 @@ if __name__ == '__main__':
     #plt.plot(-footAngles-90)
     #plt.show()
     #plot_Conti_kinetics_data(subject, trial, side)
-    #plot_Conti_joints_angles(subject, trial, side)
+    plot_Conti_joints_angles(subject, trial, side)
     #plot_Conti_measurement_data(subject, trial, side)
 
     ######## test real0time filters #############

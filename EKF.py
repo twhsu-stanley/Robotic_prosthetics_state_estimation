@@ -10,31 +10,31 @@ def process_model(x, dt):
     return A(dt) @ x
 
 ## Load control model & coefficients (for OSL implementation)
-c_model = model_loader('Control_model.pickle')
-with open('Psi/Psi_kneeAngles_NSL_B3.pickle', 'rb') as file:
+c_model = model_loader('Control_model_NSL_B10.pickle')
+with open('Psi/Psi_kneeAngles_NSL_B10.pickle', 'rb') as file:
     Psi_knee = pickle.load(file)
-with open('Psi/Psi_ankleAngles_NSL_B3.pickle', 'rb') as file:
+with open('Psi/Psi_ankleAngles_NSL_B10.pickle', 'rb') as file:
     Psi_ankle = pickle.load(file)
 
 ## Load model coefficients
 def load_Psi(subject = 'Generic'):
     if subject == 'Generic':
-        with open('Psi/Psi_globalThighAngles_NSL_B3.pickle', 'rb') as file:
+        with open('Psi/Psi_globalThighAngles_NSL_B30.pickle', 'rb') as file:
             Psi_globalThighAngles = pickle.load(file)
         
-        with open('Psi/Psi_globalThighVelocities_NSL_B3.pickle', 'rb') as file:
+        with open('Psi/Psi_globalThighVelocities_NSL_B30.pickle', 'rb') as file:
             Psi_globalThighVelocities = pickle.load(file)
         
-        with open('Psi/Psi_ankleMoment_NSL_B3.pickle', 'rb') as file:
+        with open('Psi/Psi_ankleMoment_NSL_B33.pickle', 'rb') as file:
             Psi_ankleMoment = pickle.load(file)
         
-        with open('Psi/Psi_tibiaForce_NSL_B3.pickle', 'rb') as file:
+        with open('Psi/Psi_tibiaForce_NSL_B33.pickle', 'rb') as file:
             Psi_tibiaForce = pickle.load(file)
         
         with open('Psi/Psi_atan2_NSL.pickle', 'rb') as file:
             Psi_atan2 = pickle.load(file)
 
-        with open('Psi/Psi_globalFootAngles_NSL_B1.pickle', 'rb') as file:
+        with open('Psi/Psi_globalFootAngles_NSL_B01.pickle', 'rb') as file:
             Psi_footAngles = pickle.load(file)
 
     else:
