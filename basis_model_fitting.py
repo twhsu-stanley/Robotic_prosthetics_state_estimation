@@ -4,14 +4,17 @@ import numpy as np
 from EKF import wrapTo2pi
 from scipy import stats
 
-def basis_model_fitting(model, mode):
+def basis_model_fitting(model, gait_data):
     # Generic basis model fitting using gait training data
 
     # Input:
     #   model: basis model to be fitted
-    #   mode : training data, e.g. 'kneeAngles', 'ankleAngles'
+    #   gait_data : training data, e.g. 'kneeAngles', 'ankleAngles'
     
-    with open(('Gait_training_data/' + mode + '_NSL_training_dataset.pickle'), 'rb') as file:
+    #with open(('Gait_training_data/' + gait_data + '_NSL_training_dataset.pickle'), 'rb') as file:
+    #    gait_training_dataset = pickle.load(file)
+    
+    with open(('Gait_training_R01data/' + gait_data + '_NSL_training_dataset.pickle'), 'rb') as file:
         gait_training_dataset = pickle.load(file)
 
     data = gait_training_dataset['training_data']
@@ -27,7 +30,7 @@ def basis_model_fitting(model, mode):
     print("Shape of ramp: ", np.shape(ramp))
 
     # Fit the model
-    if mode == 'atan2':
+    if gait_data == 'atan2':
         data_atan2 = data.ravel() - 2 * np.pi * phase.ravel()
         # wrap to [-pi, pi]
         for i in range(np.shape(data_atan2)[0]):
@@ -38,10 +41,12 @@ def basis_model_fitting(model, mode):
         Psi = least_squares(model, data.ravel(),\
                             phase.ravel(), phase_dot.ravel(), step_length.ravel(), ramp.ravel())
 
-    with open('Psi/Psi_' + mode + '_NSL_B10.pickle', 'wb') as file:
+    #with open('Psi/Psi_' + mode + '_NSL_B10.pickle', 'wb') as file:
+    #    pickle.dump(Psi, file)
+    with open('Psi_R01/Psi_' + gait_data + '_NSL_B10.pickle', 'wb') as file:
         pickle.dump(Psi, file)
 
-    print("Finished fitting the basis model for " + mode + "!")
+    print("Finished fitting the basis model for " + gait_data + "!")
 
     return Psi
 
@@ -262,7 +267,7 @@ if __name__ == '__main__':
     ramp_model = Berstein_Basis(0, 'ramp')
 
     model_globalThighAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
-    #psi_globalThighAngles = basis_model_fitting(model_globalThighAngles, 'globalThighAngles')
+    #psi_globalThighAngles = basis_model_fitting(model_globalThighAngles, 'globalThighAngles_walking')
     #basis_model_residuals(model_globalThighAngles, 'globalThighAngles', heteroscedastic = False)
 
     model_ankleMoment = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
@@ -302,8 +307,8 @@ if __name__ == '__main__':
     #basis_model_residuals(model_atan2, 'atan2', heteroscedastic = True)
 
     # sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2, 'globalFootAngles':3, 'ankleMoment':4, 'tibiaForce':5}
-    m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities)
-    model_saver(m_model, 'Measurement_model_01_NSL.pickle')
+    m_model = Measurement_Model(model_globalThighAngles)
+    model_saver(m_model, 'Measurement_model_0_NSL.pickle')
     #c_model = Measurement_Model(model_kneeAngles, model_ankleAngles)
     #model_saver(c_model, 'Control_model_NSL_B10.pickle')
     
