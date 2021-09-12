@@ -105,6 +105,7 @@ def derivedMeasurements_R01data():
         # 1) Walking
         mode = 'Walk'
         globalThighVelocities_walking[subject][mode] = dict()
+        atan2_walking[subject][mode] = dict()
         for speed in ['s0x8', 's1', 's1x2']:
             try:
                 print(" Walk:", speed)
@@ -146,6 +147,7 @@ def derivedMeasurements_R01data():
         # 2) Running
         mode = 'Run'
         globalThighVelocities_running[subject][mode] = dict()
+        atan2_running[subject][mode] = dict()
         for speed in ['s1x8', 's2x0', 's2x2', 's2x4']:
             try:
                 print(" Run:", speed)
@@ -194,13 +196,8 @@ def derivedMeasurements_R01data():
     	pickle.dump(atan2_running, file)
 
 def gait_training_R01data_generator(gait_data):
-    if gait_data == 'globalThighAngles_walking':
-        with open('Gait_training_R01data/globalThighAngles_walking_R01data.pickle', 'rb') as file:
-            globalThighAngles_walking = pickle.load(file)
-    
-    elif gait_data == 'globalThighAngles_running':
-        with open('Gait_training_R01data/globalThighAngles_running_R01data.pickle', 'rb') as file:
-            globalThighAngles_running = pickle.load(file)
+    with open('Gait_training_R01data/' + gait_data + '_R01data.pickle', 'rb') as file:
+        gait_data_dict = pickle.load(file)
 
     incline = 'i0'
     num_trials = 0
@@ -208,13 +205,13 @@ def gait_training_R01data_generator(gait_data):
         leg_length_left = Normalized_data[ Normalized_data['Normalized'][subject]['ParticipantDetails'][1,5] ][:][0,0] / 1000
         leg_length_right = Normalized_data[ Normalized_data['Normalized'][subject]['ParticipantDetails'][1,8] ][:][0,0] / 1000
         
-        if gait_data == 'globalThighAngles_walking':
+        if gait_data == 'globalThighAngles_walking' or gait_data == 'globalThighVelocities_walking' or gait_data == 'atan2_walking':
             mode = 'Walk'
             for speed in ['s0x8', 's1', 's1x2']:
                 try:
                     print(subject + '/' + mode  + '/' + speed)
                     # 1) gait data
-                    data = globalThighAngles_walking[subject][mode][speed]
+                    data = gait_data_dict[subject][mode][speed]
                     
                     # 2) phase dot
                     stride_period = Normalized_data['Normalized'][subject][mode][speed][incline]['events']['StrideDetails'][2,:]/100
@@ -260,13 +257,13 @@ def gait_training_R01data_generator(gait_data):
                     print("Exception: something wrong occured!")
                     continue
                 
-        elif gait_data == 'globalThighAngles_running':
+        elif gait_data == 'globalThighAngles_running' or gait_data == 'globalThighVelocities_running' or gait_data == 'atan2_running':
             mode = 'Run'
             for speed in ['s1x8', 's2x0', 's2x2', 's2x4']:
                 try:
                     print(subject + '/' + mode  + '/' + speed)
                     # 1) gait data
-                    data = globalThighAngles_running[subject][mode][speed]
+                    data = gait_data_dict[subject][mode][speed]
                     
                     # 2) phase dot
                     stride_period = Normalized_data['Normalized'][subject][mode][speed][incline]['events']['StrideDetails'][2,:]/100
@@ -311,7 +308,7 @@ def gait_training_R01data_generator(gait_data):
                     num_trials += 1
                 
                 except:
-                    print("Exception: something wrong occured!")
+                    print("Exception: something wrong occured!", subject + '/' + mode  + '/' + speed)
                     continue
     
     #===================================================================================================================
@@ -334,8 +331,15 @@ def gait_training_R01data_generator(gait_data):
 if __name__ == '__main__':
     #globalThighAngles_R01data()
     #derivedMeasurements_R01data()
-    gait_training_R01data_generator('globalThighAngles_walking')
-    gait_training_R01data_generator('globalThighAngles_running')
+    
+    #gait_training_R01data_generator('globalThighAngles_walking')
+    #gait_training_R01data_generator('globalThighVelocities_walking')
+    gait_training_R01data_generator('atan2_walking')
+
+    #gait_training_R01data_generator('globalThighAngles_running')
+    #gait_training_R01data_generator('globalThighVelocities_running')
+    gait_training_R01data_generator('atan2_running')
+    
     #print(get_commanded_velocities('AB10', 1))
     
     """
