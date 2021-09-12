@@ -10,6 +10,20 @@ Normalized_data = h5py.File(dataset_location + 'Normalized.mat', 'r')
 def get_subject_names():
     return Normalized_data['Normalized'].keys()
 
+def get_subject_velocities(subject, speed_nominal):
+    # Leg lengths here were measured by a measuring tape.
+    leg_length = {'AB01': 0.860, 'AB02': 0.790, 'AB03': 0.770, 'AB04': 0.810, 'AB05':0.770, 
+                  'AB06': 0.842, 'AB07': 0.824, 'AB08': 0.872, 'AB09': 0.830, 'AB10':0.755}
+
+    height_avergae = (1.757 + 1.618) / 2; # Average of US male and female heights
+    leg_length_avergae = 0.48 * height_avergae;  # Anthropomorphy from Biomechanics and Motor Control, David Winter
+    g = 9.81
+    
+    speed_normalzied = speed_nominal / np.sqrt(g * leg_length_avergae)
+    speed_command = speed_normalzied * np.sqrt(g * leg_length[subject])
+
+    return speed_command
+
 def globalThighAngles_R01data():
     """
     # Compute level-ground global thigh angle data from the R01 dataset
@@ -210,11 +224,11 @@ def gait_training_R01data_generator(gait_data):
                     
                     # 3) stride length
                     if speed == 's0x8':
-                        walking_speed = 0.8
+                        walking_speed = get_subject_velocities(subject, 0.8)
                     elif speed == 's1':
-                        walking_speed = 1
+                        walking_speed = get_subject_velocities(subject, 1)
                     elif speed == 's1x2':
-                        walking_speed = 1.2
+                        walking_speed = get_subject_velocities(subject, 1.2)
 
                     step_length = np.zeros(np.shape(data))
                     for n in range(np.shape(data)[0]):
@@ -262,13 +276,13 @@ def gait_training_R01data_generator(gait_data):
                     
                     # 3) stride length
                     if speed == 's1x8':
-                        walking_speed = 1.8
+                        walking_speed = get_subject_velocities(subject, 1.8)
                     elif speed == 's2x0':
-                        walking_speed = 2
+                        walking_speed = get_subject_velocities(subject, 2)
                     elif speed == 's2x2':
-                        walking_speed = 2.2
+                        walking_speed = get_subject_velocities(subject, 2.2)
                     elif speed == 's2x4':
-                        walking_speed = 2.4
+                        walking_speed = get_subject_velocities(subject, 2.4)
 
                     step_length = np.zeros(np.shape(data))
                     for n in range(np.shape(data)[0]):
@@ -320,8 +334,9 @@ def gait_training_R01data_generator(gait_data):
 if __name__ == '__main__':
     #globalThighAngles_R01data()
     #derivedMeasurements_R01data()
-    gait_training_R01data_generator('globalThighAngles_walking')
+    #gait_training_R01data_generator('globalThighAngles_walking')
     
+    print(get_subject_velocities('AB10', 1))
     
     """
     subject = 'AB02'
