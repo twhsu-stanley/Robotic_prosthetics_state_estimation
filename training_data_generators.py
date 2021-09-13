@@ -435,7 +435,8 @@ def gait_training_data_generator(mode):
 
     num_trials = 0
     error_trials = 0
-    for trial in raw_walking_data['Gaitcycle']['AB01'].keys():
+    #for trial in raw_walking_data['Gaitcycle']['AB01'].keys():
+    for trial in ['s0x8i0', 's1i0', 's1x2i0']: # flat-ground walking data only 
         if trial == 'subjectdetails':
             continue
         for subject in subject_names:
@@ -704,7 +705,7 @@ if __name__ == '__main__':
     
     #jointAngles_statistics('knee')
     #jointAngles_statistics('ankle')
-    jointAngles_statistics('foot')
+    #jointAngles_statistics('foot')
     #globalThighAngles_statistics()
 
     #time.sleep(3)
@@ -712,9 +713,9 @@ if __name__ == '__main__':
     #gait_training_data_generator('kneeAngles')
     #gait_training_data_generator('ankleAngles')
     #gait_training_data_generator('footAngles')
-    #gait_training_data_generator('globalThighAngles')
-    #gait_training_data_generator('globalThighVelocities')
-    #gait_training_data_generator('atan2')
+    gait_training_data_generator('globalThighAngles')
+    gait_training_data_generator('globalThighVelocities')
+    gait_training_data_generator('atan2')
 
     #ankleMoment_statistics()
     #gait_training_data_generator('ankleMoment')

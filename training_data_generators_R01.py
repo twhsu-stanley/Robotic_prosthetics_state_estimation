@@ -5,7 +5,6 @@ from incline_experiment_utils import *
 
 dataset_location = '../Reznick_Dataset/'
 Normalized_data = h5py.File(dataset_location + 'Normalized.mat', 'r')
-#Streaming_data = h5py.File(dataset_location + 'Streaming.mat', 'r')
 
 def get_subject_names():
     return Normalized_data['Normalized'].keys()
@@ -52,6 +51,7 @@ def globalThighAngles_R01data():
                         globalThighAngles_Sagi[n,i], _, _ = YXZ_Euler_angles(R_wt)
                 globalThighAngles_walking[subject][mode][speed] = globalThighAngles_Sagi
             except:
+                print("Exception: something wrong occured!", subject + '/' + mode  + '/' + speed)
                 continue
 
         # 2) Running
@@ -70,6 +70,7 @@ def globalThighAngles_R01data():
                         globalThighAngles_Sagi[n,i], _, _ = YXZ_Euler_angles(R_wt)
                 globalThighAngles_running[subject][mode][speed] = globalThighAngles_Sagi
             except:
+                print("Exception: something wrong occured!", subject + '/' + mode  + '/' + speed)
                 continue
         
     with open('Gait_training_R01data/globalThighAngles_walking_R01data.pickle', 'wb') as file:
@@ -139,9 +140,10 @@ def derivedMeasurements_R01data():
                         if atan2[i, j] < 0:
                             atan2[i, j] = atan2[i, j] + 2 * np.pi
                     
-                    globalThighVelocities_walking[subject][mode][speed] = globalThighVelocities
-                    atan2_walking[subject][mode][speed] = atan2
+                globalThighVelocities_walking[subject][mode][speed] = globalThighVelocities
+                atan2_walking[subject][mode][speed] = atan2
             except:
+                print("Exception: something wrong occured!", subject + '/' + mode  + '/' + speed)
                 continue
 
         # 2) Running
@@ -181,9 +183,10 @@ def derivedMeasurements_R01data():
                         if atan2[i, j] < 0:
                             atan2[i, j] = atan2[i, j] + 2 * np.pi
                     
-                    globalThighVelocities_running[subject][mode][speed] = globalThighVelocities
-                    atan2_running[subject][mode][speed] = atan2
+                globalThighVelocities_running[subject][mode][speed] = globalThighVelocities
+                atan2_running[subject][mode][speed] = atan2
             except:
+                print("Exception: something wrong occured!", subject + '/' + mode  + '/' + speed)
                 continue
               
     with open('Gait_training_R01data/globalThighVelocities_walking_R01data.pickle', 'wb') as file:
@@ -218,6 +221,9 @@ def gait_training_R01data_generator(gait_data):
                     phase_dot = np.zeros(np.shape(data))
                     for n in range(np.shape(data)[0]):
                         phase_dot[n,:].fill(1 / stride_period[n])
+                    #if min(stride_period) < 0.4:
+                    #    print("Abnormally large phase rate: ", 1/min(stride_period))
+                    #    print(subject + '/' + mode  + '/' + speed)
                     
                     # 3) stride length
                     if speed == 's0x8':
@@ -254,12 +260,16 @@ def gait_training_R01data_generator(gait_data):
                     num_trials += 1
                 
                 except:
-                    print("Exception: something wrong occured!")
+                    print("Exception: something wrong occured!", subject + '/' + mode  + '/' + speed)
                     continue
                 
         elif gait_data == 'globalThighAngles_running' or gait_data == 'globalThighVelocities_running' or gait_data == 'atan2_running':
             mode = 'Run'
             for speed in ['s1x8', 's2x0', 's2x2', 's2x4']:
+                if subject == 'AB10':
+                    # because all AB10 running data seem to be problematic
+                    continue
+
                 try:
                     print(subject + '/' + mode  + '/' + speed)
                     # 1) gait data
@@ -270,6 +280,9 @@ def gait_training_R01data_generator(gait_data):
                     phase_dot = np.zeros(np.shape(data))
                     for n in range(np.shape(data)[0]):
                         phase_dot[n,:].fill(1 / stride_period[n])
+                    #if min(stride_period) < 0.4:
+                    #    print("Abnormally large phase rate: ", 1/min(stride_period))
+                    #    print("  " + subject + '/' + mode  + '/' + speed)
                     
                     # 3) stride length
                     if speed == 's1x8':
@@ -334,10 +347,10 @@ if __name__ == '__main__':
     
     #gait_training_R01data_generator('globalThighAngles_walking')
     #gait_training_R01data_generator('globalThighVelocities_walking')
-    gait_training_R01data_generator('atan2_walking')
+    #gait_training_R01data_generator('atan2_walking')
 
-    #gait_training_R01data_generator('globalThighAngles_running')
-    #gait_training_R01data_generator('globalThighVelocities_running')
+    gait_training_R01data_generator('globalThighAngles_running')
+    gait_training_R01data_generator('globalThighVelocities_running')
     gait_training_R01data_generator('atan2_running')
     
     #print(get_commanded_velocities('AB10', 1))
