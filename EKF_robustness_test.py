@@ -52,7 +52,8 @@ if using_directRamp == True:
 
 hetero_cov = heteroscedastic_measurement_noise_covariance(*sensors)
 
-saturation_range = saturation_bounds()
+#saturation_range = saturation_bounds()
+saturation_range = np.array([1.2, 0, 2, 0])
 
 if using_ankleMoment or using_tibiaForce or using_footAngles or using_directRamp:
     sensors_swing = []
@@ -943,14 +944,14 @@ def ekf_robustness(kidnap = True, heteroscedastic = False):
         """
 
 if __name__ == '__main__':
-    subject = 'AB10'
-    trial = 's1x2d5'
+    subject = 'AB02'
+    trial = 's1x2i0'
     side = 'right'
 
     if nan_dict[subject][trial][side] == False:
         print(subject + "/"+ trial + "/"+ side+ ": This trial should be skipped!")
 
-    ekf_test(subject, trial, side, heteroscedastic = False, kidnap = False, plot = True)
-    #ekf_bank_test(subject, trial, side, N = 5, heteroscedastic = False, kidnap = [0, 1, 2], plot = True)
+    #ekf_test(subject, trial, side, heteroscedastic = False, kidnap = [0, 1, 2], plot = True)
+    ekf_bank_test(subject, trial, side, N = 5, heteroscedastic = False, kidnap = [0, 1, 2], plot = True)
     #ekf_robustness(kidnap = [0, 1, 2], heteroscedastic = False)
     #ekf_robustness(kidnap = False, heteroscedastic = False)

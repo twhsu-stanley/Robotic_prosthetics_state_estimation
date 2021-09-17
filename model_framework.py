@@ -30,21 +30,39 @@ class Basis:
 class Polynomial_Basis(Basis):
 	def __init__(self, n, var_name):
 		Basis.__init__(self, n, var_name)
-		self.size = n
+		#self.size = n
+		
+		# New version: start from x to the power of 1; n >= 1
+		if n == 0:
+			self.size = 1
+		else:
+			self.size = n
 
 	# evaluate the model at the given x value
 	def evaluate(self, x):
-		result = [x**i for i in range(0, self.n)]
+		#result = [x**i for i in range(0, self.n)]
+		# New version: start from x to the power of 1; n >= 1
+		if self.n == 0:
+			result = [1]
+		else:
+			result = [x**i for i in range(1, self.n + 1)]
+		##########################################################
 		return np.array(result)
 
 	# evaluate the derivative of the model at the given x value
 	def evaluate_derivative(self, x):
-		if self.n == 1:
+		#if self.n == 1:
+		#	result = [0]
+		#elif self.n > 1:
+		#	result = [0]
+		#	result += [i * x**(i-1) for i in range(1, self.n)]
+		
+		# New version: start from x to the power of 1; n >= 1
+		if self.n == 0:
 			result = [0]
-		elif self.n > 1:
-			result = [0]
-			result += [i * x**(i-1) for i in range(1, self.n)]
-		#print("Poly_derivative", np.array(result))
+		else:
+			result = [i * x**(i-1) for i in range(1, self.n + 1)]
+		##########################################################
 		return np.array(result)
 
 class Fourier_Basis(Basis):
@@ -105,7 +123,7 @@ class Kronecker_Model:
 		for func in funcs:
 			#Since we multiply left to right, the total size will be on the left 
 			#and the size for the new row will be on the right
-			print((str(size), str(func.size)))
+			#print((str(size), str(func.size)))
 			self.alocation_buff.append(np.zeros((size, func.size)))
 			size = size * func.size
 

@@ -349,16 +349,16 @@ if __name__ == '__main__':
     #gait_training_R01data_generator('globalThighVelocities_walking')
     #gait_training_R01data_generator('atan2_walking')
 
-    gait_training_R01data_generator('globalThighAngles_running')
-    gait_training_R01data_generator('globalThighVelocities_running')
-    gait_training_R01data_generator('atan2_running')
+    #gait_training_R01data_generator('globalThighAngles_running')
+    #gait_training_R01data_generator('globalThighVelocities_running')
+    #gait_training_R01data_generator('atan2_running')
     
     #print(get_commanded_velocities('AB10', 1))
     
-    """
-    subject = 'AB02'
-    mode = 'Run'
-    speed = 's1x8'
+    
+    subject = 'AB01'
+    mode = 'Walk'
+    speed = 'a0x2'
     
     jointAngles = Normalized_data['Normalized'][subject][mode][speed]['i0']['jointAngles']
     plt.figure()
@@ -367,15 +367,15 @@ if __name__ == '__main__':
 
         globalThighAngles = jointAngles['HipAngles'][:][n] - jointAngles['PelvisAngles'][:][n]
         
-        globalThighAngles_Euler = np.zeros(150)
-        for i in range(150):
-            R_wp = YXZ_Euler_rotation(-jointAngles['PelvisAngles'][:][n,0,i], -jointAngles['PelvisAngles'][:][n,1,i], jointAngles['PelvisAngles'][:][n,2,i])
-            R_pt = YXZ_Euler_rotation(jointAngles['HipAngles'][:][n,0,i], jointAngles['HipAngles'][:][n,1,i], jointAngles['HipAngles'][:][n,2,i])
-            R_wt = R_wp @ R_pt
-            globalThighAngles_Euler[i], _, _ = YXZ_Euler_angles(R_wt)
+        #globalThighAngles_Euler = np.zeros(150)
+        #for i in range(150):
+            #R_wp = YXZ_Euler_rotation(-jointAngles['PelvisAngles'][:][n,0,i], -jointAngles['PelvisAngles'][:][n,1,i], jointAngles['PelvisAngles'][:][n,2,i])
+            #R_pt = YXZ_Euler_rotation(jointAngles['HipAngles'][:][n,0,i], jointAngles['HipAngles'][:][n,1,i], jointAngles['HipAngles'][:][n,2,i])
+            #R_wt = R_wp @ R_pt
+            #globalThighAngles_Euler[i], _, _ = YXZ_Euler_angles(R_wt)
         
         
         plt.plot(range(150), globalThighAngles[0,:].T)
-        plt.plot(range(150), globalThighAngles_Euler)
-        plt.show()
-    """
+        #plt.plot(range(150), globalThighAngles_Euler)
+    plt.show()
+    

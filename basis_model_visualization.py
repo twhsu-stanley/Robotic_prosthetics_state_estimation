@@ -7,16 +7,16 @@ from EKF import wrapTo2pi, load_Psi
 
 
 # Determine which sensors to be used
-sensors = ['globalThighAngles', 'globalThighVelocities']#, 'atan2','globalFootAngles','ankleMoment', 'tibiaForce']
+sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2']#,'globalFootAngles','ankleMoment', 'tibiaForce']
 
 sensor_id = 1
 
-m_model = model_loader('Measurement_model_01_NSL.pickle')
+m_model = model_loader('Measurement_model_012_NSL.pickle')
 Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 
 ## A. Visualize Measurement Model w.r.t. phase_dot ===========================================================================
 phases = np.linspace(0, 1, num = 50)
-phase_dots = np.linspace(0, 1.5, num = 50)
+phase_dots = np.linspace(0, 1.1, num = 50)
 step_lengths = 1.5
 ramps = 0
 
@@ -25,8 +25,11 @@ measurement = np.zeros((len(phases), len(phase_dots)))
 for i in range(len(phases)):
     for j in range(len(phase_dots)):
         z = m_model.evaluate_h_func(Psi, phases[i], phase_dots[j], step_lengths, ramps)
-        measurement[i,j] = z[sensor_id] #+ 2*np.pi*phases[i]
-        #measurement[i,j] = wrapTo2pi(measurement[i,j])
+        if sensors[sensor_id] == 'atan2':
+            measurement[i,j] = z[sensor_id] + 2*np.pi*phases[i]
+            measurement[i,j] = wrapTo2pi(measurement[i,j])
+        else:
+            measurement[i,j] = z[sensor_id]
 
 fig = plt.figure()
 X, Y = np.meshgrid(phases, phase_dots)
@@ -38,7 +41,7 @@ ax.set_ylabel('phase_dot')
 
 ## B. Visualize Measurement Model w.r.t. stpe_length ===========================================================================
 phases = np.linspace(0, 1, num = 50)
-phase_dots = 0.8
+phase_dots = 1
 step_lengths = np.linspace(0, 2, num = 50)
 ramps = 0
 
@@ -47,7 +50,11 @@ measurement = np.zeros((len(phases), len(step_lengths)))
 for i in range(len(phases)):
     for j in range(len(step_lengths)):
         z = m_model.evaluate_h_func(Psi, phases[i], phase_dots, step_lengths[j], ramps)
-        measurement[i,j] = z[sensor_id] #+ 2*np.pi*phases[i]
+        if sensors[sensor_id] == 'atan2':
+            measurement[i,j] = z[sensor_id] + 2*np.pi*phases[i]
+            measurement[i,j] = wrapTo2pi(measurement[i,j])
+        else:
+            measurement[i,j] = z[sensor_id]
 
 
 fig = plt.figure()
@@ -59,6 +66,7 @@ ax.set_ylabel('step_length')
 # ==========================================================================================================================
 
 ## C. Visualize Measurement Model w.r.t. ramp ===========================================================================
+"""
 phases = np.linspace(0, 1, num = 50)
 phase_dots = 0.8
 step_lengths = 1.1
@@ -69,7 +77,11 @@ measurement = np.zeros((len(phases), len(ramps)))
 for i in range(len(phases)):
     for j in range(len(ramps)):
         z = m_model.evaluate_h_func(Psi, phases[i], phase_dots, step_lengths, ramps[j])
-        measurement[i,j] = z[sensor_id] #+ 2*np.pi*phases[i]
+        if sensors[sensor_id] == 'atan2':
+            measurement[i,j] = z[sensor_id] + 2*np.pi*phases[i]
+            measurement[i,j] = wrapTo2pi(measurement[i,j])
+        else:
+            measurement[i,j] = z[sensor_id]
 
 fig = plt.figure()
 X, Y = np.meshgrid(phases, ramps)
@@ -77,7 +89,7 @@ ax = plt.axes(projection='3d')
 ax.plot_surface(X, Y, measurement.T)
 ax.set_xlabel('phase')
 ax.set_ylabel('ramp')
-
+"""
 # ==========================================================================================================================
 
 """
