@@ -17,7 +17,7 @@ def Conti_trial_names(subject):
     return raw_walking_data['Continuous'][subject].keys()
 
 def Conti_heel_strikes(subject, trial, side):
-    return raw_walking_data['Gaitcycle'][subject][trial]['cycles'][side]['frame'][:]
+    return raw_walking_data['Gaitcycle'][subject][trial]['cycles'][side]['frame'][:][:,0]
 
 def Conti_start_end(subject, trial, side):
     heel_strike_index = Conti_heel_strikes(subject, trial, side)

@@ -298,11 +298,11 @@ if __name__ == '__main__':
     #with open('Streaming_data_R01/streaming_globalThighAngles_tread.pickle', 'rb') as file:
     #	streaming_globalThighAngles_tread =  pickle.load(file)
     
-    subject = 'AB04'
+    subject = 'AB05'
     mode = 'Tread'
     speed = 'all'
 
-    #plot_Streaming_data(subject, speed)
+    plot_Streaming_data(subject, speed)
     
 
     jointAngles = Streaming_data['Streaming'][subject][mode]['i0']['jointAngles']

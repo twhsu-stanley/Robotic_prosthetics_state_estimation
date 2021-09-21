@@ -45,7 +45,7 @@ Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 
 dt = 1/100
 inital_Sigma = np.diag([1e-6, 1e-6, 1e-6, 1e-6])
-Q = np.diag([0, 5e-3, 5e-3, 0]) * dt 
+Q = np.diag([0, 5e-3, 5e-3, 0]) * dt
 U = np.diag([1, 1, 1])
 R = U @ measurement_noise_covariance(*sensors) @ U.T
 if using_directRamp == True:
@@ -79,8 +79,8 @@ with open('Continuous_data/Measurements_with_Nan.pickle', 'rb') as file:
     nan_dict = pickle.load(file)
 
 # Stride in which kidnapping occurs
-kidnap_stride = 3
-total_strides = 12
+kidnap_stride = 4
+total_strides = 15
 
 # Roecover Criteria
 phase_recover_thr = 0.05
@@ -135,8 +135,6 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
         globalThighAngle, globalThighVelocity, atan2, globalFootAngle, ankleMoment, tibiaForce = load_Conti_measurement_data(subject, trial, side)
 
         heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
-        total_step = int(heel_strike_index[total_strides, 0]) + 1
-        kidnap_index = np.random.randint(heel_strike_index[kidnap_stride, 0], heel_strike_index[kidnap_stride+1, 0])
     
     # 2) Use the R01 dataset
     elif dataset == 'Reznick':
@@ -158,12 +156,11 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
             end_idx = int(cutPoints[1,2])
         
         heel_strike_index = LHS[ np.logical_and((LHS > start_idx), (LHS < end_idx)) ] - start_idx
-        total_step = len(atan2)
-        kidnap_index = np.random.randint(heel_strike_index[kidnap_stride], heel_strike_index[kidnap_stride+1]) # step at which kidnapping occurs
 
     else:
-        exit("You need to choose a dataset.")
+        exit("You need to choose a dataset: inclineExp or Reznick")
     
+    total_step = int(heel_strike_index[total_strides]) + 1
     phases = phases[0 : total_step]
     phase_dots = phase_dots[0 : total_step]
     step_lengths = step_lengths[0 : total_step]
@@ -198,6 +195,7 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
     ekf = extended_kalman_filter(sys, init)
     
     if kidnap != False:
+        kidnap_index = np.random.randint(heel_strike_index[kidnap_stride], heel_strike_index[kidnap_stride+1])
         #print("kidnap_index(%) = ", (kidnap_index - heel_strike_index[3, 0])/(heel_strike_index[4, 0]- heel_strike_index[3, 0])*100)
         phase_kidnap =  np.random.uniform(0, 1)
         phase_dot_kidnap = np.random.uniform(0, 5)
@@ -528,16 +526,51 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
     else:
         exit("The ekf_test program does not return anything for the kidnapping case.")
 
-def ekf_bank_test(subject, trial, side, N = 30, heteroscedastic = False, kidnap = [0, 1, 2, 3], plot = True):
+def ekf_bank_test(dataset, subject, trial, side, N = 30, heteroscedastic = False, kidnap = [0, 1, 2, 3], plot = True):
     # N: number of EKFs in the EKF-bank
-    print("Monte-Carlo Test: ", subject, "/", trial, '/', side)
+    print("Monte-Carlo Test: ", dataset, "/", subject, "/", trial, 'i0/', side)
 
-    # load ground truth
-    phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
-    # load measurements
-    globalThighAngle, globalThighVelocity, atan2, globalFootAngle, ankleMoment, tibiaForce = load_Conti_measurement_data(subject, trial, side)
+    # 1) Use the incine experiment dataset
+    if dataset == 'inclineExp':
+        trial += 'i0'
+        # load ground truth
+        phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
+        # load measurements
+        globalThighAngle, globalThighVelocity, atan2, globalFootAngle, ankleMoment, tibiaForce = load_Conti_measurement_data(subject, trial, side)
 
-    z_full = np.array([[globalThighAngle], [globalThighVelocity], [atan2], [globalFootAngle], [ankleMoment], [tibiaForce]])
+        heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
+    
+    # 2) Use the R01 dataset
+    elif dataset == 'Reznick':
+        # here, trial is equivalent to speed: s0x8, s1, s1x2, all
+        (phases, phase_dots, step_lengths, ramps, globalThighAngle, globalThighVelocity, atan2) = load_Streaming_data(subject, trial)
+        LHS = Streaming_data['Streaming'][subject]['Tread']['i0']['events']['LHS'][:][:,0]
+        cutPoints = Streaming_data['Streaming'][subject]['Tread']['i0']['events']['cutPoints'][:]
+        if trial == 'all':
+            start_idx = 0
+            end_idx = int(len(streaming_globalThighAngles_tread[subject])-1)
+        elif trial == 's0x8':
+            start_idx = int(cutPoints[0,0])
+            end_idx = int(cutPoints[1,0])
+        elif trial == 's1':
+            start_idx = int(cutPoints[0,1])
+            end_idx = int(cutPoints[1,1])
+        elif trial == 's1x2':
+            start_idx = int(cutPoints[0,2])
+            end_idx = int(cutPoints[1,2])
+        
+        heel_strike_index = LHS[ np.logical_and((LHS > start_idx), (LHS < end_idx)) ] - start_idx
+
+    else:
+        exit("You need to choose a dataset: inclineExp or Reznick")
+    
+    total_step = int(heel_strike_index[total_strides]) + 1
+    phases = phases[0 : total_step]
+    phase_dots = phase_dots[0 : total_step]
+    step_lengths = step_lengths[0 : total_step]
+    ramps = ramps[0 : total_step]
+
+    z_full = np.array([[globalThighAngle], [globalThighVelocity], [atan2]])#, [globalFootAngle], [ankleMoment], [tibiaForce]
     z_full = np.squeeze(z_full)
     z = z_full[sensor_id, :]
 
@@ -550,17 +583,8 @@ def ekf_bank_test(subject, trial, side, N = 30, heteroscedastic = False, kidnap 
     sys.R = R
     
     init = myStruct()
-
-    heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
-    total_step = int(heel_strike_index[total_strides, 0]) + 1
     
-    # ground truth states
-    phases = phases[0:total_step]
-    phase_dots = phase_dots[0:total_step]
-    step_lengths = step_lengths[0:total_step]
-    ramps = ramps[0:total_step]
-    
-    kidnap_index = np.random.randint(heel_strike_index[kidnap_stride, 0], heel_strike_index[kidnap_stride+1, 0]) # step at which kidnapping occurs
+    kidnap_index = np.random.randint(heel_strike_index[kidnap_stride], heel_strike_index[kidnap_stride+1]) # step at which kidnapping occurs
     x = np.zeros((N+1, total_step, 4))  # state estimate
     estimate_error = np.zeros((N+1, total_step, 4))
     phase_converge_dist = np.zeros((N+1, total_step))
@@ -672,32 +696,13 @@ def ekf_bank_test(subject, trial, side, N = 30, heteroscedastic = False, kidnap 
                 estimate_error[n, i, 0] = 1 + estimate_error[n, i, 0]
         if n > 0:
             #idx_1 = int(kidnap_index + 1/np.average(phase_dots)/dt)
-            idx_1 = int(heel_strike_index[kidnap_stride + 2, 0])
+            idx_1 = int(heel_strike_index[kidnap_stride + 2])
             #idx_3 = int(kidnap_index + 3/np.average(phase_dots)/dt)
-            idx_3 = int(heel_strike_index[kidnap_stride + 4, 0])
+            idx_3 = int(heel_strike_index[kidnap_stride + 4])
             #idx_5 = int(kidnap_index + 5/np.average(phase_dots)/dt)
-            idx_5 = int(heel_strike_index[kidnap_stride + 6, 0])
-
-            # 1) Error mean approach
-            """
-            # Means of steady-state stride_length & ramp estimates before kidnapping
-            step_length_est_error_mean = np.mean(estimate_error[n, int(heel_strike_index[2, 0]):int(kidnap_index-1), 2])
-            ramp_est_error_mean = np.mean(estimate_error[n, int(heel_strike_index[2, 0]):int(kidnap_index-1), 3])
-                
-            phase_recover_1 = np.all(abs(estimate_error[n, idx_1:, 0]) < phase_recover_thr)
-            step_length_recover_1 = np.all(x[n, idx_1:, 2] < step_lengths[idx_1:] + step_length_est_error_mean + step_length_recover_thr)\
-                                    and np.all(x[n, idx_1:, 2] > step_lengths[idx_1:] + step_length_est_error_mean - step_length_recover_thr)
-            ramp_recover_1 = np.all(x[n, idx_1:, 3] < ramps[idx_1:] + ramp_est_error_mean + ramp_recover_thr)\
-                            and np.all(x[n, idx_1:, 3] > ramps[idx_1:] + ramp_est_error_mean - ramp_recover_thr)
+            idx_5 = int(heel_strike_index[kidnap_stride + 6])
             
-            phase_recover_3 = np.all(abs(estimate_error[n, idx_3:, 0]) < phase_recover_thr)
-            step_length_recover_3 = np.all(x[n, idx_3:, 2] < step_lengths[idx_3:] + step_length_est_error_mean + step_length_recover_thr)\
-                                    and np.all(x[n, idx_3:, 2] > step_lengths[idx_3:] + step_length_est_error_mean - step_length_recover_thr)
-            ramp_recover_3 = np.all(x[n, idx_3:, 3] < ramps[idx_3:] + ramp_est_error_mean + ramp_recover_thr)\
-                            and np.all(x[n, idx_3:, 3] > ramps[idx_3:] + ramp_est_error_mean - ramp_recover_thr)
-            """
-            
-            # 2) Absolute estimate error approach
+            # 1) Absolute estimate error approach
             """
             #phase_recover_1 = np.all(abs(estimate_error[n, int(kidnap_index + 1/np.average(phase_dots)/dt):, 0]) < phase_recover_thr)
             #phase_recover_3 = np.all(abs(estimate_error[n, int(kidnap_index + 3/np.average(phase_dots)/dt):, 0]) < phase_recover_thr)
@@ -707,7 +712,7 @@ def ekf_bank_test(subject, trial, side, N = 30, heteroscedastic = False, kidnap 
             #ramp_recover_3 = np.all(abs(estimate_error[n, int(kidnap_index + 3/np.average(phase_dots)/dt):, 3]) < ramp_recover_thr)
             """
 
-            # 3) Convergence approach
+            # 2) Convergence approach
             phase_converge_dist[n, :] = phase_error(x[n,:, 0], x[0,:, 0])
             phase_recover_1 = np.all(phase_converge_dist[n,idx_1:] < phase_recover_thr)
             step_length_recover_1 = np.all(abs(x[n, idx_1:, 2] - x[0, idx_1:, 2]) < step_length_recover_thr)
@@ -897,7 +902,7 @@ def ekf_robustness(kidnap = True, heteroscedastic = False):
                     total_trials = total_trials + 1
                     
                     if kidnap != False:
-                        (R_11, R_13, R_33, R_15, R_55) = ekf_bank_test(subject, trial, side, 5, heteroscedastic, kidnap, plot = False)
+                        (R_11, R_13, R_33, R_15, R_55) = ekf_bank_test(dataset, subject, trial, side, 5, heteroscedastic, kidnap, plot = False)
                         robustness_11 += R_11
                         robustness_13 += R_13
                         robustness_33 += R_33
@@ -989,10 +994,10 @@ if __name__ == '__main__':
         print(subject + "/"+ trial + "/"+ side+ ": This trial should be skipped!")
     
     dataset = 'Reznick'
-    subject = 'AB03'
-    trial = 's1'
+    subject = 'AB05'
+    trial = 's0x8'
 
-    ekf_test(dataset, subject, trial, side, heteroscedastic = False, kidnap = [0, 1, 2], plot = True)
-    #ekf_bank_test(subject, trial, side, N = 5, heteroscedastic = False, kidnap = [0, 1, 2], plot = True)
+    #ekf_test(dataset, subject, trial, side, heteroscedastic = False, kidnap = [0, 1, 2], plot = True)
+    #ekf_bank_test(dataset, subject, trial, side, N = 5, heteroscedastic = False, kidnap = [0, 1, 2], plot = True)
     #ekf_robustness(kidnap = [0, 1, 2], heteroscedastic = False)
-    #ekf_robustness(kidnap = False, heteroscedastic = False)
+    ekf_robustness(kidnap = False, heteroscedastic = False)
