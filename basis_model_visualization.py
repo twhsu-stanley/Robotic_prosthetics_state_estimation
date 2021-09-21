@@ -9,7 +9,7 @@ from EKF import wrapTo2pi, load_Psi
 # Determine which sensors to be used
 sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2']#,'globalFootAngles','ankleMoment', 'tibiaForce']
 
-sensor_id = 1
+sensor_id = 0
 
 m_model = model_loader('Measurement_model_012_NSL.pickle')
 Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
@@ -51,10 +51,10 @@ for i in range(len(phases)):
 fig = plt.figure()
 X, Y = np.meshgrid(phases, phase_dots)
 ax = plt.axes(projection='3d')
-ax.plot_surface(X, Y, measurement.T)
 for p in range(np.shape(data_training)[0]):
-    if p % 5 == 0:
+    if p % 10 == 0:
         ax.plot(phase_training[p,:], phase_dot_training[p,:], data_training[p,:], 'r')
+ax.plot_surface(X, Y, measurement.T, alpha = 0.7)
 ax.set_xlabel('phase')
 ax.set_ylabel('phase_dot')
 # ==========================================================================================================================
@@ -80,10 +80,10 @@ for i in range(len(phases)):
 fig = plt.figure()
 X, Y = np.meshgrid(phases, step_lengths)
 ax = plt.axes(projection='3d')
-ax.plot_surface(X, Y, measurement.T)
 for p in range(np.shape(data_training)[0]):
-    if p % 5 == 0:
+    if p % 10 == 0:
         ax.plot(phase_training[p,:], step_length_training[p,:], data_training[p,:], 'r')
+ax.plot_surface(X, Y, measurement.T, alpha = 0.7)
 ax.set_xlabel('phase')
 ax.set_ylabel('step_length')
 

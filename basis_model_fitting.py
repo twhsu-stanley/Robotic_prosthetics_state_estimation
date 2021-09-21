@@ -28,17 +28,17 @@ def virtual_training_data(n, gait_data):
         step_length_virtual_2 = np.zeros((n, 150))
         ramp_virtual_2 = np.zeros((n, 150))
 
-        data_virtual_3 = np.zeros((n, 150))
-        phase_virtual_3 = np.tile(np.linspace(0, 1, 150), (n,1))
-        phase_dot_virtual_3 = np.zeros((n, 150))
-        step_length_virtual_3 = np.ones((n, 150))
-        ramp_virtual_3 = np.zeros((n, 150))
+        #data_virtual_3 = np.zeros((n, 150))
+        #phase_virtual_3 = np.tile(np.linspace(0, 1, 150), (n,1))
+        #phase_dot_virtual_3 = np.zeros((n, 150))
+        #step_length_virtual_3 = np.ones((n, 150))
+        #ramp_virtual_3 = np.zeros((n, 150))
         
-        data_virtual = np.vstack((data_virtual_1, data_virtual_2, data_virtual_3))
-        phase_virtual = np.vstack((phase_virtual_1, phase_virtual_2, phase_virtual_3))
-        phase_dot_virtual = np.vstack((phase_dot_virtual_1, phase_dot_virtual_2, phase_dot_virtual_3))
-        step_length_virtual = np.vstack((step_length_virtual_1, step_length_virtual_2, step_length_virtual_3))
-        ramp_virtual = np.vstack((ramp_virtual_1, ramp_virtual_2, ramp_virtual_3))
+        data_virtual = np.vstack((data_virtual_1, data_virtual_2)) #, data_virtual_3
+        phase_virtual = np.vstack((phase_virtual_1, phase_virtual_2)) #, phase_virtual_3
+        phase_dot_virtual = np.vstack((phase_dot_virtual_1, phase_dot_virtual_2)) #, phase_dot_virtual_3
+        step_length_virtual = np.vstack((step_length_virtual_1, step_length_virtual_2)) #, step_length_virtual_3
+        ramp_virtual = np.vstack((ramp_virtual_1, ramp_virtual_2)) #, ramp_virtual_3
     
     return (data_virtual, phase_virtual, phase_dot_virtual, step_length_virtual, ramp_virtual)
 
@@ -298,19 +298,22 @@ def heteroscedastic_measurement_noise_covariance(*sensors):
 
 def F_test(sensor, order1 = 1, order2 = 2):
     # order2 > order1
-    with open(('Basis_model/' + sensor + '_NSL_B' + str(order1) + '_residuals.pickle'), 'rb') as file:
+    with open(('Basis_model/' + sensor + '_NSL_B' + str(order1) + '0_const_residuals.pickle'), 'rb') as file:
         r1 = pickle.load(file)
-    with open(('Basis_model/' + sensor + '_NSL_B' + str(order2) + '_residuals.pickle'), 'rb') as file:
+    with open(('Basis_model/' + sensor + '_NSL_B' + str(order2) + '0_const_residuals.pickle'), 'rb') as file:
         r2 = pickle.load(file)
-    n = len(r1)
+    n = len(r1) # = len(r2)
     RSS1 = sum(r1**2)
     RSS2 = sum(r2**2)
+    RMSE1 = np.sqrt(RSS1/n)
+    RMSE2 = np.sqrt(RSS2/n)
     p1 = 21 * 1 * (order1+1) * (order1+1)
     p2 = 21 * 1 * (order2+1) * (order2+1)
     df1 = n - p1
     df2 = n - p2
     F = (RSS1 - RSS2) / (df1 - df2) / (RSS2/df2)
     p_value = 1 - stats.f.cdf(F, (df1 - df2), df2)
+    print("RMSE1=", RMSE1, "| RMSE2 = ", RMSE2)
     print("F = ", F, "| p-value = ", p_value)
 
 def saturation_bounds():
@@ -342,8 +345,10 @@ if __name__ == '__main__':
     #print(np.diag(measurement_noise_covariance(*sensors)))
     #sensors = ['tibiaForce']
     #heteroscedastic_measurement_noise_covariance(*sensors)
-    #F_test('globalThighAngles', 1, 2)
-    #F_test('globalThighAngles', 2, 3)
+    F_test('globalThighAngles', 1, 2)
+    F_test('globalThighAngles', 2, 3)
+    F_test('globalThighVelocities', 1, 2)
+    F_test('globalThighVelocities', 2, 3)
 
     F = 11
     B = 1

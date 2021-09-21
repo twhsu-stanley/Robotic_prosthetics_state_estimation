@@ -80,7 +80,7 @@ with open('Continuous_data/Measurements_with_Nan.pickle', 'rb') as file:
 
 # Stride in which kidnapping occurs
 kidnap_stride = 4
-total_strides = 15
+total_strides = 50
 
 # Roecover Criteria
 phase_recover_thr = 0.05
@@ -135,6 +135,7 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
         globalThighAngle, globalThighVelocity, atan2, globalFootAngle, ankleMoment, tibiaForce = load_Conti_measurement_data(subject, trial, side)
 
         heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
+        total_step = int(heel_strike_index[total_strides]) + 1
     
     # 2) Use the R01 dataset
     elif dataset == 'Reznick':
@@ -143,8 +144,8 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
         LHS = Streaming_data['Streaming'][subject]['Tread']['i0']['events']['LHS'][:][:,0]
         cutPoints = Streaming_data['Streaming'][subject]['Tread']['i0']['events']['cutPoints'][:]
         if trial == 'all':
-            start_idx = 0
-            end_idx = int(len(streaming_globalThighAngles_tread[subject])-1)
+            start_idx = min(int(cutPoints[0,0]), int(cutPoints[0,1]), int(cutPoints[0,2]))
+            end_idx = max(int(cutPoints[1,0]), int(cutPoints[1,1]), int(cutPoints[1,2]))
         elif trial == 's0x8':
             start_idx = int(cutPoints[0,0])
             end_idx = int(cutPoints[1,0])
@@ -154,13 +155,22 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
         elif trial == 's1x2':
             start_idx = int(cutPoints[0,2])
             end_idx = int(cutPoints[1,2])
+        elif trial == 'a0x2':
+            start_idx = int(cutPoints[0,3])
+            end_idx = int(cutPoints[1,5])
+        elif trial == 'a0x5':
+            start_idx = int(cutPoints[0,4])
+            end_idx = int(cutPoints[1,6])
         
         heel_strike_index = LHS[ np.logical_and((LHS > start_idx), (LHS < end_idx)) ] - start_idx
+        if trial == 'all' or trial == 'a0x2' or trial == 'a0x5':
+            total_step = len(phases)#int(heel_strike_index[-1]) + 1
+        else:
+             total_step = int(heel_strike_index[total_strides]) + 1
 
     else:
         exit("You need to choose a dataset: inclineExp or Reznick")
     
-    total_step = int(heel_strike_index[total_strides]) + 1
     phases = phases[0 : total_step]
     phase_dots = phase_dots[0 : total_step]
     step_lengths = step_lengths[0 : total_step]
@@ -994,10 +1004,10 @@ if __name__ == '__main__':
         print(subject + "/"+ trial + "/"+ side+ ": This trial should be skipped!")
     
     dataset = 'Reznick'
-    subject = 'AB05'
-    trial = 's0x8'
+    subject = 'AB01'
+    trial = 'all'
 
-    #ekf_test(dataset, subject, trial, side, heteroscedastic = False, kidnap = [0, 1, 2], plot = True)
+    ekf_test(dataset, subject, trial, side, heteroscedastic = False, kidnap = False, plot = True)
     #ekf_bank_test(dataset, subject, trial, side, N = 5, heteroscedastic = False, kidnap = [0, 1, 2], plot = True)
     #ekf_robustness(kidnap = [0, 1, 2], heteroscedastic = False)
-    ekf_robustness(kidnap = False, heteroscedastic = False)
+    #ekf_robustness(kidnap = False, heteroscedastic = False)

@@ -89,7 +89,7 @@ def load_Streaming_data(subject, speed):
     heel_strike_index = Streaming_data['Streaming'][subject][mode]['i0']['events']['LHS'][:]
     leg_length_left = Streaming_data[ Streaming_data['Streaming'][subject]['ParticipantDetails'][1,5] ][:][0,0] / 1000
     cvel = Streaming_data['Streaming'][subject][mode]['i0']['events']['VelProf']['cvel'][:][:,0]
-    if speed == 'all':
+    if speed == 'all' or speed == 'a0x2' or speed == 'a0x5':
         walking_speed = get_commanded_velocities(subject, cvel)
     elif speed == 's0x8':
         walking_speed = get_commanded_velocities(subject, 0.8)
@@ -109,20 +109,20 @@ def load_Streaming_data(subject, speed):
             for k in range(p):
                 phase[int(heel_strike_index[i]) + k] = k * 1/p
                 phase_dot[int(heel_strike_index[i]) + k] = 1/p / dt
-                if speed == 'all':
-                    try:
+                if speed == 'all' or speed == 'a0x2' or speed == 'a0x5':
+                    if heel_strike_index[i+1] - heel_strike_index[i] > 200:
+                        step_length[int(heel_strike_index[i]) + k] = 0
+                    else:
                         step_length[int(heel_strike_index[i]) + k] = ((walking_speed[int(heel_strike_index[i])] + walking_speed[int(heel_strike_index[i+1])]) / 2 
-                                                                     * p * dt / leg_length_left) #/leg_length_left
-                    except:
-                        continue
+                                                                    * p * dt / leg_length_left)
                 else: 
-                    step_length[int(heel_strike_index[i]) + k] = walking_speed * p * dt / leg_length_left #/leg_length_left
+                    step_length[int(heel_strike_index[i]) + k] = walking_speed * p * dt / leg_length_left 
 
     # Extract a particular section
     cutPoints = Streaming_data['Streaming'][subject][mode][incline]['events']['cutPoints'][:]
     if speed == 'all':
-        start_idx = 0
-        end_idx = int(len(streaming_globalThighAngles_tread[subject])-1)
+        start_idx = min(int(cutPoints[0,0]), int(cutPoints[0,1]), int(cutPoints[0,2]))
+        end_idx = max(int(cutPoints[1,0]), int(cutPoints[1,1]), int(cutPoints[1,2]))
     elif speed == 's0x8':
         start_idx = int(cutPoints[0,0])
         end_idx = int(cutPoints[1,0])
@@ -132,6 +132,12 @@ def load_Streaming_data(subject, speed):
     elif speed == 's1x2':
         start_idx = int(cutPoints[0,2])
         end_idx = int(cutPoints[1,2])
+    elif speed == 'a0x2':
+        start_idx = int(cutPoints[0,3])
+        end_idx = int(cutPoints[1,5])
+    elif speed == 'a0x5':
+        start_idx = int(cutPoints[0,4])
+        end_idx = int(cutPoints[1,6])
 
     phase = phase[start_idx:end_idx]
     phase_dot = phase_dot[start_idx:end_idx]
@@ -298,11 +304,11 @@ if __name__ == '__main__':
     #with open('Streaming_data_R01/streaming_globalThighAngles_tread.pickle', 'rb') as file:
     #	streaming_globalThighAngles_tread =  pickle.load(file)
     
-    subject = 'AB05'
+    subject = 'AB04'
     mode = 'Tread'
-    speed = 'all'
+    speed = 's1'
 
-    plot_Streaming_data(subject, speed)
+    #plot_Streaming_data(subject, speed)
     
 
     jointAngles = Streaming_data['Streaming'][subject][mode]['i0']['jointAngles']
