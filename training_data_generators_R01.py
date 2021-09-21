@@ -6,14 +6,14 @@ from incline_experiment_utils import *
 dataset_location = '../Reznick_Dataset/'
 Normalized_data = h5py.File(dataset_location + 'Normalized.mat', 'r')
 
+# Leg lengths here were measured by a measuring tape.
+leg_length = {'AB01': 0.860, 'AB02': 0.790, 'AB03': 0.770, 'AB04': 0.810, 'AB05':0.770,
+              'AB06': 0.842, 'AB07': 0.824, 'AB08': 0.872, 'AB09': 0.830, 'AB10':0.755}
+
 def get_subject_names():
     return Normalized_data['Normalized'].keys()
 
 def get_commanded_velocities(subject, speed_nominal):
-    # Leg lengths here were measured by a measuring tape.
-    leg_length = {'AB01': 0.860, 'AB02': 0.790, 'AB03': 0.770, 'AB04': 0.810, 'AB05':0.770, 
-                  'AB06': 0.842, 'AB07': 0.824, 'AB08': 0.872, 'AB09': 0.830, 'AB10':0.755}
-
     height_avergae = (1.757 + 1.618) / 2; # Average of US male and female heights
     leg_length_avergae = 0.48 * height_avergae;  # Anthropomorphy from Biomechanics and Motor Control, David Winter
     g = 9.81
@@ -29,8 +29,17 @@ def globalThighAngles_R01data():
     """
     globalThighAngles_walking = dict()
     globalThighAngles_running = dict()
+
+    ## patch ##############
+    #with open(('Gait_training_R01data/globalThighAngles_walking_R01data.pickle'), 'rb') as file:
+    #    globalThighAngles_walking = pickle.load(file)
+    #with open(('Gait_training_R01data/globalThighAngles_running_R01data.pickle'), 'rb') as file:
+    #    globalThighAngles_running = pickle.load(file)
+    #######################
+
     incline = 'i0'
     for subject in get_subject_names():
+    #for subject in ['AB04']:
         print("Subject:", subject)
         globalThighAngles_walking[subject] = dict()
         globalThighAngles_running[subject] = dict()
@@ -44,11 +53,15 @@ def globalThighAngles_R01data():
                 jointAngles = Normalized_data['Normalized'][subject][mode][speed][incline]['jointAngles']
                 globalThighAngles_Sagi = np.zeros((np.shape(jointAngles['PelvisAngles'][:])[0], 150))
                 for n in range(np.shape(jointAngles['PelvisAngles'][:])[0]):
-                    for i in range(150):
-                        R_wp = YXZ_Euler_rotation(-jointAngles['PelvisAngles'][:][n,0,i], -jointAngles['PelvisAngles'][:][n,1,i], jointAngles['PelvisAngles'][:][n,2,i])
-                        R_pt = YXZ_Euler_rotation(jointAngles['HipAngles'][:][n,0,i], jointAngles['HipAngles'][:][n,1,i], jointAngles['HipAngles'][:][n,2,i])
-                        R_wt = R_wp @ R_pt
-                        globalThighAngles_Sagi[n,i], _, _ = YXZ_Euler_angles(R_wt)
+                    if subject == 'AB04':
+                        globalThighAngles = jointAngles['HipAngles'][:][n] - jointAngles['PelvisAngles'][:][n]
+                        globalThighAngles_Sagi[n,:] = globalThighAngles[0,:]
+                    else:
+                        for i in range(150):
+                            R_wp = YXZ_Euler_rotation(-jointAngles['PelvisAngles'][:][n,0,i], -jointAngles['PelvisAngles'][:][n,1,i], jointAngles['PelvisAngles'][:][n,2,i])
+                            R_pt = YXZ_Euler_rotation(jointAngles['HipAngles'][:][n,0,i], jointAngles['HipAngles'][:][n,1,i], jointAngles['HipAngles'][:][n,2,i])
+                            R_wt = R_wp @ R_pt
+                            globalThighAngles_Sagi[n,i], _, _ = YXZ_Euler_angles(R_wt)
                 globalThighAngles_walking[subject][mode][speed] = globalThighAngles_Sagi
             except:
                 print("Exception: something wrong occured!", subject + '/' + mode  + '/' + speed)
@@ -63,11 +76,15 @@ def globalThighAngles_R01data():
                 jointAngles = Normalized_data['Normalized'][subject][mode][speed][incline]['jointAngles']
                 globalThighAngles_Sagi = np.zeros((np.shape(jointAngles['PelvisAngles'][:])[0], 150))
                 for n in range(np.shape(jointAngles['PelvisAngles'][:])[0]):
-                    for i in range(150):
-                        R_wp = YXZ_Euler_rotation(-jointAngles['PelvisAngles'][:][n,0,i], -jointAngles['PelvisAngles'][:][n,1,i], jointAngles['PelvisAngles'][:][n,2,i])
-                        R_pt = YXZ_Euler_rotation(jointAngles['HipAngles'][:][n,0,i], jointAngles['HipAngles'][:][n,1,i], jointAngles['HipAngles'][:][n,2,i])
-                        R_wt = R_wp @ R_pt
-                        globalThighAngles_Sagi[n,i], _, _ = YXZ_Euler_angles(R_wt)
+                    if subject == 'AB04':
+                        globalThighAngles = jointAngles['HipAngles'][:][n] - jointAngles['PelvisAngles'][:][n]
+                        globalThighAngles_Sagi[n,:] = globalThighAngles[0,:]
+                    else:
+                        for i in range(150):
+                            R_wp = YXZ_Euler_rotation(-jointAngles['PelvisAngles'][:][n,0,i], -jointAngles['PelvisAngles'][:][n,1,i], jointAngles['PelvisAngles'][:][n,2,i])
+                            R_pt = YXZ_Euler_rotation(jointAngles['HipAngles'][:][n,0,i], jointAngles['HipAngles'][:][n,1,i], jointAngles['HipAngles'][:][n,2,i])
+                            R_wt = R_wp @ R_pt
+                            globalThighAngles_Sagi[n,i], _, _ = YXZ_Euler_angles(R_wt)
                 globalThighAngles_running[subject][mode][speed] = globalThighAngles_Sagi
             except:
                 print("Exception: something wrong occured!", subject + '/' + mode  + '/' + speed)
@@ -94,9 +111,21 @@ def derivedMeasurements_R01data():
     globalThighVelocities_running = dict()
     atan2_walking = dict()
     atan2_running = dict()
+    
+    ## patch ##############
+    #with open(('Gait_training_R01data/globalThighVelocities_walking_R01data.pickle'), 'rb') as file:
+    #    globalThighVelocities_walking = pickle.load(file)
+    #with open(('Gait_training_R01data/globalThighVelocities_running_R01data.pickle'), 'rb') as file:
+    #    globalThighVelocities_running = pickle.load(file)
+    #with open(('Gait_training_R01data/atan2_walking_R01data.pickle'), 'rb') as file:
+    #    atan2_walking = pickle.load(file)
+    #with open(('Gait_training_R01data/atan2_running_R01data.pickle'), 'rb') as file:
+    #    atan2_running = pickle.load(file)
+    #######################
 
     incline = 'i0'
     for subject in get_subject_names():
+    #for subject in ['AB04']:
         print("Subject:", subject)
         globalThighVelocities_walking[subject] = dict()
         globalThighVelocities_running[subject] = dict()
@@ -237,7 +266,7 @@ def gait_training_R01data_generator(gait_data):
                     for n in range(np.shape(data)[0]):
                         side = Normalized_data['Normalized'][subject][mode][speed][incline]['events']['StrideDetails'][3,n]
                         if side == 1: # left
-                            step_length[n,:].fill(walking_speed * stride_period[n] / leg_length_left) # normalization
+                            step_length[n,:].fill(walking_speed * stride_period[n] / leg_length_left) # normalization leg_length_left
                         elif side == 2: # right
                             step_length[n,:].fill(walking_speed * stride_period[n] / leg_length_right)
                     
@@ -345,20 +374,20 @@ if __name__ == '__main__':
     #globalThighAngles_R01data()
     #derivedMeasurements_R01data()
     
-    #gait_training_R01data_generator('globalThighAngles_walking')
-    #gait_training_R01data_generator('globalThighVelocities_walking')
-    #gait_training_R01data_generator('atan2_walking')
+    gait_training_R01data_generator('globalThighAngles_walking')
+    gait_training_R01data_generator('globalThighVelocities_walking')
+    gait_training_R01data_generator('atan2_walking')
 
-    #gait_training_R01data_generator('globalThighAngles_running')
-    #gait_training_R01data_generator('globalThighVelocities_running')
-    #gait_training_R01data_generator('atan2_running')
+    gait_training_R01data_generator('globalThighAngles_running')
+    gait_training_R01data_generator('globalThighVelocities_running')
+    gait_training_R01data_generator('atan2_running')
     
     #print(get_commanded_velocities('AB10', 1))
     
-    
-    subject = 'AB01'
+    """
+    subject = 'AB04'
     mode = 'Walk'
-    speed = 'a0x2'
+    speed = 's0x8'
     
     jointAngles = Normalized_data['Normalized'][subject][mode][speed]['i0']['jointAngles']
     plt.figure()
@@ -367,15 +396,43 @@ if __name__ == '__main__':
 
         globalThighAngles = jointAngles['HipAngles'][:][n] - jointAngles['PelvisAngles'][:][n]
         
-        #globalThighAngles_Euler = np.zeros(150)
-        #for i in range(150):
-            #R_wp = YXZ_Euler_rotation(-jointAngles['PelvisAngles'][:][n,0,i], -jointAngles['PelvisAngles'][:][n,1,i], jointAngles['PelvisAngles'][:][n,2,i])
-            #R_pt = YXZ_Euler_rotation(jointAngles['HipAngles'][:][n,0,i], jointAngles['HipAngles'][:][n,1,i], jointAngles['HipAngles'][:][n,2,i])
-            #R_wt = R_wp @ R_pt
-            #globalThighAngles_Euler[i], _, _ = YXZ_Euler_angles(R_wt)
+        globalThighAngles_Euler = np.zeros(150)
+        for i in range(150):
+            R_wp = YXZ_Euler_rotation(-jointAngles['PelvisAngles'][:][n,0,i], -jointAngles['PelvisAngles'][:][n,1,i], jointAngles['PelvisAngles'][:][n,2,i])
+            R_pt = YXZ_Euler_rotation(jointAngles['HipAngles'][:][n,0,i], jointAngles['HipAngles'][:][n,1,i], jointAngles['HipAngles'][:][n,2,i])
+            R_wt = R_wp @ R_pt
+            globalThighAngles_Euler[i], _, _ = YXZ_Euler_angles(R_wt)
         
         
-        plt.plot(range(150), globalThighAngles[0,:].T)
-        #plt.plot(range(150), globalThighAngles_Euler)
+        plt.plot(range(150), globalThighAngles[0,:].T, 'k')
+        plt.plot(range(150), globalThighAngles_Euler, 'b')
     plt.show()
-    
+    """
+
+    with open(('Gait_training_R01data/globalThighAngles_walking_NSL_training_dataset.pickle'), 'rb') as file:
+        gait_training_dataset = pickle.load(file)
+    data = gait_training_dataset['training_data']
+    phase = gait_training_dataset['phase']
+    phase_dot = gait_training_dataset['phase_dot']
+    step_length = gait_training_dataset['step_length']
+    ramp = gait_training_dataset['ramp']
+    print("#rows = ", np.shape(data)[0])
+
+    plt.figure()
+    for i in range(np.shape(data)[0]):
+        if step_length[i,0] < 1.9 and step_length[i,0] > 1.7:
+            plt.plot(data[i,:], 'r')
+
+    with open(('Gait_training_data/globalThighAngles_NSL_training_dataset.pickle'), 'rb') as file:
+        gait_training_dataset = pickle.load(file)
+    data = gait_training_dataset['training_data']
+    phase = gait_training_dataset['phase']
+    phase_dot = gait_training_dataset['phase_dot']
+    step_length = gait_training_dataset['step_length']
+    ramp = gait_training_dataset['ramp']
+    print("#rows = ", np.shape(data)[0])
+
+    for i in range(np.shape(data)[0]):
+        if step_length[i,0] < 1.07 and step_length[i,0] > 1.05:
+            plt.plot(data[i,:], 'b')
+    plt.show()

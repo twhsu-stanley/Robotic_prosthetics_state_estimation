@@ -14,6 +14,23 @@ sensor_id = 1
 m_model = model_loader('Measurement_model_012_NSL.pickle')
 Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 
+# load training data
+with open(('Gait_training_data/' + sensors[sensor_id] + '_NSL_training_dataset.pickle'), 'rb') as file:
+    gait_training_dataset = pickle.load(file)
+data_training = gait_training_dataset['training_data']
+phase_training = gait_training_dataset['phase']
+phase_dot_training = gait_training_dataset['phase_dot']
+step_length_training = gait_training_dataset['step_length']
+ramp_training = gait_training_dataset['ramp']
+
+with open(('Gait_training_R01data/' + sensors[sensor_id] + '_walking_NSL_training_dataset.pickle'), 'rb') as file:
+    gait_training_dataset = pickle.load(file)
+data_training = np.vstack((data_training, gait_training_dataset['training_data']))
+phase_training = np.vstack((phase_training, gait_training_dataset['phase']))
+phase_dot_training = np.vstack((phase_dot_training, gait_training_dataset['phase_dot']))
+step_length_training = np.vstack((step_length_training, gait_training_dataset['step_length']))
+ramp_training = np.vstack((ramp_training, gait_training_dataset['ramp']))
+
 ## A. Visualize Measurement Model w.r.t. phase_dot ===========================================================================
 phases = np.linspace(0, 1, num = 50)
 phase_dots = np.linspace(0, 1.1, num = 50)
@@ -35,6 +52,9 @@ fig = plt.figure()
 X, Y = np.meshgrid(phases, phase_dots)
 ax = plt.axes(projection='3d')
 ax.plot_surface(X, Y, measurement.T)
+for p in range(np.shape(data_training)[0]):
+    if p % 5 == 0:
+        ax.plot(phase_training[p,:], phase_dot_training[p,:], data_training[p,:], 'r')
 ax.set_xlabel('phase')
 ax.set_ylabel('phase_dot')
 # ==========================================================================================================================
@@ -61,8 +81,34 @@ fig = plt.figure()
 X, Y = np.meshgrid(phases, step_lengths)
 ax = plt.axes(projection='3d')
 ax.plot_surface(X, Y, measurement.T)
+for p in range(np.shape(data_training)[0]):
+    if p % 5 == 0:
+        ax.plot(phase_training[p,:], step_length_training[p,:], data_training[p,:], 'r')
 ax.set_xlabel('phase')
 ax.set_ylabel('step_length')
+
+## C. Visualize Measurement Model w.r.t. phase_dot & stpe_length ===========================================================================
+if sensors[sensor_id] != 'atan2':
+    phases = 1
+    phase_dots = np.linspace(0, 1.5, num = 50)
+    step_lengths = np.linspace(0, 2, num = 50)
+    ramps = 0
+
+    measurement = np.zeros((len(phase_dots), len(step_lengths)))
+
+    for i in range(len(phase_dots)):
+        for j in range(len(step_lengths)):
+            z = m_model.evaluate_h_func(Psi, phases, phase_dots[i], step_lengths[j], ramps)
+            measurement[i,j] = z[sensor_id]
+
+    fig = plt.figure()
+    X, Y = np.meshgrid(phase_dots, step_lengths)
+    ax = plt.axes(projection='3d')
+    ax.plot_surface(X, Y, measurement.T)
+    #for p in range(np.shape(data_training)[0]):
+    #    ax.plot(phase_dot_training[p,:], step_length_training[p,:], data_training[p,:], 'r')
+    ax.set_xlabel('phase_dot')
+    ax.set_ylabel('step_length')
 # ==========================================================================================================================
 
 ## C. Visualize Measurement Model w.r.t. ramp ===========================================================================

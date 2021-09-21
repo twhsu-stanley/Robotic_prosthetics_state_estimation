@@ -743,8 +743,8 @@ if __name__ == '__main__':
     """
     ##################################################################
     
-    subject = 'AB10'
-    trial = 's1i0'
+    subject = 'AB05'
+    trial = 's0x8i0'
     side = 'right'
     
     #footAngles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]['foot'][0,:]
