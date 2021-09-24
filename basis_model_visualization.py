@@ -137,12 +137,12 @@ ax.set_xlabel('phase')
 ax.set_ylabel('ramp')
 """
 # ==========================================================================================================================
+# Visualization of joint models
 
-"""
-c_model = model_loader('Control_model_NSL_B10.pickle')
-with open('Psi/Psi_kneeAngles_NSL_B10.pickle', 'rb') as file:#_withoutNan
+c_model = model_loader('Control_model_NSL_B20.pickle')
+with open('Psi/Psi_kneeAngles_NSL_B20_const.pickle', 'rb') as file:#_withoutNan
     Psi_knee = pickle.load(file)
-with open('Psi/Psi_ankleAngles_NSL_B10.pickle', 'rb') as file:
+with open('Psi/Psi_ankleAngles_NSL_B20_const.pickle', 'rb') as file:
     Psi_ankle = pickle.load(file)
 ## C. Visualize Joint Model w.r.t. step_length ===============================================================================================
 phases = np.linspace(0, 1, num = 50)
@@ -159,20 +159,58 @@ for i in range(len(phases)):
         knee_angle_model[i,j] = joint_angles[0]
         ankle_angle_model[i,j] = joint_angles[1]
         
+with open(('Gait_training_data/ankleAngles_NSL_training_dataset.pickle'), 'rb') as file:
+    gait_training_dataset = pickle.load(file)
+data_training = gait_training_dataset['training_data']
+phase_training = gait_training_dataset['phase']
+phase_dot_training = gait_training_dataset['phase_dot']
+step_length_training = gait_training_dataset['step_length']
+ramp_training = gait_training_dataset['ramp']
+
+with open(('Gait_training_R01data/ankleAngles_walking_NSL_training_dataset.pickle'), 'rb') as file:
+    gait_training_dataset = pickle.load(file)
+data_training = np.vstack((data_training, gait_training_dataset['training_data']))
+phase_training = np.vstack((phase_training, gait_training_dataset['phase']))
+phase_dot_training = np.vstack((phase_dot_training, gait_training_dataset['phase_dot']))
+step_length_training = np.vstack((step_length_training, gait_training_dataset['step_length']))
+ramp_training = np.vstack((ramp_training, gait_training_dataset['ramp']))
 
 fig = plt.figure()
 X, Y = np.meshgrid(phases, step_lengths)
 ax = plt.axes(projection='3d')
-ax.plot_surface(X, Y, -ankle_angle_model.T)
+for p in range(np.shape(data_training)[0]):
+    if p % 10 == 0:
+        ax.plot(phase_training[p,:], step_length_training[p,:], data_training[p,:], 'r')
+ax.plot_surface(X, Y, ankle_angle_model.T, alpha = 0.7)
 ax.set_xlabel('phase')
 ax.set_ylabel('step_length')
 ax.set_zlabel('ankle angle (deg)')
 ax.set_zlim(-20,40)
 
+
+with open(('Gait_training_data/kneeAngles_NSL_training_dataset.pickle'), 'rb') as file:
+    gait_training_dataset = pickle.load(file)
+data_training = gait_training_dataset['training_data']
+phase_training = gait_training_dataset['phase']
+phase_dot_training = gait_training_dataset['phase_dot']
+step_length_training = gait_training_dataset['step_length']
+ramp_training = gait_training_dataset['ramp']
+
+with open(('Gait_training_R01data/kneeAngles_walking_NSL_training_dataset.pickle'), 'rb') as file:
+    gait_training_dataset = pickle.load(file)
+data_training = np.vstack((data_training, gait_training_dataset['training_data']))
+phase_training = np.vstack((phase_training, gait_training_dataset['phase']))
+phase_dot_training = np.vstack((phase_dot_training, gait_training_dataset['phase_dot']))
+step_length_training = np.vstack((step_length_training, gait_training_dataset['step_length']))
+ramp_training = np.vstack((ramp_training, gait_training_dataset['ramp']))
+
 fig = plt.figure()
 X, Y = np.meshgrid(phases, step_lengths)
 ax = plt.axes(projection='3d')
-ax.plot_surface(X, Y, -knee_angle_model.T)
+for p in range(np.shape(data_training)[0]):
+    if p % 10 == 0:
+        ax.plot(phase_training[p,:], step_length_training[p,:], data_training[p,:], 'r')
+ax.plot_surface(X, Y, knee_angle_model.T, alpha = 0.7)
 ax.set_xlabel('phase')
 ax.set_ylabel('step_length')
 ax.set_zlabel('knee angle (deg)')
@@ -180,6 +218,7 @@ ax.set_zlabel('knee angle (deg)')
 #==============================================================================================================================
 
 ## D. Visualize Joint Model w.r.t. ramp ===============================================================================================
+"""
 phases = np.linspace(0, 1, num = 50)
 phase_dots = 0.8
 step_lengths = 1.3
@@ -212,6 +251,7 @@ ax.set_xlabel('phase')
 ax.set_ylabel('ramp')
 ax.set_zlabel('knee angle (deg)')
 ax.set_zlim(-50,100)
+"""
 #==============================================================================================================================
 
 ## D. Visualize Joint Model w.r.t. phase_dot ===============================================================================================
@@ -246,6 +286,6 @@ ax.plot_surface(X, Y, -knee_angle_model.T)
 ax.set_xlabel('phase')
 ax.set_ylabel('phase_dots')
 ax.set_zlabel('knee angle (deg)')
-"""
+
 #==============================================================================================================================
 plt.show()

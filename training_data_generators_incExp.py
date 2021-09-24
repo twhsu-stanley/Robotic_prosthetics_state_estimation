@@ -710,12 +710,12 @@ if __name__ == '__main__':
 
     #time.sleep(3)
 
-    #gait_training_data_generator('kneeAngles')
-    #gait_training_data_generator('ankleAngles')
+    gait_training_data_generator('kneeAngles')
+    gait_training_data_generator('ankleAngles')
     #gait_training_data_generator('footAngles')
-    gait_training_data_generator('globalThighAngles')
-    gait_training_data_generator('globalThighVelocities')
-    gait_training_data_generator('atan2')
+    #gait_training_data_generator('globalThighAngles')
+    #gait_training_data_generator('globalThighVelocities')
+    #gait_training_data_generator('atan2')
 
     #ankleMoment_statistics()
     #gait_training_data_generator('ankleMoment')

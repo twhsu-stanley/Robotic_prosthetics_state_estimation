@@ -110,11 +110,14 @@ def load_Streaming_data(subject, speed):
                 phase[int(heel_strike_index[i]) + k] = k * 1/p
                 phase_dot[int(heel_strike_index[i]) + k] = 1/p / dt
                 if speed == 'all' or speed == 'a0x2' or speed == 'a0x5':
-                    if heel_strike_index[i+1] - heel_strike_index[i] > 200:
-                        step_length[int(heel_strike_index[i]) + k] = 0
-                    else:
-                        step_length[int(heel_strike_index[i]) + k] = ((walking_speed[int(heel_strike_index[i])] + walking_speed[int(heel_strike_index[i+1])]) / 2 
-                                                                    * p * dt / leg_length_left)
+                    try:
+                        if heel_strike_index[i+1] - heel_strike_index[i] > 200:
+                            step_length[int(heel_strike_index[i]) + k] = 0
+                        else:
+                            step_length[int(heel_strike_index[i]) + k] = ((walking_speed[int(heel_strike_index[i])] + walking_speed[int(heel_strike_index[i+1])]) / 2 
+                                                                        * p * dt / leg_length_left)
+                    except:
+                        continue
                 else: 
                     step_length[int(heel_strike_index[i]) + k] = walking_speed * p * dt / leg_length_left 
 
@@ -147,13 +150,18 @@ def load_Streaming_data(subject, speed):
     globalThighAngles = streaming_globalThighAngles_tread[subject][start_idx:end_idx]
     globalThighVelocities = streaming_globalThighVelocities_tread[subject][start_idx:end_idx]
     atan2 = streaming_atan2_tread[subject][start_idx:end_idx]
+
+    jointAngles = Streaming_data['Streaming'][subject][mode]['i0']['jointAngles']
+    kneeAngles = -jointAngles['LKneeAngles'][:][0, start_idx:end_idx]
+    ankleAngles = -jointAngles['LAnkleAngles'][:][0, start_idx:end_idx]
     
-    return (phase, phase_dot, step_length, ramp, globalThighAngles, globalThighVelocities, atan2)
+    return (phase, phase_dot, step_length, ramp, globalThighAngles, globalThighVelocities, atan2, kneeAngles, ankleAngles)
 
 def plot_Streaming_data(subject, speed):
     print("subject: ",  subject, "| tread-i0 | speed: ", speed)
 
-    (phases, phase_dots, step_lengths, ramps, globalThighAngle, globalThighVelocity, atan2) = load_Streaming_data(subject, speed)
+    (phases, phase_dots, step_lengths, ramps, globalThighAngle, globalThighVelocity, atan2, kneeAngles, ankleAngles) \
+                                    = load_Streaming_data(subject, speed)
 
     m_model = model_loader('Measurement_model_012_NSL.pickle')
     Psi = load_Psi('Generic')
@@ -170,20 +178,37 @@ def plot_Streaming_data(subject, speed):
     print("Cov(globalThighVelocity) = ", np.cov(globalThighVelocity - globalThighVelocity_pred))
     print("Cov(atan2) = ", np.cov(residuals_atan2))
 
+    c_model = model_loader('Control_model_NSL_B20.pickle')
+    with open('Psi/Psi_kneeAngles_NSL_B20_const.pickle', 'rb') as file:#_withoutNan
+        Psi_knee = pickle.load(file)
+    with open('Psi/Psi_ankleAngles_NSL_B20_const.pickle', 'rb') as file:
+        Psi_ankle = pickle.load(file)
+
+    kneeAngles_pred = model_prediction(c_model.models[0], Psi_knee, phases, phase_dots, step_lengths, ramps)
+    ankleAngles_pred = model_prediction(c_model.models[1], Psi_ankle, phases, phase_dots, step_lengths, ramps)
+
+    
     plt.figure('State')
     plt.subplot(411)
     plt.plot(phases)
     plt.ylabel('Phase')
+    plt.grid()
     plt.subplot(412)
     plt.plot(phase_dots)
+    plt.ylim([0,1.5])
     plt.ylabel('Phase dot')
+    plt.grid()
     plt.subplot(413)
     plt.plot(step_lengths)
+    plt.ylim([0,2])
     plt.ylabel('Normalized step length')
+    plt.grid()
     plt.subplot(414)
     plt.plot(ramps)
     plt.ylabel('Ramp')
+    plt.grid()
 
+    """
     plt.figure('atan2')
     plt.subplot(211)
     plt.plot(atan2[0:1600])
@@ -199,6 +224,7 @@ def plot_Streaming_data(subject, speed):
         a2[i] = np.arctan2(np.sin(a2[i]), np.cos(a2[i]))
     plt.plot(a2)
     plt.legend(['atan2-phase*2pi', 'least-squares fitting', 'new'])
+    """
     
     #heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
     total_step =  int(np.shape(globalThighAngle)[0] / 1)
@@ -207,18 +233,18 @@ def plot_Streaming_data(subject, speed):
     plt.subplot(411)
     plt.plot(phases[0:total_step])
     plt.ylabel('Phase')
-
+    plt.grid()
     plt.subplot(412)
     plt.plot(tt, globalThighAngle[0:total_step], 'k-')
     plt.plot(tt, globalThighAngle_pred[0:total_step],'b--')
     plt.legend(('actual', 'least squares'))
     plt.ylabel('$\\theta_{th}~(deg)$')
-
+    plt.grid()
     plt.subplot(413)
     plt.plot(tt, globalThighVelocity[0:total_step],'k-')
     plt.plot(tt, globalThighVelocity_pred[0:total_step], 'b--')
     plt.ylabel('$\dot{\\theta}_{Y_{2Hz}} ~(deg/s)$')
-
+    plt.grid()
     plt.subplot(414)
     plt.plot(tt, atan2[0:total_step],'k-')
     plt.plot(tt, atan2_pred[0:total_step], 'b--')
@@ -226,6 +252,22 @@ def plot_Streaming_data(subject, speed):
     plt.xlabel('time (s)')
     plt.ylim([0, 7.5])
     plt.xlabel('time (s)')
+    plt.grid()
+
+
+    plt.figure('Joints')
+    plt.subplot(211)
+    plt.plot(tt, kneeAngles[0:total_step], 'k-')
+    plt.plot(tt, kneeAngles_pred[0:total_step],'b--')
+    plt.legend(('actual', 'least squares'))
+    plt.ylabel('$\\theta_{knee}~(deg)$')
+    plt.grid()
+    plt.subplot(212)
+    plt.plot(tt, ankleAngles[0:total_step], 'k-')
+    plt.plot(tt, ankleAngles_pred[0:total_step],'b--')
+    plt.legend(('actual', 'least squares'))
+    plt.ylabel('$\\theta_{ankle}~(deg)$')
+    plt.grid()
 
     plt.show()
 
@@ -304,11 +346,11 @@ if __name__ == '__main__':
     #with open('Streaming_data_R01/streaming_globalThighAngles_tread.pickle', 'rb') as file:
     #	streaming_globalThighAngles_tread =  pickle.load(file)
     
-    subject = 'AB04'
+    subject = 'AB03'
     mode = 'Tread'
     speed = 's1'
 
-    #plot_Streaming_data(subject, speed)
+    plot_Streaming_data(subject, speed)
     
 
     jointAngles = Streaming_data['Streaming'][subject][mode]['i0']['jointAngles']
@@ -366,7 +408,7 @@ if __name__ == '__main__':
     plt.xlim((0, max(len(command_speed)/100, len(atan2_data)/100)))
     plt.grid()
 
-    (phase, phase_dot, step_length, ramp, globalThighAngles, globalThighVelocities, atan2) \
+    (phase, phase_dot, step_length, ramp, globalThighAngles, globalThighVelocities, atan2, _, _) \
         = load_Streaming_data(subject, 'all')
     plt.figure("phase:" + subject + "/" + speed)
     plt.subplot(411)
