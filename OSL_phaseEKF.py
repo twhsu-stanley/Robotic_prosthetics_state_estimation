@@ -17,7 +17,7 @@ from EKF import *
 from model_framework import *
 from scipy.signal import butter, lfilter, lfilter_zi
 from basis_model_fitting import measurement_noise_covariance
-from collections import deque
+#from collections import deque
 import sender_test as sender   # for real-time plotting
 
 # -----------------TODO: change these constants to match your setup ------------------------------------------------
@@ -39,8 +39,8 @@ packets = IMU.getDataPackets(TIMEOUT)   # Clean the internal circular buffer.
 
 # Set streaming        
 IMU.resume()
-fxs.start_streaming(kneID, freq = 100, log_en = False)
-fxs.start_streaming(ankID, freq = 100, log_en = False)
+fxs.start_streaming(kneID, freq = 100, log_en = False) # change to 500 Hz?
+fxs.start_streaming(ankID, freq = 100, log_en = False) # change to 500 Hz?
 time.sleep(1)                           # Healthy pause before using ActPacks or IMU
 
 # Soft start
@@ -101,8 +101,8 @@ try:
                'thigh_angle_pred': 0.0, 'thigh_angle_vel_pred': 0.0, 'atan2_pred': 0.0,
                'thigh_angle_bandpass': 0.0,
                'thigh_angle_vel': 0.0, 'atan2': 0.0,
-               'walking': 0, 'MD': 0.0, 'steady_state': 0}
-    logger = loco.ini_log({**dataOSL, **cmd_log, **ekf_log}, sensors = "all_sensors", trialName = "OSL_parallelBar_Swing_test")
+               'radius': 0.0}
+    logger = loco.ini_log({**dataOSL, **cmd_log, **ekf_log}, sensors = "all_sensors", trialName = "OSL_benchtop_Swing_test")
 
     ## Initialize buffers for joints angles =============================================================================
     knee_angle_buffer = []   # in rad
@@ -117,8 +117,8 @@ try:
         ankle_moment_buffer.append(dataOSL['ankJoiTor'])
     print("Initial knee position (deg): %.2f, %.2f, %.2f " % (knee_angle_buffer[0]*180/np.pi, knee_angle_buffer[1]*180/np.pi, knee_angle_buffer[2]*180/np.pi))
     print("Initial ankle position (deg): %.2f, %.2f, %.2f " % (ankle_angle_buffer[0]*180/np.pi, ankle_angle_buffer[1]*180/np.pi, ankle_angle_buffer[2]*180/np.pi))
-    print("Initial loadCell Fz (N): %.2f, %.2f, %.2f " % (loadCell_Fz_buffer[0], loadCell_Fz_buffer[1], loadCell_Fz_buffer[2]))
-    print("Initial ankle torque (N-m): %.2f, %.2f, %.2f " % (ankle_moment_buffer[0], ankle_moment_buffer[1], ankle_moment_buffer[2]))
+    #print("Initial loadCell Fz (N): %.2f, %.2f, %.2f " % (loadCell_Fz_buffer[0], loadCell_Fz_buffer[1], loadCell_Fz_buffer[2]))
+    #print("Initial ankle torque (N-m): %.2f, %.2f, %.2f " % (ankle_moment_buffer[0], ankle_moment_buffer[1], ankle_moment_buffer[2]))
 
     knee_angle_initial = np.median(knee_angle_buffer) * 180/np.pi   # deg
     ankle_angle_initial = np.median(ankle_angle_buffer) * 180/np.pi
@@ -138,47 +138,46 @@ try:
 
     ## Initialize EKF ==================================================================================================
     # Dictionary of the sensors
-    sensors_dict = {'global_thigh_angle': 0, 'force_z_ankle': 1, 'force_x_ankle': 2,
-                    'moment_y_ankle': 3, 'global_thigh_angle_vel': 4, 'atan2': 5}
+    sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2,
+                    'globalFootAngles':3, 'ankleMoment':4, 'tibiaForce':5}
 
-    # Determine which sensors to be used
-    sensors = ['global_thigh_angle', 'global_thigh_angle_vel', 'atan2']
+    # Specify which sensors to be used
+    sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2']
+    using_atan2 = np.any(np.array(sensors) == 'atan2')
+
     sensor_id = [sensors_dict[key] for key in sensors]
-
-    arctan2 = False
-    if sensors[-1] == 'atan2':
-        arctan2 = True
-
-    with open('R.pickle', 'rb') as file:
-        R = pickle.load(file)
-
-    m_model = model_loader('Measurement_model_' + str(len(sensors)) +'.pickle')
-    Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
-    saturation_range = [2, 0, 2, 0.7] 
+    sensor_id_str = ""
+    for i in range(len(sensor_id)):
+        sensor_id_str += str(sensor_id[i])
+    m_model = model_loader('Measurement_model_' + sensor_id_str +'_NSL.pickle')
     
+    Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
+    
+    #saturation_range = saturation_bounds()
+    saturation_range = np.array([1.3, 0, 2, 0])
+
     ## build the system
     sys = myStruct()
     sys.f = process_model
     sys.A = A
     sys.h = m_model
-    sys.Q = np.diag([0, 1e-5, 1e-5, 0])
+    sys.Q = np.diag([0, 5e-3, 5e-3, 0])
     # measurement noise covariance
-    sys.R = R['Generic'][np.ix_(sensor_id, sensor_id)]
-    #sys.R = measurement_noise_covariance(*sensors)
-    #sys.R = np.diag(np.diag(sys.R))
-    U = np.diag([2, 2, 2])
-    sys.R = U @ sys.R @ U.T
+    U = np.diag([1, 1, 1])
+    R = U @ measurement_noise_covariance(*sensors) @ U.T
+    R_org = np.copy(R)
+    sys.R = R
 
     # initialize the state
     init = myStruct()
-    init.x = np.array([[0], [0.5], [1.1], [0]])
+    init.x = np.array([[0.3], [0], [0], [0]])
     init.Sigma = np.diag([1, 1, 1, 0])
 
     ekf = extended_kalman_filter(sys, init)
     #==================================================================================================================
 
     ### Create filters ================================================================================================
-    fs = 67          # sampling rate = 100Hz (actual: dt ~ 0.0135 sec; 74Hz) 
+    fs = 500          # sampling rate = 100Hz (actual: dt ~ 0.0135 sec; 67Hz) 
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
     # configure low-pass filter (1-order)
     normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
@@ -187,7 +186,7 @@ try:
     z_lp_2 = lfilter_zi(b_lp,  a_lp)
     
     # configure band-pass filter (2-order)
-    normal_lowcut = 0.2 / nyq    #lower cut-off frequency = 0.5Hz
+    normal_lowcut = 0.2 / nyq    #lower cut-off frequency = 0.2 - 0.5Hz
     normal_highcut = 2 / nyq     #upper cut-off frequency = 2Hz
     b_bp, a_bp = butter(2, [normal_lowcut, normal_highcut], btype = 'band', analog = False)
     z_bp = lfilter_zi(b_bp,  a_bp)
@@ -205,20 +204,21 @@ try:
     fade_in_time = 2      # sec
     
     ### Walking Status Detector =====================================================================================
-    t_s = start_time
-    t_ns = start_time
-    t_s_previous = start_time
-    t_ns_previous = start_time
-    steady_state = False
-    steady_state_previous = False
-    walking = False
+    #t_s = start_time
+    #t_ns = start_time
+    #t_s_previous = start_time
+    #t_ns_previous = start_time
+    #steady_state = False
+    #steady_state_previous = False
+    #walking = False
 
-    MD_hist= deque([])
-    global_thigh_angle_hist = np.ones((int(fs*2.5), 1)) * dataOSL["ThighSagi"] * 180 / np.pi # ~ 2seconds window
+
+    #MD_hist= deque([])
+    #global_thigh_angle_hist = np.ones((int(fs*2.5), 1)) * dataOSL["ThighSagi"] * 180 / np.pi # ~ 2seconds window
 
     #MD_threshold = 5 # MD
-    global_thigh_angle_max_threshold = 20    # global thigh angle range (deg)
-    global_thigh_angle_min_threshold = 8    # global thigh angle range (deg)
+    #global_thigh_angle_max_threshold = 20    # global thigh angle range (deg)
+    #global_thigh_angle_min_threshold = 8    # global thigh angle range (deg)
 
     # ================================================= MAIN LOOP ====================================================
     
@@ -272,6 +272,7 @@ try:
         global_thigh_angle = dataOSL['ThighSagi'] * 180 / np.pi
 
         # Walking detector
+        """
         global_thigh_angle_hist = np.roll(global_thigh_angle_hist, -1)
         global_thigh_angle_hist[-1] = global_thigh_angle
         if (min(global_thigh_angle_hist) < global_thigh_angle_min_threshold
@@ -279,6 +280,7 @@ try:
             walking = True
         else:
             walking = False
+        """
 
         # 2) Global thigh angle velocity (deg/s)
         if ptr == 0:
@@ -310,8 +312,15 @@ try:
             Atan2 = Atan2 + 2 * np.pi
         
         # Set atan2 to zero if the user is not walking
-        if walking == False:
-            Atan2 = 0
+        #if walking == False:
+        #    Atan2 = 0
+        ########################################################################################
+        radius = (global_thigh_angle_bp / 10) ** 2 + (global_thigh_angle_vel_blp / 50) ** 2
+        if radius >= 1:
+            ekf.R = R_org
+        else:
+            ekf.R[2, 2] = 1e20
+        ########################################################################################
 
         measurement = np.array([[global_thigh_angle], [global_thigh_angle_vel_lp], [Atan2]])
         measurement = np.squeeze(measurement)
@@ -320,7 +329,7 @@ try:
         ## EKF implementation  ====================================================================================
         ekf.prediction(dt)
         ekf.state_saturation(saturation_range)
-        ekf.correction(measurement, Psi, arctan2)
+        ekf.correction(measurement, Psi, using_atan2)
         ekf.state_saturation(saturation_range)
         #==========================================================================================================
         
@@ -424,9 +433,9 @@ try:
         ekf_log['thigh_angle_bandpass'] = global_thigh_angle_bp
         ekf_log['thigh_angle_vel'] = global_thigh_angle_vel_lp
         ekf_log['atan2'] = Atan2
-        ekf_log['walking'] = int(walking)
-        ekf_log['steady_state'] = int(steady_state)
-        ekf_log['MD'] = ekf.MD
+        ekf_log['radius'] = radius
+        #ekf_log['steady_state'] = int(steady_state)
+        #ekf_log['MD'] = ekf.MD
         loco.log_OSL({**dataOSL,**cmd_log, **ekf_log}, logger)
         #==========================================================================================================
 
@@ -441,9 +450,10 @@ try:
                          #ekf.x[3, 0], 'ramp_angle', 'deg'
                          global_thigh_angle, ekf.z_hat[0], 'Global Thigh Angle', 'deg',
                          #global_thigh_angle_vel_lp, ekf.z_hat[1], 'Global Thigh Angle Vel', 'deg/s',
-                         # Atan2, ekf.z_hat[2], 'Atan2', '-',
-                         knee_angle, knee_angle_cmd, 'Knee Angle', 'deg',
-                         ankle_angle, ankle_angle_cmd, 'Ankle Angle', 'deg'
+                         Atan2, ekf.z_hat[2], 'Atan2', '--',
+                         radius, radius, 'phase plane radius', '--',
+                         #knee_angle, knee_angle_cmd, 'Knee Angle', 'deg',
+                         #ankle_angle, ankle_angle_cmd, 'Ankle Angle', 'deg'
                          )
         print("knee angle cmd: ", knee_angle_cmd, "; ankle angle cmd: ", ankle_angle_cmd, "; walking (T/F): ", walking)
         #==========================================================================================================

@@ -18,7 +18,7 @@ sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2,
 
 # Determine what sensors to be used
 # 1) measurements that use the basis model
-sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2']#, 'ankleMoment', 'tibiaForce'
+sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2']
 
 sensor_id = [sensors_dict[key] for key in sensors]
 sensor_id_str = ""
@@ -26,6 +26,10 @@ for i in range(len(sensor_id)):
     sensor_id_str += str(sensor_id[i])
 m_model = model_loader('Measurement_model_' + sensor_id_str +'_NSL.pickle')
 
+# for walking determination
+global_thigh_angle_max_threshold = 5    # global thigh angle range (deg)
+global_thigh_angle_min_threshold = -5   # global thigh angle range (deg)
+    
 using_atan2 = np.any(np.array(sensors) == 'atan2')
 using_ankleMoment = np.any(np.array(sensors) == 'ankleMoment')
 using_tibiaForce = np.any(np.array(sensors) == 'tibiaForce')
@@ -44,14 +48,14 @@ print("Using sensors:", sensors, "| using direct ramp:", using_directRamp)
 Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 
 dt = 1/100
-inital_Sigma = np.diag([1e-6, 1e-6, 1e-6, 1e-6])
+inital_Sigma = np.diag([1e-3, 1e-3, 1e-3, 1e-20])
 Q = np.diag([0, 5e-3, 5e-3, 0]) * dt # p1) 5e-3, 5e-3; p2) 5e-4, 1e-3
 U = np.diag([1, 1, 1])
 R = U @ measurement_noise_covariance(*sensors) @ U.T
 if using_directRamp == True:
     R = np.diag(np.append(np.diag(R), R_directRamp))
 
-hetero_cov = heteroscedastic_measurement_noise_covariance(*sensors)
+#hetero_cov = heteroscedastic_measurement_noise_covariance(*sensors)
 
 #saturation_range = saturation_bounds()
 saturation_range = np.array([1.3, 0, 1.9, 0])
@@ -198,6 +202,12 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
     z_full = np.squeeze(z_full) 
     z = z_full[sensor_id, :]
 
+    ### For studying atan2 ###########################################################
+    gt_bp = butter_bandpass_filter(globalThighAngle, 0.5, 2, 1/dt, order = 2)
+    v_bp = np.diff(gt_bp) / dt
+    gtv_bp = butter_lowpass_filter(np.insert(v_bp, 0, 0), 2, 1/dt, order = 1)
+    ##################################################################################
+
     # build the system
     sys = myStruct()
     sys.f = process_model
@@ -205,11 +215,12 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
     sys.h = m_model
     sys.Q = Q
     sys.R = R
+    R_org = np.copy(R)
 
     # initialize the state
     init = myStruct()
-    init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
-    #init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [0]])
+    #init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
+    init.x = np.array([[0.3], [0], [0], [0]])
     init.Sigma = inital_Sigma
 
     ekf = extended_kalman_filter(sys, init)
@@ -226,6 +237,11 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
 
     x = np.zeros((total_step, 4))  # state estimate
     z_pred = np.zeros((total_step, len(sensors) + int(using_directRamp)))
+    
+    # for walking determination
+    walking = False
+    global_thigh_angle_hist = np.ones(int(1 / dt)) * globalThighAngle[0] # ~ 2seconds window
+
     directRamp = np.zeros((total_step, 1))
     L_cop = np.zeros((total_step, 1))
     #Q_diag = np.zeros((total_step, 4))
@@ -253,6 +269,24 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
         
         ekf.prediction(dt)
         ekf.state_saturation(saturation_range)
+        
+        # set atan2 to zero when the subejct is not waking
+        global_thigh_angle_hist = np.roll(global_thigh_angle_hist, -1)
+        global_thigh_angle_hist[-1] = z[0, i]
+        
+        a = 10
+        b = 50
+        radius = (gt_bp[i] / a)**2 + (gtv_bp[i] / b)**2
+         
+        if radius >= 1:
+        #if (min(global_thigh_angle_hist) < global_thigh_angle_min_threshold
+        #    and max(global_thigh_angle_hist) > global_thigh_angle_max_threshold):
+        #    walking = True
+            ekf.R = R_org
+        else:
+        #    walking = False
+            #z[2, i] = 0
+            ekf.R[2, 2] = 1e20
         
         if using_ankleMoment or using_tibiaForce or using_footAngles or using_directRamp:
             # Compute L_cop; here, "stance" means that the foot is flat on the ground 
@@ -475,23 +509,11 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
         plt.ylabel('MD of State Estimate')
         plt.xlabel('time (s)')
         """
-
-        
-        plt.figure("Control Commands: Joint Angles")
-        plt.title("Control Commands: Joint Angles")
-        plt.subplot(211)
-        plt.plot(tt, kneeAngle, 'k-')
-        plt.plot(tt, kneeAngle_kmd, 'm-')
-        plt.plot(tt, kneeAngle_cmd, 'r-')
-        plt.legend(('actual', 'kinematic model', 'prescribed trajectory'))
-        plt.ylabel('knee angle (deg)')
-        plt.subplot(212)
-        plt.plot(tt, ankleAngle, 'k-')
-        plt.plot(tt, ankleAngle_kmd, 'm-')
-        plt.plot(tt, ankleAngle_cmd, 'r-')
-        plt.legend(('actual', 'kinematic model', 'prescribed trajectory'))
-        plt.ylabel('ankle angle (deg)')
-        plt.xlabel('time (s)')
+        plt.figure("Atan2 phase plane")
+        plt.plot(gt_bp, gtv_bp, 'b-')
+        #plt.plot(gt_Y[start_idx:end_idx], globalThighVelocities_Sagi[start_idx:end_idx], 'r-')
+        theta = np.linspace(0, 2*np.pi, 100)
+        plt.plot( a*np.cos(theta) , b*np.sin(theta), 'r--')
         
 
         plt.figure("Measurements")
@@ -500,7 +522,7 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
             if using_directRamp == True and i == len(sensors):
                 plt.plot(tt, directRamp, 'k-')
             else:
-                plt.plot(tt, z[i, 0:total_step], 'k-')
+                plt.plot(tt, z[i, :], 'k-')
             plt.plot(tt, z_pred[:, i], 'r--')
             plt.xlim([0, tt[-1]+0.1])
             plt.grid()
@@ -510,6 +532,7 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
                 plt.legend(('actual', 'predicted'))
             elif i == len(sensors)-1:
                 plt.xlabel("time (s)")
+        
         """
         plt.figure("Kinetics")
         plt.subplot(411)
@@ -539,6 +562,22 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
         plt.xlim([0, tt[-1]+0.1])
         plt.grid()
         """
+        plt.figure("Control Commands: Joint Angles")
+        plt.title("Control Commands: Joint Angles")
+        plt.subplot(211)
+        plt.plot(tt, kneeAngle, 'k-')
+        plt.plot(tt, kneeAngle_kmd, 'm-')
+        plt.plot(tt, kneeAngle_cmd, 'r-')
+        plt.legend(('actual', 'kinematic model', 'prescribed trajectory'))
+        plt.ylabel('knee angle (deg)')
+        plt.subplot(212)
+        plt.plot(tt, ankleAngle, 'k-')
+        plt.plot(tt, ankleAngle_kmd, 'm-')
+        plt.plot(tt, ankleAngle_cmd, 'r-')
+        plt.legend(('actual', 'kinematic model', 'prescribed trajectory'))
+        plt.ylabel('ankle angle (deg)')
+        plt.xlabel('time (s)')
+        
         plt.show()
     
     if kidnap == False:
@@ -1015,7 +1054,7 @@ if __name__ == '__main__':
     
     dataset = 'Reznick'
     subject = 'AB07'
-    trial = 's1'
+    trial = 'a0x5'
 
     ekf_test(dataset, subject, trial, side, heteroscedastic = False, kidnap = False, plot = True)
     #ekf_bank_test(dataset, subject, trial, side, N = 5, heteroscedastic = False, kidnap = [0, 1, 2], plot = True)

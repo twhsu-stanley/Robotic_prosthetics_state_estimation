@@ -34,6 +34,7 @@ def Streaming_globalThighAngles():
                 R_wt = R_wp @ R_pt
                 globalThighAngles_Sagi[i], _, _ = YXZ_Euler_angles(R_wt)
         streaming_globalThighAngles_tread[subject] = globalThighAngles_Sagi
+
     
     with open('Streaming_data_R01/streaming_globalThighAngles_tread.pickle', 'wb') as file:
     	pickle.dump(streaming_globalThighAngles_tread, file)
@@ -43,7 +44,7 @@ def Streaming_derivedMeasurements():
     # global thigh velocities and atan2
     with open('Streaming_data_R01/streaming_globalThighAngles_tread.pickle', 'rb') as file:
     	streaming_globalThighAngles_tread =  pickle.load(file)
-
+    
     # mode = 'Tread'
     # incline = 'i0'
     dt = 1/100
@@ -271,6 +272,71 @@ def plot_Streaming_data(subject, speed):
 
     plt.show()
 
+def atan2_analysis(subject, speed):
+    with open('Streaming_data_R01/streaming_globalThighAngles_tread.pickle', 'rb') as file:
+    	streaming_globalThighAngles_tread =  pickle.load(file)
+    print("Max = ", max(abs(streaming_globalThighAngles_tread[subject])))
+    dt = 1/100
+    gt_Y = streaming_globalThighAngles_tread[subject]
+    v = np.diff(gt_Y) / dt
+    globalThighVelocities_Sagi = butter_lowpass_filter(np.insert(v, 0, 0), 2, 1/dt, order = 1)
+
+    gt_Y = streaming_globalThighAngles_tread[subject]
+    gt_bp = butter_bandpass_filter(gt_Y, 0.4, 2, 1/dt, order = 2)
+    v_bp = np.diff(gt_bp) / dt
+    gtv_bp = butter_lowpass_filter(np.insert(v_bp, 0, 0), 2, 1/dt, order = 1)
+    atan2 = np.arctan2(-gtv_bp/(2*np.pi*0.8), gt_bp) # scaled
+    for i in range(np.shape(atan2)[0]):
+        if atan2[i] < 0:
+            atan2[i] = atan2[i] + 2 * np.pi
+
+    a = 10
+    b = 25
+    radius = (gt_bp / a)**2 + (gtv_bp / b)**2
+
+    # Extract a particular section
+    cutPoints = Streaming_data['Streaming'][subject][mode]['i0']['events']['cutPoints'][:]
+    if speed == 'all':
+        start_idx = min(int(cutPoints[0,0]), int(cutPoints[0,1]), int(cutPoints[0,2]))
+        end_idx = max(int(cutPoints[1,0]), int(cutPoints[1,1]), int(cutPoints[1,2]))
+    elif speed == 's0x8':
+        start_idx = int(cutPoints[0,0])
+        end_idx = int(cutPoints[1,0])
+    elif speed == 's1':
+        start_idx = int(cutPoints[0,1])
+        end_idx = int(cutPoints[1,1])
+    elif speed == 's1x2':
+        start_idx = int(cutPoints[0,2])
+        end_idx = int(cutPoints[1,2])
+    elif speed == 'a0x2':
+        start_idx = int(cutPoints[0,3])
+        end_idx = int(cutPoints[1,5])
+    elif speed == 'a0x5':
+        start_idx = int(cutPoints[0,4])
+        end_idx = int(cutPoints[1,6])
+
+
+    tt = dt * np.arange(len(gt_Y))
+    plt.figure("Atan2")
+    plt.subplot(311)
+    plt.plot(tt[start_idx:end_idx], gt_Y[start_idx:end_idx])
+    plt.plot(tt[start_idx:end_idx], gt_bp[start_idx:end_idx], '--')
+    plt.subplot(312)
+    plt.plot(tt[start_idx:end_idx], globalThighVelocities_Sagi[start_idx:end_idx])
+    plt.plot(tt[start_idx:end_idx], gtv_bp[start_idx:end_idx], '--')
+    plt.subplot(313)
+    plt.plot(tt[start_idx:end_idx], atan2[start_idx:end_idx])
+
+    plt.figure("Atan2 phase plane")
+    plt.plot(gt_bp[start_idx:end_idx], gtv_bp[start_idx:end_idx], 'b-')
+    #plt.plot(gt_Y[start_idx:end_idx], globalThighVelocities_Sagi[start_idx:end_idx], 'r-')
+    theta = np.linspace(0, 2*np.pi, 100)
+    plt.plot( a*np.cos(theta ) , b*np.sin(theta), 'r--')
+
+    plt.figure("radius")
+    plt.plot(tt[start_idx:end_idx], radius[start_idx:end_idx])
+    plt.show()
+
 """
 def load_Conti_joints_angles(subject, trial, side):
     pass
@@ -346,10 +412,10 @@ if __name__ == '__main__':
     #with open('Streaming_data_R01/streaming_globalThighAngles_tread.pickle', 'rb') as file:
     #	streaming_globalThighAngles_tread =  pickle.load(file)
     
-    subject = 'AB03'
+    subject = 'AB07'
     mode = 'Tread'
-    speed = 's1'
-
+    speed = 'a0x5'
+    atan2_analysis(subject, speed)
     plot_Streaming_data(subject, speed)
     
 
