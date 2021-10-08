@@ -114,7 +114,7 @@ axs[0].set_title("Measurements")
 axs[0].set_ylabel('Global Thigh Angle (deg)')
 axs[0].plot(xindex, actualTrajectory["ThighSagi"][ranA:ranB] * 180 / np.pi, 'k-')
 axs[0].plot(xindex, ekfEstimates["thigh_angle_pred"][ranA:ranB], 'r-')
-axs[0].plot(xindex, ekfEstimates["thigh_angle_bandpass"][ranA:ranB], 'm-')
+#axs[0].plot(xindex, ekfEstimates["thigh_angle_bandpass"][ranA:ranB], 'm-')
 axs[0].legend(["Actual", "EKF Predicted", "Band-pass filtered"])
 
 axs[1].set_ylabel('Global Thigh Angle Vel (deg/s)')
@@ -132,6 +132,7 @@ fig.set_size_inches(22, 13)
 plt.savefig(logFile + 'EKF_measurements.png', dpi=100)
 
 ## Figure 4
+"""
 fig, axs = plt.subplots(3, 1)
 axs[0].set_title("Walking Status")
 axs[0].set_ylabel('Walking (T/F)')
@@ -146,5 +147,5 @@ axs[2].plot(xindex, ekfEstimates["steady_state"][ranA:ranB], 'r-')
 
 fig.set_size_inches(22, 13)
 plt.savefig(logFile + 'EKF_walkingStatus.png', dpi=100)
-
+"""
 plt.show()

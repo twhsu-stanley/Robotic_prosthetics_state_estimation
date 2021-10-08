@@ -31,8 +31,8 @@ packets = IMU.getDataPackets(TIMEOUT)   # Clean the internal circular buffer.
 
 # Set streaming        
 IMU.resume()
-fxs.start_streaming(kneID, freq = 100, log_en = False)
-fxs.start_streaming(ankID, freq = 100, log_en = False)
+fxs.start_streaming(kneID, freq = 500, log_en = False)
+fxs.start_streaming(ankID, freq = 500, log_en = False)
 time.sleep(1)                           # Healthy pause before using ActPacks or IMU
 
 # Soft start

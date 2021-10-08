@@ -10,10 +10,16 @@ sys.path.append(r'/usr/share/python3-mscl/')                # Path of the MSCL -
 sys.path.append(r'/home/pi/OSL/Reference_Trajectories')     # Path to reference trajectories
 import mscl as ms
 import peakutils
+import flexsea
 from flexsea import flexsea as flex
 from flexsea import fxEnums as fxe
 from scipy import interpolate
 from scipy import fftpack
+
+#print(dir(flex))
+#print(dir(flexsea))
+#print(flexsea.__path__)
+#print(flexsea.__spec__)
 
 # TODO
 # Check loadcell scale. It is reading about 140N when Edgar is stading only in the OSL. (We should be able to measure something close to 700N)
@@ -750,9 +756,8 @@ def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
             # Read IMU to control sample time
             joiDict = state2Dict( fxs.read_device(actPackID) )
             IMUDict = IMUPa2Dict( IMU.getDataPackets(TIMEOUT) )      
-            #print('Calculated motor torque: %3.3f'%joiDict['MotTor'])  
-
-            if ( np.abs( joiDict['MotTor'] ) >= motTorThr ):
+            print('Calculated motor torque: %3.3f'%joiDict['MotTor'])  
+            if ( np.abs( joiDict['MotTor'] ) >= motTorThr):
                 keepGoing = False
                 fxs.send_motor_command(actPackID, fxe.FX_VOLTAGE, 0)
                 IMU.getDataPackets(TIMEOUT)     # Wait one sample so that torque goes to 0
@@ -790,9 +795,9 @@ def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
             motPosArray = np.append( motPosArray, joiDict['MotTic'])
             joiPosArray = np.append( joiPosArray, joiDict['JoiPos'])           
             
-            #print('Calculated motor torque: %3.3f'%joiDict['MotTor'])
+            print('Calculated motor torque: %3.3f'%joiDict['MotTor'])
 
-            if ( np.abs( joiDict['MotTor'] ) >= motTorThr ):
+            if ( np.abs( joiDict['MotTor'] ) >= motTorThr):
                 keepGoing = False
                 fxs.send_motor_command(actPackID, fxe.FX_VOLTAGE, 0)
                 # Read and append data
@@ -801,12 +806,12 @@ def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
                 torqueArray = np.append( torqueArray, joiDict['MotTor'])
                 motPosArray = np.append( motPosArray, joiDict['MotTic'])
                 joiPosArray = np.append( joiPosArray, joiDict['JoiPos'])   
-            elif (i > 2000):
+            elif (i > 5000):
                 raise Exception(f'Stopping homing routine after {i} samples')
-            #print('Delta of time in the cycle: %4.4f [ms]'%deltaTime) 
+            print('Delta of time in the cycle: %8.6f [ms]'%deltaTime) 
             i += 1
             deltaTime = (time.perf_counter_ns() - iniTime)/1e6
-        time.sleep(0.1)     # Healthy pause before finishing
+        time.sleep(1)     # Healthy pause before finishing
         return motPosArray, joiPosArray
     
     try:
@@ -1056,21 +1061,20 @@ if __name__ == "__main__":
 
     # Set streaming        
     IMU.resume()
-    fxs.start_streaming(kneID, freq = 100, log_en = True)
-    fxs.start_streaming(ankID, freq = 100, log_en = True)
-    time.sleep(0.01)                            # Healthy pause before using OSL
+    fxs.start_streaming(kneID, freq = 500, log_en = True)
+    fxs.start_streaming(ankID, freq = 500, log_en = True)
+    time.sleep(1)                            # Healthy pause before using OSL
 
     # ----------------------------- MAIN LOOP --------------------------------------------
     try:
         if ( len(sys.argv) > 1 and sys.argv[1] == "home" ):
-            home_joint(fxs, kneID, IMU, "knee" , jointVolt = 2000, motTorThr = 0.45)  # flex2ext
-            home_joint(fxs, ankID, IMU, "ankle", jointVolt = -1500, motTorThr = 0.40) # plan2dor
+            home_joint(fxs, kneID, IMU, "knee" , jointVolt = 2000, motTorThr = 1.7)  # flex2ext 0.45
+            home_joint(fxs, ankID, IMU, "ankle", jointVolt = -1500, motTorThr = 0.6) # plan2dor 0.40
         elif(  len(sys.argv) > 1 and sys.argv[1] == "move" ):
             test_motion(fxs, ankID, kneID, IMU)
         else:
             example_read(fxs, ankID, kneID, IMU)
             # test_motion(fxs, ankID, kneID, IMU)
-
 
     finally:        
         # Do anything but turn off the motors at the end of the program
