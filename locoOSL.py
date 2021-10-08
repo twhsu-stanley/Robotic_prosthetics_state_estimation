@@ -745,7 +745,7 @@ def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
         """
         Move using open voltage control until hitting torque threshold (neg. -> pos.). 
         """
-        time.sleep(0.1)         # Healthy pause before starting
+        time.sleep(1)          # Healthy pause before starting
         keepGoing = True
         i = 0
 
@@ -756,8 +756,8 @@ def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
             # Read IMU to control sample time
             joiDict = state2Dict( fxs.read_device(actPackID) )
             IMUDict = IMUPa2Dict( IMU.getDataPackets(TIMEOUT) )      
-            print('Calculated motor torque: %3.3f'%joiDict['MotTor'])  
-            if ( np.abs( joiDict['MotTor'] ) >= motTorThr):
+            #print('Calculated motor torque: %3.3f'%joiDict['MotTor'])  
+            if (np.abs( joiDict['MotTor'] ) >= motTorThr):
                 keepGoing = False
                 fxs.send_motor_command(actPackID, fxe.FX_VOLTAGE, 0)
                 IMU.getDataPackets(TIMEOUT)     # Wait one sample so that torque goes to 0
@@ -795,9 +795,9 @@ def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
             motPosArray = np.append( motPosArray, joiDict['MotTic'])
             joiPosArray = np.append( joiPosArray, joiDict['JoiPos'])           
             
-            print('Calculated motor torque: %3.3f'%joiDict['MotTor'])
+            #print('Calculated motor torque: %3.3f'%joiDict['MotTor'])
 
-            if ( np.abs( joiDict['MotTor'] ) >= motTorThr):
+            if ( np.abs( joiDict['MotTor'] ) >= motTorThr and i >= 10):
                 keepGoing = False
                 fxs.send_motor_command(actPackID, fxe.FX_VOLTAGE, 0)
                 # Read and append data
@@ -818,6 +818,7 @@ def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
         fxs.send_motor_command(actPackID, fxe.FX_NONE, 0)
         # Execute homing task               
         motPosArray, joiPosArray = moveUntilTorqueLimit( jointVolt )
+        # Compute the range of the joint angles actually moved
         joiPosRange = abs(joiPosArray[0] - joiPosArray[len(joiPosArray)-1]) * 180 / np.pi # deg
         if joint == 'ankle':
             strFile = 'joint2motorAnkle.csv'
@@ -834,7 +835,6 @@ def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
                 f.write(f"{Mo}, {Jo}\n") 
     except KeyboardInterrupt:
         print('\n***Homing routine stopped by user***\n')
-# OUTDATED
 
 def log_OSL(dataOSL, logger, degrees = True):
     """

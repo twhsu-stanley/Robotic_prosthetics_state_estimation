@@ -42,7 +42,7 @@ fxs.set_gains(ankID, G_A["kp"], G_A["ki"], 0, G_A["K"], G_A["B"], G_A["FF"])
 fxs.set_gains(kneID, G_K["kp"], G_K["ki"], 0, G_K["K"], G_K["B"], G_K["FF"])
 fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, fxs.read_device(ankID).mot_ang)
 fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, fxs.read_device(kneID).mot_ang)
-time.sleep(2/100)
+time.sleep(0.5)
 
 ## Set controller gains
 # For gain details check https://dephy.com/wiki/flexsea/doku.php?id=controlgains
