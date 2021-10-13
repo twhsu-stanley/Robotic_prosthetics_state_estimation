@@ -107,10 +107,10 @@ def derivedMeasurements_R01data():
     #with open('Gait_training_R01data/globalThighAngles_running_R01data.pickle', 'rb') as file:
     #    globalThighAngles_running = pickle.load(file)
 
-    globalThighVelocities_walking = dict()
-    globalThighVelocities_running = dict()
+    #globalThighVelocities_walking = dict()
+    #globalThighVelocities_running = dict()
     atan2_walking = dict()
-    atan2_running = dict()
+    #atan2_running = dict()
     
     ## patch ##############
     #with open(('Gait_training_R01data/globalThighVelocities_walking_R01data.pickle'), 'rb') as file:
@@ -197,6 +197,7 @@ def derivedMeasurements_R01data():
                     for j in range(np.shape(atan2_ss[i, :])[0]):
                         if atan2_ss[i, j] < 0:
                             atan2_ss[i, j] = atan2_ss[i, j] + 2 * np.pi
+                
                 plt.plot(np.arange(150), atan2_ss.T)   
                 #plt.plot(phase_x, phase_y) 
                 

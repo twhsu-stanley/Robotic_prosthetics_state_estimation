@@ -12,7 +12,7 @@ print("Average fs = %4.2f Hz" % fs)
 
 #Actual trajectory obtained from log files
 actualTrajectory = {
-    "ThighSagi": datatxt["ThighSagi"],
+    "global_thigh_angle": datatxt["ThighSagi"],
     #"PV": datatxt['PV'],
     "AnkleAngle": datatxt["ankJoiPos"],
     "KneeAngle": datatxt["kneJoiPos"]
@@ -31,21 +31,25 @@ ekfEstimates = {
     "stride_length": datatxt["stride_length"],
     "ramp": datatxt["ramp"],
     
-    "thigh_angle_pred": datatxt["thigh_angle_pred"],
-    "thigh_angle_bandpass": datatxt["thigh_angle_bandpass"], 
-    "thigh_angle_vel_pred": datatxt["thigh_angle_vel_pred"],
+    "global_thigh_angle_pred": datatxt["global_thigh_angle_pred"], 
+    "global_thigh_vel_pred": datatxt["global_thigh_vel_pred"],
     "atan2_pred": datatxt["atan2_pred"],
     
-    "thigh_angle_vel": datatxt["thigh_angle_vel"],
-    "atan2": datatxt["atan2"],
+    "global_thigh_vel_lp": datatxt["global_thigh_vel_lp"],
 
-    "walking": datatxt["walking"],
-    #"MD_movingAverage": datatxt["MD_movingAverage"],
-    "MD": datatxt["MD"],
-    "steady_state": datatxt["steady_state"]
+    "global_thigh_angle_lp": datatxt["global_thigh_angle_lp"],
+    "global_thigh_vel_lp2": datatxt["global_thigh_vel_lp2"],
+    "global_thigh_angle_max": datatxt["global_thigh_angle_max"],
+    "global_thigh_angle_min": datatxt["global_thigh_angle_min"],
+    "global_thigh_vel_max": datatxt["global_thigh_vel_max"],
+    "global_thigh_vel_min": datatxt["global_thigh_vel_min"],
+    "phase_x": datatxt["phase_x"],
+    "phase_y": datatxt["phase_y"],
+    "radius": datatxt["radius"],
+    "atan2": datatxt["atan2"]
 }
 
-## Generating joints angles using the kinematics model
+## Generating joints angles using the kinematics model ============================================
 knee_angle_kmodel = np.zeros((len(ekfEstimates['phase']), 1))
 ankle_angle_kmodel = np.zeros((len(ekfEstimates['phase']), 1))
 for i in range(len(ekfEstimates['phase'])):
@@ -54,7 +58,7 @@ for i in range(len(ekfEstimates['phase'])):
     knee_angle_kmodel[i] = joint_angles[0]
     ankle_angle_kmodel[i] = joint_angles[1]
 
-############## Plotting and Saving #################
+## Plotting and Saving =============================================================================
 ranA = 0
 ranB = len(datatxt["Time"])
 xindex = datatxt["Time"]
@@ -98,7 +102,7 @@ axs[1].set_ylabel('EKF Phase Rate (1/s)')
 axs[1].plot(xindex, ekfEstimates['phase_dot'][ranA:ranB], 'r-')
 #axs[1].set_ylim([0,100])
 
-axs[2].set_ylabel('EKF Stride Length (m)')
+axs[2].set_ylabel('EKF Normalized Stride Length (m)')
 axs[2].plot(xindex, ekfEstimates['stride_length'][ranA:ranB], 'r-')
 
 axs[3].set_xlabel('Time(s)')
@@ -112,7 +116,7 @@ plt.savefig(logFile + 'EKF_estimates.png', dpi=100)
 fig, axs = plt.subplots(3, 1)
 axs[0].set_title("Measurements")
 axs[0].set_ylabel('Global Thigh Angle (deg)')
-axs[0].plot(xindex, actualTrajectory["ThighSagi"][ranA:ranB] * 180 / np.pi, 'k-')
+axs[0].plot(xindex, actualTrajectory["thigh_angle"][ranA:ranB] * 180 / np.pi, 'k-')
 axs[0].plot(xindex, ekfEstimates["thigh_angle_pred"][ranA:ranB], 'r-')
 #axs[0].plot(xindex, ekfEstimates["thigh_angle_bandpass"][ranA:ranB], 'm-')
 axs[0].legend(["Actual", "EKF Predicted", "Band-pass filtered"])
@@ -132,20 +136,33 @@ fig.set_size_inches(22, 13)
 plt.savefig(logFile + 'EKF_measurements.png', dpi=100)
 
 ## Figure 4
-"""
 fig, axs = plt.subplots(3, 1)
-axs[0].set_title("Walking Status")
-axs[0].set_ylabel('Walking (T/F)')
-axs[0].plot(xindex, ekfEstimates["walking"][ranA:ranB], 'r-')
+axs[0].set_title("Atan2 Computation")
+axs[0].set_ylabel('Global Thigh Angle (deg)')
+axs[0].plot(xindex, ekfEstimates["global_thigh_angle_lp"][ranA:ranB], 'k-', lebel = 'low-passed')
+axs[0].plot(xindex, actualTrajectory["global_thigh_angle"][ranA:ranB], 'm-', alpha = 0.4, lebel = 'raw')
+axs[0].plot(xindex, actualTrajectory["global_thigh_angle_max"][ranA:ranB], 'r-', lebel = 'max')
+axs[0].plot(xindex, actualTrajectory["global_thigh_angle_min"][ranA:ranB], 'b-', lebel = 'min')
 
-axs[1].set_ylabel('MD')
-axs[1].plot(xindex, ekfEstimates["MD"][ranA:ranB], 'r-')
+axs[1].set_ylabel('Global Thigh Velocity (deg/s)')
+axs[1].plot(xindex, ekfEstimates["global_thigh_vel_lp_2"][ranA:ranB], 'k-', lebel = 'for atan2 computation')
+axs[1].plot(xindex, ekfEstimates["global_thigh_vel_lp"][ranA:ranB], 'm-', lebel = 'for vel measurement')
+axs[0].plot(xindex, actualTrajectory["global_thigh_vel_max"][ranA:ranB], 'r-', lebel = 'max')
+axs[0].plot(xindex, actualTrajectory["global_thigh_vel_min"][ranA:ranB], 'b-', lebel = 'min')
 
 axs[2].set_xlabel('Time(s)')
-axs[2].set_ylabel('Steady-state (T/F)')
-axs[2].plot(xindex, ekfEstimates["steady_state"][ranA:ranB], 'r-')
+axs[2].set_ylabel('Atan2')
+axs[2].plot(xindex, ekfEstimates["atan2"][ranA:ranB], 'k-')
 
 fig.set_size_inches(22, 13)
-plt.savefig(logFile + 'EKF_walkingStatus.png', dpi=100)
-"""
+plt.savefig(logFile + 'EKF_atan2_computation.png', dpi=100)
+
+## Figure 5
+plt.figure("Atan2 Phase Portrait")
+plt.plot(actualTrajectory["phase_x"][ranA:ranB], actualTrajectory["phase_y"][ranA:ranB])
+plt.xlabel("Phase X")
+plt.xlabel("Phase Y")
+plt.grid()
+plt.save(logFile + 'EKF_atan2_phasePortrait.png', dpi=100)
+
 plt.show()
