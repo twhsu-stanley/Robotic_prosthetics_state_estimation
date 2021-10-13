@@ -9,13 +9,13 @@ from EKF import wrapTo2pi, load_Psi
 # Determine which sensors to be used
 sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2']#,'globalFootAngles','ankleMoment', 'tibiaForce']
 
-sensor_id = 0
+sensor_id = 2
 
 m_model = model_loader('Measurement_model_012_NSL.pickle')
 Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 
 # load training data
-with open(('Gait_training_data/' + sensors[sensor_id] + '_NSL_training_dataset.pickle'), 'rb') as file:
+with open(('Gait_training_data/' + sensors[sensor_id] + 'ss_NSL_training_dataset.pickle'), 'rb') as file:
     gait_training_dataset = pickle.load(file)
 data_training = gait_training_dataset['training_data']
 phase_training = gait_training_dataset['phase']
@@ -23,7 +23,7 @@ phase_dot_training = gait_training_dataset['phase_dot']
 step_length_training = gait_training_dataset['step_length']
 ramp_training = gait_training_dataset['ramp']
 
-with open(('Gait_training_R01data/' + sensors[sensor_id] + '_walking_NSL_training_dataset.pickle'), 'rb') as file:
+with open(('Gait_training_R01data/' + sensors[sensor_id] + 'ss_walking_NSL_training_dataset.pickle'), 'rb') as file:
     gait_training_dataset = pickle.load(file)
 data_training = np.vstack((data_training, gait_training_dataset['training_data']))
 phase_training = np.vstack((phase_training, gait_training_dataset['phase']))
@@ -75,7 +75,6 @@ for i in range(len(phases)):
             measurement[i,j] = wrapTo2pi(measurement[i,j])
         else:
             measurement[i,j] = z[sensor_id]
-
 
 fig = plt.figure()
 X, Y = np.meshgrid(phases, step_lengths)

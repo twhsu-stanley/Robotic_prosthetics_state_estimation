@@ -104,8 +104,8 @@ def derivedMeasurements_R01data():
     with open('Gait_training_R01data/globalThighAngles_walking_R01data.pickle', 'rb') as file:
         globalThighAngles_walking = pickle.load(file)
     
-    with open('Gait_training_R01data/globalThighAngles_running_R01data.pickle', 'rb') as file:
-        globalThighAngles_running = pickle.load(file)
+    #with open('Gait_training_R01data/globalThighAngles_running_R01data.pickle', 'rb') as file:
+    #    globalThighAngles_running = pickle.load(file)
 
     globalThighVelocities_walking = dict()
     globalThighVelocities_running = dict()
@@ -124,41 +124,48 @@ def derivedMeasurements_R01data():
     #######################
 
     incline = 'i0'
+    plt.figure()
     for subject in get_subject_names():
     #for subject in ['AB04']:
         print("Subject:", subject)
-        globalThighVelocities_walking[subject] = dict()
-        globalThighVelocities_running[subject] = dict()
+        #globalThighVelocities_walking[subject] = dict()
+        #globalThighVelocities_running[subject] = dict()
         atan2_walking[subject] = dict()
-        atan2_running[subject] = dict()
+        #atan2_running[subject] = dict()
 
         # 1) Walking
         mode = 'Walk'
-        globalThighVelocities_walking[subject][mode] = dict()
+        #globalThighVelocities_walking[subject][mode] = dict()
         atan2_walking[subject][mode] = dict()
+    
         for speed in ['s0x8', 's1', 's1x2']:
             try:
                 print(" Walk:", speed)
                 globalThighAngles = globalThighAngles_walking[subject][mode][speed]
                 stride_period = Normalized_data['Normalized'][subject][mode][speed][incline]['events']['StrideDetails'][2,:]/100
 
-                globalThighVelocities = np.zeros(np.shape(globalThighAngles))
-                atan2 = np.zeros(np.shape(globalThighAngles))
+                #globalThighVelocities = np.zeros(np.shape(globalThighAngles))
+                #atan2 = np.zeros(np.shape(globalThighAngles))
+                atan2_ss = np.zeros(np.shape(globalThighAngles))
                 for i in range(np.shape(globalThighAngles)[0]):
                     dt = stride_period[i] / 150
+                    # compute golabal thigh velocity with a low-pass filter
+                    """
                     v = np.diff(globalThighAngles[i, :]) / dt
                     gtv = np.insert(v, 0, 0)
                     gtv_stack = np.array([gtv, gtv, gtv, gtv, gtv]).reshape(-1)
                     gtv_lp_stack = butter_lowpass_filter(gtv_stack, 2, 1/dt, order = 1)
                     globalThighVelocities[i, :] = gtv_lp_stack[2 * len(globalThighAngles[i, :]): 3 * len(globalThighAngles[i, :])]
+                    """
 
-                    # compute atan2 w/ a band-pass filter
-                    gt_stack = np.array([globalThighAngles[i, :], globalThighAngles[i, :], globalThighAngles[i, :],\
+                    # compute atan2 with a band-pass filter
+                    gta_stack = np.array([globalThighAngles[i, :], globalThighAngles[i, :], globalThighAngles[i, :],\
                                          globalThighAngles[i, :], globalThighAngles[i, :]]).reshape(-1)
-                    gt_bp_stack = butter_bandpass_filter(gt_stack, 0.5, 2, 1/dt, order = 2)
-                    gt_bp = gt_bp_stack[2 * len(globalThighAngles[i, :]): 3 * len(globalThighAngles[i, :])]
+                    """                     
+                    gta_bp_stack = butter_bandpass_filter(gta_stack, 0.5, 2, 1/dt, order = 2)
+                    gta_bp = gta_bp_stack[2 * len(globalThighAngles[i, :]): 3 * len(globalThighAngles[i, :])]
 
-                    v_bp = np.diff(gt_bp) / dt
+                    v_bp = np.diff(gta_bp) / dt
                     gtv_bp = np.insert(v_bp, 0, 0)
                     gtv_bp_stack = np.array([gtv_bp, gtv_bp, gtv_bp, gtv_bp, gtv_bp]).reshape(-1)
                     gtv_blp_stack = butter_lowpass_filter(gtv_bp_stack, 2, 1/dt, order = 1)
@@ -168,14 +175,39 @@ def derivedMeasurements_R01data():
                     for j in range(np.shape(atan2[i, :])[0]):
                         if atan2[i, j] < 0:
                             atan2[i, j] = atan2[i, j] + 2 * np.pi
+                    """
                     
-                globalThighVelocities_walking[subject][mode][speed] = globalThighVelocities
-                atan2_walking[subject][mode][speed] = atan2
+                    # compute shifted & scaled atan2 w/ a low-pass filter
+                    gta_lp_stack = butter_lowpass_filter(gta_stack, 2, 1/dt, order = 1) # 1st, 2nd or 3rd order? 
+                    gta_lp = gta_lp_stack[2 * len(globalThighAngles[i, :]): 3 * len(globalThighAngles[i, :])]
+                    gtv_lp = np.insert(np.diff(gta_lp) / dt, 0, 0)
+                    gta_max = max(gta_lp)
+                    gta_min = min(gta_lp)
+                    gtv_max = max(gtv_lp)
+                    gtv_min = min(gtv_lp)
+
+                    gta_shift = (gta_max + gta_min) / 2
+                    gta_scale = abs(gtv_max - gtv_min) / abs(gta_max - gta_min)
+                    gtv_shift = (gtv_max + gtv_min) / 2
+
+                    phase_y = - (gtv_lp - gtv_shift)
+                    phase_x = gta_scale * (gta_lp - gta_shift)
+                    
+                    atan2_ss[i, :] = np.arctan2(phase_y, phase_x)
+                    for j in range(np.shape(atan2_ss[i, :])[0]):
+                        if atan2_ss[i, j] < 0:
+                            atan2_ss[i, j] = atan2_ss[i, j] + 2 * np.pi
+                plt.plot(np.arange(150), atan2_ss.T)   
+                #plt.plot(phase_x, phase_y) 
+                
+                #globalThighVelocities_walking[subject][mode][speed] = globalThighVelocities
+                atan2_walking[subject][mode][speed] = atan2_ss
             except:
                 print("Exception: something wrong occured!", subject + '/' + mode  + '/' + speed)
                 continue
-
+    
         # 2) Running
+        """
         mode = 'Run'
         globalThighVelocities_running[subject][mode] = dict()
         atan2_running[subject][mode] = dict()
@@ -217,15 +249,16 @@ def derivedMeasurements_R01data():
             except:
                 print("Exception: something wrong occured!", subject + '/' + mode  + '/' + speed)
                 continue
-              
-    with open('Gait_training_R01data/globalThighVelocities_walking_R01data.pickle', 'wb') as file:
-    	pickle.dump(globalThighVelocities_walking, file)
-    with open('Gait_training_R01data/globalThighVelocities_running_R01data.pickle', 'wb') as file:
-    	pickle.dump(globalThighVelocities_running, file)
-    with open('Gait_training_R01data/atan2_walking_R01data.pickle', 'wb') as file:
+        """
+    plt.show()      
+    #with open('Gait_training_R01data/globalThighVelocities_walking_R01data.pickle', 'wb') as file:
+    #	pickle.dump(globalThighVelocities_walking, file)
+    #with open('Gait_training_R01data/globalThighVelocities_running_R01data.pickle', 'wb') as file:
+    #	pickle.dump(globalThighVelocities_running, file)
+    with open('Gait_training_R01data/atan2ss_walking_R01data.pickle', 'wb') as file:
     	pickle.dump(atan2_walking, file)
-    with open('Gait_training_R01data/atan2_running_R01data.pickle', 'wb') as file:
-    	pickle.dump(atan2_running, file)
+    #with open('Gait_training_R01data/atan2_running_R01data.pickle', 'wb') as file:
+    #	pickle.dump(atan2_running, file)
 
 def kneeAnkleAngles_R01data():
     """
@@ -282,7 +315,6 @@ def kneeAnkleAngles_R01data():
     with open('Gait_training_R01data/ankleAngles_walking_R01data.pickle', 'wb') as file:
     	pickle.dump(ankleAngles_walking, file)
 
-
 def gait_training_R01data_generator(gait_data):
     with open('Gait_training_R01data/' + gait_data + '_R01data.pickle', 'rb') as file:
         gait_data_dict = pickle.load(file)
@@ -293,7 +325,7 @@ def gait_training_R01data_generator(gait_data):
         leg_length_left = Normalized_data[ Normalized_data['Normalized'][subject]['ParticipantDetails'][1,5] ][:][0,0] / 1000
         leg_length_right = Normalized_data[ Normalized_data['Normalized'][subject]['ParticipantDetails'][1,8] ][:][0,0] / 1000
         
-        if (gait_data == 'globalThighAngles_walking' or gait_data == 'globalThighVelocities_walking' or gait_data == 'atan2_walking'
+        if (gait_data == 'globalThighAngles_walking' or gait_data == 'globalThighVelocities_walking' or gait_data == 'atan2ss_walking'
             or gait_data == 'kneeAngles_walking' or gait_data == 'ankleAngles_walking'):
             mode = 'Walk'
             for speed in ['s0x8', 's1', 's1x2']:
@@ -429,21 +461,21 @@ def gait_training_R01data_generator(gait_data):
     
 if __name__ == '__main__':
     #globalThighAngles_R01data()
-    #derivedMeasurements_R01data()
+    derivedMeasurements_R01data()
     #kneeAnkleAngles_R01data()
 
     #gait_training_R01data_generator('globalThighAngles_walking')
     #gait_training_R01data_generator('globalThighVelocities_walking')
-    #gait_training_R01data_generator('atan2_walking')
-    gait_training_R01data_generator('kneeAngles_walking')
-    gait_training_R01data_generator('ankleAngles_walking')
+    gait_training_R01data_generator('atan2ss_walking')
+    #gait_training_R01data_generator('kneeAngles_walking')
+    #gait_training_R01data_generator('ankleAngles_walking')
 
     #gait_training_R01data_generator('globalThighAngles_running')
     #gait_training_R01data_generator('globalThighVelocities_running')
     #gait_training_R01data_generator('atan2_running')
 
     #print(get_commanded_velocities('AB10', 1))
-    
+    """
     subject = 'AB03'
     mode = 'Walk'
     speed = 's0x8'
@@ -474,7 +506,7 @@ if __name__ == '__main__':
         plt.plot(range(150), ankleAngles[0,:].T, 'b')
 
     plt.show()
-    
+    """
 
     """
     ## To see if similar stride length leads to similar kinematics.

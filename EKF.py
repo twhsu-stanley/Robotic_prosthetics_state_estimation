@@ -31,7 +31,7 @@ def load_Psi(subject = 'Generic'):
         #with open('Psi_incExp/Psi_tibiaForce_NSL_B33.pickle', 'rb') as file:
         #    Psi_tibiaForce = pickle.load(file)
         
-        with open('Psi/Psi_atan2_NSL.pickle', 'rb') as file:
+        with open('Psi/Psi_atan2ss_NSL.pickle', 'rb') as file:
             Psi_atan2 = pickle.load(file)
 
     else:
@@ -107,8 +107,7 @@ class extended_kalman_filter:
         self.Q = self.Q_static    # process model noise covariance
 
         self.h = system.h  # measurement model
-        self.R_static = system.R  # measurement noise covariance
-        self.R = self.R_static
+        self.R = system.R  # measurement noise covariance
 
         self.x = init.x  # state mean
         self.Sigma = init.Sigma  # state covariance
@@ -119,7 +118,7 @@ class extended_kalman_filter:
         self.x[0, 0] = warpToOne(self.x[0, 0]) # wrap to be between 0 and 1
         self.Sigma = self.A(dt) @ self.Sigma @ self.A(dt).T + self.Q  # predicted state covariance
 
-    def correction(self, z, Psi, using_atan2 = False, steady_state_walking = False, direct_ramp = False):
+    def correction(self, z, Psi, using_atan2 = False, direct_ramp = False):
         # EKF correction step
         # Inputs:
         #   z:  measurement

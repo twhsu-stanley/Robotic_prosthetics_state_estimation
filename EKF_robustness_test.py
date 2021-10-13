@@ -25,10 +25,6 @@ sensor_id_str = ""
 for i in range(len(sensor_id)):
     sensor_id_str += str(sensor_id[i])
 m_model = model_loader('Measurement_model_' + sensor_id_str +'_NSL.pickle')
-
-# for walking determination
-global_thigh_angle_max_threshold = 5    # global thigh angle range (deg)
-global_thigh_angle_min_threshold = -5   # global thigh angle range (deg)
     
 using_atan2 = np.any(np.array(sensors) == 'atan2')
 using_ankleMoment = np.any(np.array(sensors) == 'ankleMoment')
@@ -52,12 +48,12 @@ inital_Sigma = np.diag([1e-3, 1e-3, 1e-3, 1e-20])
 Q = np.diag([0, 5e-3, 5e-3, 0]) * dt # p1) 5e-3, 5e-3; p2) 5e-4, 1e-3
 U = np.diag([1, 1, 1])
 R = U @ measurement_noise_covariance(*sensors) @ U.T
+
 if using_directRamp == True:
     R = np.diag(np.append(np.diag(R), R_directRamp))
 
 #hetero_cov = heteroscedastic_measurement_noise_covariance(*sensors)
 
-#saturation_range = saturation_bounds()
 saturation_range = np.array([1.3, 0, 1.9, 0])
 
 if using_ankleMoment or using_tibiaForce or using_footAngles or using_directRamp:
@@ -136,8 +132,9 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
         # load ground truth
         phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
         # load measurements
-        globalThighAngle, globalThighVelocity, atan2, globalFootAngle, ankleMoment, tibiaForce = load_Conti_measurement_data(subject, trial, side)
-        
+        globalThighAngle, globalThighVelocity, _, _, _, _ = load_Conti_measurement_data(subject, trial, side)
+        atan2 = Continuous_atan2_scale_shift(subject, trial, side, plot = False) # use the shifted & scalsed version
+
         kneeAngle, ankleAngle = load_Conti_joints_angles(subject, trial, side)
 
         heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
@@ -146,8 +143,9 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
     # 2) Use the R01 dataset
     elif dataset == 'Reznick':
         # here, trial is equivalent to speed: s0x8, s1, s1x2, all
-        (phases, phase_dots, step_lengths, ramps, globalThighAngle, globalThighVelocity, atan2, kneeAngle, ankleAngle) \
+        (phases, phase_dots, step_lengths, ramps, globalThighAngle, globalThighVelocity, _, kneeAngle, ankleAngle) \
         = load_Streaming_data(subject, trial)
+        atan2 = Streaming_atan2_scale_shift(subject, trial, plot = False) # use the scaled&shifted version
 
         LHS = Streaming_data['Streaming'][subject]['Tread']['i0']['events']['LHS'][:][:,0]
         cutPoints = Streaming_data['Streaming'][subject]['Tread']['i0']['events']['cutPoints'][:]
@@ -202,12 +200,6 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
     z_full = np.squeeze(z_full) 
     z = z_full[sensor_id, :]
 
-    ### For studying atan2 ###########################################################
-    gt_bp = butter_bandpass_filter(globalThighAngle, 0.5, 2, 1/dt, order = 2)
-    v_bp = np.diff(gt_bp) / dt
-    gtv_bp = butter_lowpass_filter(np.insert(v_bp, 0, 0), 2, 1/dt, order = 1)
-    ##################################################################################
-
     # build the system
     sys = myStruct()
     sys.f = process_model
@@ -215,7 +207,6 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
     sys.h = m_model
     sys.Q = Q
     sys.R = R
-    R_org = np.copy(R)
 
     # initialize the state
     init = myStruct()
@@ -238,29 +229,21 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
     x = np.zeros((total_step, 4))  # state estimate
     z_pred = np.zeros((total_step, len(sensors) + int(using_directRamp)))
     
-    # for walking determination
-    walking = False
-    global_thigh_angle_hist = np.ones(int(1 / dt)) * globalThighAngle[0] # ~ 2seconds window
-
-    directRamp = np.zeros((total_step, 1))
-    L_cop = np.zeros((total_step, 1))
-    #Q_diag = np.zeros((total_step, 4))
-    #Sigma_diag = np.zeros((total_step, 4))
+    #directRamp = np.zeros((total_step, 1))
+    #L_cop = np.zeros((total_step, 1))
     
     estimate_error = np.zeros((total_step, 4))
-    #MD_residual = np.zeros((total_step, 1))
-    #MD_estimate = np.zeros((total_step, 1))
     
     kneeAngle_kmd = np.zeros((total_step, 1))
     ankleAngle_kmd = np.zeros((total_step, 1))
     kneeAngle_cmd = np.zeros((total_step, 1))
     ankleAngle_cmd = np.zeros((total_step, 1))
     
-    stance = False
-    stance_prev = False
-    stance_idxs = 0
-    stance_idx1 = 0
-    stance_idx2 = 0
+    #stance = False
+    #stance_prev = False
+    #stance_idxs = 0
+    #stance_idx1 = 0
+    #stance_idx2 = 0
     
     for i in range(total_step):
         if kidnap != False:
@@ -269,26 +252,11 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
         
         ekf.prediction(dt)
         ekf.state_saturation(saturation_range)
+
         
-        # set atan2 to zero when the subejct is not waking
-        global_thigh_angle_hist = np.roll(global_thigh_angle_hist, -1)
-        global_thigh_angle_hist[-1] = z[0, i]
-        
-        a = 10
-        b = 50
-        radius = (gt_bp[i] / a)**2 + (gtv_bp[i] / b)**2
-         
-        if radius >= 1:
-        #if (min(global_thigh_angle_hist) < global_thigh_angle_min_threshold
-        #    and max(global_thigh_angle_hist) > global_thigh_angle_max_threshold):
-        #    walking = True
-            ekf.R = R_org
-        else:
-        #    walking = False
-            #z[2, i] = 0
-            ekf.R[2, 2] = 1e20
-        
+        """
         if using_ankleMoment or using_tibiaForce or using_footAngles or using_directRamp:
+            
             # Compute L_cop; here, "stance" means that the foot is flat on the ground 
             if tibiaForce[i] <= tibiaForce_threshold:
                 # Location of the centoer of pressure
@@ -320,56 +288,56 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
             if tibiaForce[i] <= tibiaForce_threshold:
                 ekf.h = m_model
                 if heteroscedastic == True:
-                    ekf.R = np.diag(hetero_cov[:, int(ekf.x[0, 0]*150)])
+                    ekf.R = np.diag(hetero_cov[:, int(ekf.x[0, 0]*150)]) ## WRONG? pass by reference? 
                     if using_directRamp:
+                        ## WRONG? pass by reference? 
                         ekf.R = np.diag(np.append(np.diag(ekf.R), R_directRamp))               
                 else:
+                    ## WRONG? pass by reference? 
                     ekf.R = R
 
                 if using_directRamp:
-                    ekf.correction(z[:, i], Psi, using_atan2, steady_state_walking = True, direct_ramp = directRamp[i])
+                    ekf.correction(z[:, i], Psi, using_atan2, direct_ramp = directRamp[i])
                 else:
-                    ekf.correction(z[:, i], Psi, using_atan2, steady_state_walking = True, direct_ramp = False)
+                    ekf.correction(z[:, i], Psi, using_atan2, direct_ramp = False)
                 z_pred[i,:] = ekf.z_hat.T
             else: # swing
                 ekf.h = m_model_swing
                 if heteroscedastic == True:
                     ekf.R = np.diag(hetero_cov[sensor_swing_id, int(ekf.x[0, 0]*150)])
                     if using_directRamp:
+                        ## WRONG? pass by reference? 
                         ekf.R = np.diag(np.append(np.diag(ekf.R), R_directRamp))
                 else:
+                    ## WRONG? pass by reference? 
                     ekf.R = R_swing
                 
                 if using_directRamp :
-                    ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, steady_state_walking = True, direct_ramp = directRamp[i])
+                    ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, direct_ramp = directRamp[i])
                     z_pred[i, np.append(sensor_swing_id, len(sensors))] = ekf.z_hat.T
                 else:
-                    ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, steady_state_walking = True, direct_ramp = False)
+                    ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, direct_ramp = False)
                     z_pred[i, sensor_swing_id] = ekf.z_hat.T
-                
+              
                 #==============================================================================================================
         else:
-            if heteroscedastic == True:
-                ekf.R = np.diag(hetero_cov[:, int(ekf.x[0, 0]*150)])
-            else:
-                ekf.R = R
-            ekf.correction(z[:, i], Psi, using_atan2, steady_state_walking = True)
-            z_pred[i,:] = ekf.z_hat.T
+        """ 
+            #if heteroscedastic == True:
+                ## WRONG? pass by reference? 
+                #ekf.R = np.diag(hetero_cov[:, int(ekf.x[0, 0]*150)])
+            #else:
+                ## WRONG? pass by reference? 
+                #ekf.R = R
+        ekf.correction(z[:, i], Psi, using_atan2)
         ekf.state_saturation(saturation_range)
 
+        z_pred[i,:] = ekf.z_hat.T
         x[i,:] = ekf.x.T
-
-        #Q_diag[i,:] = np.diag(ekf.Q)
-        #Sigma_diag[i, :] = np.diag(ekf.Sigma)
-        #MD_residual[i] = ekf.MD_residual
-
         estimate_error[i, :] = (ekf.x - np.array([[phases[i]], [phase_dots[i]], [step_lengths[i]], [ramps[i]]])).reshape(-1)
         if estimate_error[i, 0] > 0.5:
             estimate_error[i, 0] = estimate_error[i, 0] - 1
         elif estimate_error[i, 0] < -0.5:
             estimate_error[i, 0] = 1 + estimate_error[i, 0]
-
-        #MD_estimate[i] = np.sqrt(estimate_error[i, :].T @ np.linalg.inv(ekf.Sigma) @ estimate_error[i, :])
 
         ## Joints control commands 
         # 1) generated by the kinematic model
@@ -509,13 +477,7 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
         plt.ylabel('MD of State Estimate')
         plt.xlabel('time (s)')
         """
-        plt.figure("Atan2 phase plane")
-        plt.plot(gt_bp, gtv_bp, 'b-')
-        #plt.plot(gt_Y[start_idx:end_idx], globalThighVelocities_Sagi[start_idx:end_idx], 'r-')
-        theta = np.linspace(0, 2*np.pi, 100)
-        plt.plot( a*np.cos(theta) , b*np.sin(theta), 'r--')
         
-
         plt.figure("Measurements")
         for i in range(len(sensors) + int(using_directRamp)):
             plt.subplot(int(str(len(sensors) + int(using_directRamp)) + "1" + str(i+1)))
@@ -604,10 +566,11 @@ def ekf_bank_test(dataset, subject, trial, side, N = 30, heteroscedastic = False
         # here, trial is equivalent to speed: s0x8, s1, s1x2, all
         (phases, phase_dots, step_lengths, ramps, globalThighAngle, globalThighVelocity, atan2) = load_Streaming_data(subject, trial)
         LHS = Streaming_data['Streaming'][subject]['Tread']['i0']['events']['LHS'][:][:,0]
+        
         cutPoints = Streaming_data['Streaming'][subject]['Tread']['i0']['events']['cutPoints'][:]
         if trial == 'all':
-            start_idx = 0
-            end_idx = int(len(streaming_globalThighAngles_tread[subject])-1)
+            start_idx = min(int(cutPoints[0,0]), int(cutPoints[0,1]), int(cutPoints[0,2]))
+            end_idx = max(int(cutPoints[1,0]), int(cutPoints[1,1]), int(cutPoints[1,2]))
         elif trial == 's0x8':
             start_idx = int(cutPoints[0,0])
             end_idx = int(cutPoints[1,0])
@@ -617,7 +580,7 @@ def ekf_bank_test(dataset, subject, trial, side, N = 30, heteroscedastic = False
         elif trial == 's1x2':
             start_idx = int(cutPoints[0,2])
             end_idx = int(cutPoints[1,2])
-        
+    
         heel_strike_index = LHS[ np.logical_and((LHS > start_idx), (LHS < end_idx)) ] - start_idx
 
     else:
@@ -682,7 +645,7 @@ def ekf_bank_test(dataset, subject, trial, side, N = 30, heteroscedastic = False
             
             ekf.prediction(dt)
             ekf.state_saturation(saturation_range)
-
+            """
             if using_ankleMoment or using_tibiaForce or using_footAngles or using_directRamp:
                 if tibiaForce[i] <= tibiaForce_threshold:
                     # Location of the centoer of pressure
@@ -721,9 +684,9 @@ def ekf_bank_test(dataset, subject, trial, side, N = 30, heteroscedastic = False
                         ekf.R = R
 
                     if using_directRamp:
-                        ekf.correction(z[:, i], Psi, using_atan2, steady_state_walking = True, direct_ramp = directRamp[i])
+                        ekf.correction(z[:, i], Psi, using_atan2, direct_ramp = directRamp[i])
                     else:
-                        ekf.correction(z[:, i], Psi, using_atan2, steady_state_walking = True, direct_ramp = False)
+                        ekf.correction(z[:, i], Psi, using_atan2, direct_ramp = False)
                 else: # swing
                     ekf.h = m_model_swing
                     if heteroscedastic == True:
@@ -734,16 +697,17 @@ def ekf_bank_test(dataset, subject, trial, side, N = 30, heteroscedastic = False
                         ekf.R = R_swing
                     
                     if using_directRamp:
-                        ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, steady_state_walking = True, direct_ramp = directRamp[i])
+                        ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, direct_ramp = directRamp[i])
                     else:
-                        ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, steady_state_walking = True, direct_ramp = False)       
+                        ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, direct_ramp = False)       
 
             else:
                 if heteroscedastic == True:
                     ekf.R = np.diag(hetero_cov[:, int(ekf.x[0, 0]*150)])
                 else:
                     ekf.R = R
-                ekf.correction(z[:, i], Psi, using_atan2, steady_state_walking = True)
+            """
+            ekf.correction(z[:, i], Psi, using_atan2)
             ekf.state_saturation(saturation_range)
 
             x[n, i,:] = ekf.x.T
@@ -1052,11 +1016,11 @@ if __name__ == '__main__':
     if nan_dict[subject][trial+'i0'][side] == False:
         print(subject + "/"+ trial + "/"+ side+ ": This trial should be skipped!")
     
-    dataset = 'Reznick'
-    subject = 'AB07'
-    trial = 'a0x5'
+    #dataset = 'Reznick'
+    #subject = 'AB07'
+    #trial = 's1'
 
-    ekf_test(dataset, subject, trial, side, heteroscedastic = False, kidnap = False, plot = True)
+    ekf_test(dataset, subject, trial, side, heteroscedastic = False, kidnap = [0, 1, 2], plot = True)
     #ekf_bank_test(dataset, subject, trial, side, N = 5, heteroscedastic = False, kidnap = [0, 1, 2], plot = True)
     #ekf_robustness(kidnap = [0, 1, 2], heteroscedastic = False)
     #ekf_robustness(kidnap = False, heteroscedastic = False)

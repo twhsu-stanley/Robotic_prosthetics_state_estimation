@@ -16,7 +16,7 @@ import sender_test as sender   # for real-time plotting
 
 ### A. Load Ross's pre-recorded walking data / EKF Tests 
 """
-logFile = r"OSL_walking_data/210617_113644_PV_Siavash_walk_oscillations in phase.csv"
+logFile = r"OSL_walking_data/210617_122334_PV_Siavash_walk_500_2500.csv"
 # 1) 210617_113644_PV_Siavash_walk_oscillations in phase
 # 2) 210617_121732_PV_Siavash_walk_300_1600
 # 3) 210617_122334_PV_Siavash_walk_500_2500
@@ -116,7 +116,6 @@ def loadTrajectory(trajectory = 'walking'):
     return trajectory
 
 try:
-
     ### Load reference trajectory
     refTrajectory = loadTrajectory(trajectory = 'walking')
     refAnk = refTrajectory["ankl"]
@@ -129,7 +128,7 @@ try:
 
     # Determine which sensors to be used
     # 1) measurements that use the basis model
-    sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2']#, 'ankleMoment', 'tibiaForce'
+    sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2']
 
     sensor_id = [sensors_dict[key] for key in sensors]
     sensor_id_str = ""
@@ -164,21 +163,18 @@ try:
     ekf = extended_kalman_filter(sys, init)
 
     ########## Create filters ################################################################
-    
     fs = 1 / np.average(np.diff(dataOSL["Time"]))        # sampling rate = 100 Hz (actual: ~77 Hz)
     print("Average fs = %4.2f Hz" % fs)
+
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
-    ## configure low-pass filter (1-order)
     normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
-    b_lp, a_lp = butter(1, normal_cutoff, btype = 'low', analog = False)
-    z_lp_1 = lfilter_zi(b_lp,  a_lp)
-    z_lp_2 = lfilter_zi(b_lp,  a_lp)
+    # Configure 1st order low-pass filters for computing velocity 
+    b_lp_1, a_lp_1 = butter(1, normal_cutoff, btype = 'low', analog = False)
+    z_lp_1 = lfilter_zi(b_lp_1,  a_lp_1)
     
-    ## configure band-pass filter (2-order)
-    normal_lowcut = 0.1 / nyq    #lower cut-off frequency = 0.5Hz 
-    normal_highcut = 2 / nyq     #upper cut-off frequency = 2Hz
-    b_bp, a_bp = butter(2, [normal_lowcut, normal_highcut], btype = 'band', analog = False)
-    z_bp = lfilter_zi(b_bp,  a_bp)
+    # Configure 1st/2nd/3rd order low-pass filters for computing atan2
+    b_lp_2, a_lp_2 = butter(1, normal_cutoff, btype = 'low', analog = False)
+    z_lp_2 = lfilter_zi(b_lp_2,  a_lp_2)
 
     ### Kinetic data processing
     #dataOSL['AnkleTorque_lp'] = butter_lowpass_filter(dataOSL['AnkleTorque'], 10, fs, order = 1)
@@ -190,33 +186,21 @@ try:
     t_0 = dataOSL["Time"][ptr]   # for EKF
     start_time = t_0             # for live plotting
     fade_in_time = 2             # sec
-
-    t_s = np.zeros((len(dataOSL["Time"]), 1))  # for steady-state
-    t_ns = np.zeros((len(dataOSL["Time"]), 1)) # for non steady-state
-    t_s[0] = start_time
-    t_ns[0] = start_time
-    t_s_previous = start_time
-    t_ns_previous = start_time
-    #steady_state = False
-    #steady_state_previous = False
-    #walking = False
-
-    #MD_hist= deque([])
-    global_thigh_angle_hist = np.ones((int(fs*2.5), 1)) * dataOSL["ThighSagi"][0] * 180 / np.pi # ~ 2seconds window
-
-    #MD_threshold = 5 # MD
-    global_thigh_angle_max_threshold = 10    # global thigh angle range (deg)
-    global_thigh_angle_min_threshold = -5     # global thigh angle range (deg)
     
+    idx_min_prev = 0
+    idx_min = 0
+    idx_max_prev = 0
+    idx_max = 0
+    globalThighAngle_lp = np.zeros(100) # time window/ pre-allocate 1 sec
+    globalThighVelocity_lp = np.zeros(100)
+
     knee_angle_initial = dataOSL['KneeAngle'][0]
     ankle_angle_initial = dataOSL['AnkleAngle'][0]
     
-    loadCell_Fz_buffer = []
-    for i in range(3):
-        loadCell_Fz_buffer.append(dataOSL['LoadCellFz'][ptr])
-    dataOSL['LoadCellFz'][ptr] = np.median(loadCell_Fz_buffer)
-
-    #subject_weight = 60
+    #loadCell_Fz_buffer = []
+    #for i in range(3):
+    #    loadCell_Fz_buffer.append(dataOSL['LoadCellFz'][ptr])
+    #dataOSL['LoadCellFz'][ptr] = np.median(loadCell_Fz_buffer)
 
     simulation_log = {
         # state estimates
@@ -224,22 +208,27 @@ try:
         "phase_dot_est": np.zeros((len(dataOSL["Time"]), 1)),
         "step_length_est": np.zeros((len(dataOSL["Time"]), 1)),
         "ramp_est": np.zeros((len(dataOSL["Time"]), 1)),
-        
-        #"steady-state": np.zeros((len(dataOSL["Time"]), 1)),
-        "walking": np.zeros((len(dataOSL["Time"]), 1)),
-        "global_thigh_angle_min": np.zeros((len(dataOSL["Time"]), 1)),
-        "global_thigh_angle_max": np.zeros((len(dataOSL["Time"]), 1)),
-        "atan2_radius": np.zeros((len(dataOSL["Time"]), 1)),
-        #"MD": np.zeros((len(dataOSL["Time"]), 1)),
-        #"MD_movingAverage": np.zeros((len(dataOSL["Time"]), 1)),
+        "Sigma": np.zeros((len(dataOSL["Time"]), 4)),
+
+        "idx_min_prev": np.zeros((len(dataOSL["Time"]), 1)),
+        "idx_min": np.zeros((len(dataOSL["Time"]), 1)),
+        "idx_max_prev": np.zeros((len(dataOSL["Time"]), 1)),
+        "idx_max": np.zeros((len(dataOSL["Time"]), 1)),
+
+        "global_thigh_angle_lp": np.zeros((len(dataOSL["Time"]), 1)),
+        "global_thigh_angle_vel_lp2": np.zeros((len(dataOSL["Time"]), 1)),
+        "global_thigh_angle_lp_max": np.zeros((len(dataOSL["Time"]), 1)),
+        "global_thigh_angle_lp_min": np.zeros((len(dataOSL["Time"]), 1)),
+        "global_thigh_angle_vel_max": np.zeros((len(dataOSL["Time"]), 1)),
+        "global_thigh_angle_vel_min": np.zeros((len(dataOSL["Time"]), 1)),
+        "phase_x": np.zeros((len(dataOSL["Time"]), 1)),
+        "phase_y": np.zeros((len(dataOSL["Time"]), 1)),
+        "radius": np.zeros((len(dataOSL["Time"]), 1)),
+        "R": np.zeros((len(dataOSL["Time"]), 3)),
 
         # EKF prediction of measurements/ derived measurements
         "global_thigh_angle_pred": np.zeros((len(dataOSL["Time"]), 1)),
         "global_thigh_angle": np.zeros((len(dataOSL["Time"]), 1)),
-        "global_thigh_angle_bp": np.zeros((len(dataOSL["Time"]), 1)),
-        "global_thigh_angle_vel_blp": np.zeros((len(dataOSL["Time"]), 1)),
-        #"ankleMoment_pred": np.zeros((len(dataOSL["Time"]), 1)),
-        #"ankleMoment": np.zeros((len(dataOSL["Time"]), 1)),
         "global_thigh_angle_vel_pred": np.zeros((len(dataOSL["Time"]), 1)),
         "global_thigh_angle_vel": np.zeros((len(dataOSL["Time"]), 1)),
         "Atan2_pred": np.zeros((len(dataOSL["Time"]), 1)),
@@ -252,25 +241,42 @@ try:
         "knee_angle_cmd": np.zeros((len(dataOSL["Time"]), 1))
     }
 
+    ###############
+    """
+    gta = dataOSL["ThighSagi"] * 180 / np.pi
+    gta = butter_lowpass_filter(gta, 2, 100, order = 5)
+    v = np.diff(gta) / (1/100)
+    gtv = np.insert(v, 0, 0)
+    #gtv = butter_lowpass_filter(np.insert(v, 0, 0), 2, 100, order = 2)
+    plt.figure()
+    plt.subplot(211)
+    plt.plot(gta)
+    plt.subplot(212)
+    plt.plot(gtv)
+    plt.grid()
+    plt.show()
+    """
+    ################
+
+
     while True:
         ### Read OSL measurement data
         global_thigh_angle = dataOSL["ThighSagi"][ptr] * 180 / np.pi # deg # NO negative sign
-        #ankle_angle = dataOSL['AnkleAngle'][ptr]
-        #knee_angle = dataOSL['KneeAngle'][ptr]
-        #ankleMoment = dataOSL['AnkleTorque'][ptr] / subject_weight
 
         ## Calculate loadCell Fz using the buffer
-        if dataOSL['LoadCellFz'][ptr] > 50:
-            loadCell_Fz_buffer = [loadCell_Fz_buffer[0], loadCell_Fz_buffer[0], loadCell_Fz_buffer[1]]
-        else:
-            loadCell_Fz_buffer = [dataOSL['LoadCellFz'][ptr], loadCell_Fz_buffer[0], loadCell_Fz_buffer[1]]
+        #if dataOSL['LoadCellFz'][ptr] > 50:
+        #    loadCell_Fz_buffer = [loadCell_Fz_buffer[0], loadCell_Fz_buffer[0], loadCell_Fz_buffer[1]]
+        #else:
+        #    loadCell_Fz_buffer = [dataOSL['LoadCellFz'][ptr], loadCell_Fz_buffer[0], loadCell_Fz_buffer[1]]
 
-        dataOSL['LoadCellFz'][ptr] =  np.median(loadCell_Fz_buffer)
+        #dataOSL['LoadCellFz'][ptr] =  np.median(loadCell_Fz_buffer)
         #==========================================================================================================
 
         # time
         t = dataOSL["Time"][ptr]
         dt = t - t_0
+        if dt < 1/700:
+            print("Small dt:", dt)
         if ptr != 0 and dt < 0.0002:
             ptr += 1
             null += 1
@@ -283,95 +289,83 @@ try:
         else:
             global_thigh_angle_vel = (global_thigh_angle - global_thigh_angle_0) / dt
             # low-pass filtering
-            global_thigh_angle_vel_lp, z_lp_1 = lfilter(b_lp, a_lp, [global_thigh_angle_vel], zi = z_lp_1)
+            global_thigh_angle_vel_lp, z_lp_1 = lfilter(b_lp_1, a_lp_1, [global_thigh_angle_vel], zi = z_lp_1)
             global_thigh_angle_vel_lp = global_thigh_angle_vel_lp[0]
-        
         global_thigh_angle_0 = global_thigh_angle
-
-        ## Compute atan2
-        # band-pass filtering
-        global_thigh_angle_bp, z_bp = lfilter(b_bp, a_bp, [global_thigh_angle], zi = z_bp) 
-        global_thigh_angle_bp = global_thigh_angle_bp[0]
+        
+        ## Compute Atan2 ###############################################################################################################
+        global_thigh_angle_lp, z_lp_2 = lfilter(b_lp_2, a_lp_2, [global_thigh_angle], zi = z_lp_2) 
+        global_thigh_angle_lp = global_thigh_angle_lp[0]
         if ptr == 0:
-            global_thigh_angle_vel_blp = 0
+            global_thigh_angle_vel_lp_2 = 0
         else:
-            global_thigh_angle_vel_bp = (global_thigh_angle_bp - global_thigh_angle_bp_0) / dt
-            # low-pass filtering
-            global_thigh_angle_vel_blp, z_lp_2 = lfilter(b_lp, a_lp, [global_thigh_angle_vel_bp], zi = z_lp_2)
-            global_thigh_angle_vel_blp = global_thigh_angle_vel_blp[0]
+            global_thigh_angle_vel_lp_2 = (global_thigh_angle_lp - global_thigh_angle_lp_0) / dt
+        global_thigh_angle_lp_0 = global_thigh_angle_lp
 
-        global_thigh_angle_bp_0 = global_thigh_angle_bp
+        # allocte more space if ptr exceed the bounds
+        if ptr - idx_max_prev >= np.shape(globalThighAngle_lp)[0]:
+            globalThighAngle_lp = np.concatenate((globalThighAngle_lp, np.zeros(np.shape(globalThighAngle_lp)[0])))
+            globalThighVelocity_lp = np.concatenate((globalThighVelocity_lp, np.zeros(np.shape(globalThighAngle_lp)[0])))
 
-        Atan2 = np.arctan2(-global_thigh_angle_vel_blp / (2*np.pi*0.8), global_thigh_angle_bp)
+        globalThighAngle_lp[ptr - idx_max_prev] = global_thigh_angle_lp
+        globalThighVelocity_lp[ptr - idx_max_prev] = global_thigh_angle_vel_lp_2
+       
+        if ptr > 0:
+            globalThighAngle_max = np.max(globalThighAngle_lp[idx_min_prev - idx_max_prev:ptr - idx_max_prev])
+            globalThighAngle_min = np.min(globalThighAngle_lp[idx_max_prev - idx_max_prev:ptr - idx_max_prev])
+            globalThighVelocity_max = np.max(globalThighVelocity_lp[idx_min_prev - idx_max_prev:ptr - idx_max_prev])
+            globalThighVelocity_min = np.min(globalThighVelocity_lp[idx_max_prev - idx_max_prev:ptr - idx_max_prev])
+        
+        # compute the indices
+        if ptr > idx_max + 1:
+            idx_min_temp = np.argmin(globalThighAngle_lp[idx_max - idx_max_prev:ptr - idx_max_prev]) + idx_max
+            if ptr > idx_min_temp + 1 and globalThighAngle_lp[idx_min_temp - idx_max_prev] < -5:
+                idx_min = idx_min_temp
+                idx_max_temp = np.argmax(globalThighAngle_lp[idx_min_temp - idx_max_prev:ptr - idx_max_prev]) + idx_min_temp
+                if ptr > idx_max_temp + 1 and globalThighAngle_lp[idx_max_temp - idx_max_prev] > 5: # new stride
+                    # reform the time windows
+                    globalThighAngle_lp = globalThighAngle_lp[idx_max - idx_max_prev:-1]
+                    globalThighVelocity_lp = globalThighVelocity_lp[idx_max - idx_max_prev:-1]
+
+                    # swap indices
+                    idx_max_prev = idx_max
+                    idx_max = idx_max_temp
+                    idx_min_prev = idx_min
+        
+        # compute the scaled and shifted Atan2
+        if idx_max_prev > 0 and idx_min_prev > 0:
+            globalThighAngle_shift = (globalThighAngle_max + globalThighAngle_min) / 2
+            globalThighAngle_scale = abs(globalThighVelocity_max - globalThighVelocity_min) / abs(globalThighAngle_max - globalThighAngle_min)
+            globalThighVelocity_shift = (globalThighVelocity_max + globalThighVelocity_min) / 2
+
+            phase_y = - (global_thigh_angle_vel_lp_2 - globalThighVelocity_shift)
+            phase_x = globalThighAngle_scale * (global_thigh_angle_lp - globalThighAngle_shift)
+        else:
+            phase_y = - global_thigh_angle_vel_lp_2 / (2*np.pi*0.8)
+            phase_x = global_thigh_angle_lp
+        
+        Atan2 = np.arctan2(phase_y, phase_x)
         if Atan2 < 0:
             Atan2 = Atan2 + 2 * np.pi
         
-        # neglect atan2 when the subejct is not waking
-        global_thigh_angle_hist = np.roll(global_thigh_angle_hist, -1)
-        global_thigh_angle_hist[-1] = global_thigh_angle
-        
-        #if (min(global_thigh_angle_hist) < global_thigh_angle_min_threshold
-        #    and max(global_thigh_angle_hist) > global_thigh_angle_max_threshold):
-        a = 5
-        b = 5
-        radius = (global_thigh_angle_bp / a)**2 + (global_thigh_angle_vel_blp / b)**2
-        if radius >= 1:
-            #walking = True
-            ekf.R = np.copy(R_org)
-        else:
-            #walking = False
-            ekf.R[2, 2] = 1e30
+        c = 75
+        d = 75
+        radius = (phase_x / c) ** 2 + (phase_y / d) ** 2
+        #if radius >= 1:
+        #    ekf.R = np.copy(R_org)
+        #else:
+        #    ekf.R[2, 2] = 1e30
+        #######################################################################################################################################
 
         measurement = np.array([[global_thigh_angle], [global_thigh_angle_vel_lp], [Atan2]])
         measurement = np.squeeze(measurement)
 
         ### EKF implementation
-        ekf.Q = np.diag([0, 5e-3, 5e-3, 0]) * dt
+        ekf.Q = np.diag([0, 5e-3, 5e-3, 0]) * dt 
         ekf.prediction(dt)
         ekf.state_saturation(saturation_range)
         ekf.correction(measurement, Psi, using_atan2) #, steady_state_walking = steady_state
         ekf.state_saturation(saturation_range)
-
-        # Detect steady-state waling =========================================================================
-        """
-        if len(MD_hist) < int(fs * 2.5):
-            MD_hist.append(ekf.MD)
-        else:
-            MD_hist.append(ekf.MD)
-            MD_hist.popleft()
-        MD_movingAverage = np.mean(MD_hist)
-        
-        if MD_movingAverage < MD_threshold:
-            t_s[indx] = t
-            t_ns[indx] = t_ns_previous
-        else:
-            t_ns[indx] = t
-            t_s[indx] = t_s_previous
-        
-        if t_s[indx] - t_ns[indx] > 3:
-            steady_state = True
-        #else:
-        elif t_s[indx] - t_ns[indx] < -1:
-            steady_state = False
-        
-        steady_state = steady_state and walking
-        
-        t_s_previous = t_s[indx]
-        t_ns_previous = t_ns[indx]
-        
-        if steady_state == True and steady_state_previous == False:
-            ekf.Q = np.diag([0, 1e-5, 1e-5, 0])
-            ekf.Sigma = np.diag([1, 1, 1, 0])
-
-        elif steady_state == False and steady_state_previous == True:
-            ekf.Q = np.diag([0, 1e-5, 0, 0]) 
-            ekf.Sigma = np.diag([1, 1, 0, 0])
-            ekf.x[2, 0] = 1.1
-            ekf.x[3, 0] = 0
-        
-        steady_state_previous = steady_state
-        """
-        #=====================================================================================================
 
         ### Control commands: joints angles
         ## 1) Control commands generated by the trainned model
@@ -409,21 +403,27 @@ try:
         simulation_log['phase_dot_est'][indx] = ekf.x[1, 0]
         simulation_log['step_length_est'][indx] = ekf.x[2, 0]
         simulation_log['ramp_est'][indx] = ekf.x[3, 0]
+        simulation_log['Sigma'][indx] = np.diag(ekf.Sigma)
         
-        #simulation_log["steady-state"][indx] = steady_state
-        #simulation_log["R"][indx] = np.diag(sys.R)
-        simulation_log["global_thigh_angle_min"][indx] = min(global_thigh_angle_hist)
-        simulation_log["global_thigh_angle_max"][indx] = max(global_thigh_angle_hist)
-        simulation_log["atan2_radius"][indx] = radius
-        #simulation_log["MD"][indx] = ekf.MD
-        #simulation_log["MD_movingAverage"][indx] = MD_movingAverage
+        simulation_log["idx_min"][indx] = idx_min
+        simulation_log["idx_min_prev"][indx] = idx_min_prev
+        simulation_log["idx_max"][indx] = idx_max
+        simulation_log["idx_max_prev"][indx] = idx_max_prev
+
+        simulation_log["global_thigh_angle_lp"][indx] = global_thigh_angle_lp
+        simulation_log["global_thigh_angle_vel_lp2"][indx] = global_thigh_angle_vel_lp_2
+        if indx > 0:
+            simulation_log["global_thigh_angle_lp_max"][indx] = globalThighAngle_max
+            simulation_log["global_thigh_angle_lp_min"][indx] = globalThighAngle_min
+            simulation_log["global_thigh_angle_vel_max"][indx] = globalThighVelocity_max
+            simulation_log["global_thigh_angle_vel_min"][indx] = globalThighVelocity_min
+        simulation_log["phase_x"][indx] = phase_x
+        simulation_log["phase_y"][indx] = phase_y
+        simulation_log["radius"][indx] = radius
+        simulation_log["R"][indx] = np.diag(ekf.R)
 
         simulation_log["global_thigh_angle_pred"][indx] = ekf.z_hat[0,0]
         simulation_log["global_thigh_angle"][indx] = global_thigh_angle
-        simulation_log["global_thigh_angle_bp"][indx] = global_thigh_angle_bp
-        simulation_log["global_thigh_angle_vel_blp"][indx] = global_thigh_angle_vel_blp
-        #simulation_log["ankleMoment_pred"][indx] = ekf.z_hat[1,0]
-        #simulation_log["ankleMoment"][indx] = ankleMoment
         simulation_log["global_thigh_angle_vel_pred"][indx] = ekf.z_hat[1,0]
         simulation_log["global_thigh_angle_vel"][indx] = global_thigh_angle_vel_lp
         simulation_log["Atan2_pred"][indx] = ekf.z_hat[2,0]
@@ -490,6 +490,17 @@ finally:
     plt.ylabel("Ramp (deg)")
     plt.xlim((t_lower, t_upper))
 
+    plt.figure("R")
+    plt.semilogy(dataOSL["Time"], simulation_log["R"][:, 0])
+    plt.semilogy(dataOSL["Time"], simulation_log["R"][:, 1])
+    plt.semilogy(dataOSL["Time"], simulation_log["R"][:, 2])
+
+    #plt.figure("Sigma")
+    #plt.plot(dataOSL["Time"], simulation_log["Sigma"][:, 0])
+    #plt.plot(dataOSL["Time"], simulation_log["Sigma"][:, 1])
+    #plt.plot(dataOSL["Time"], simulation_log["Sigma"][:, 2])
+    #plt.plot(dataOSL["Time"], simulation_log["Sigma"][:, 3])
+
     plt.figure("Measurements")
     plt.subplot(311)
     plt.title("Measurements")
@@ -499,15 +510,7 @@ finally:
     plt.legend(('actual', 'EKF predicted'))
     plt.ylabel("Global Thigh Angle (deg)")
     plt.xlim((t_lower, t_upper))
-    #plt.subplot(412)
-    #plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle_min"], 'g-')
-    #plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle_max"], 'm-')
-    #plt.plot(dataOSL["Time"], global_thigh_angle_min_threshold * np.ones((len(dataOSL["Time"]), 1)), 'g--')
-    #plt.plot(dataOSL["Time"], global_thigh_angle_max_threshold * np.ones((len(dataOSL["Time"]), 1)), 'm--')
-    #plt.legend(('Min. thigh angle in the moving window', 'Max. thigh angle in the moving window', 
-    #            'Threshold for Min. thigh angle', 'Threshold for Max. thigh angle'))
-    #plt.ylabel("Global Thigh Angle Range (deg)")
-    #plt.xlim((t_lower, t_upper))
+
     plt.subplot(312)
     plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle_vel"], 'k-')
     plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle_vel_pred"], 'r-')
@@ -524,33 +527,45 @@ finally:
 
     plt.figure("Atan2")
     plt.subplot(311)
-    plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle"], 'k-')
-    plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle_bp"])
-    plt.ylabel("Band-passed $\\theta_{th}$ (deg)")
-    plt.legend(('actual', 'band-passed'))
+    plt.plot(simulation_log["global_thigh_angle_lp"])
+    plt.plot(simulation_log["global_thigh_angle_lp_max"], 'r-')
+    plt.plot(simulation_log["global_thigh_angle_lp_min"], 'b-')
+    plt.plot(simulation_log["global_thigh_angle"], 'm-', alpha = 0.5)
+    plt.plot(simulation_log["idx_min"], np.zeros(np.shape(simulation_log["idx_min"])[0]), 'bx', label = 'min')
+    plt.plot(simulation_log["idx_min_prev"], np.zeros(np.shape(simulation_log["idx_min_prev"])[0]),'g.', label = 'min_prev', alpha = 0.5)
+    plt.plot(simulation_log["idx_max"], np.zeros(np.shape(simulation_log["idx_max"])[0]),'rx', label = 'max')
+    plt.plot(simulation_log["idx_max_prev"], np.zeros(np.shape(simulation_log["idx_max_prev"])[0]), 'm.', label = 'max_prev', alpha = 0.5)
+    plt.ylabel("low-passed $\\theta_{th}$ (deg)")
     plt.grid()
     plt.subplot(312)
-    plt.plot(dataOSL["Time"], -simulation_log["global_thigh_angle_vel_blp"])
-    plt.ylabel("Band-passed & Scaled $\dot{\\theta_{th}}$ (deg/s)")
+    plt.plot(simulation_log["global_thigh_angle_vel_lp2"])
+    plt.plot(simulation_log["global_thigh_angle_vel"], 'm-', alpha = 0.5)
+    plt.plot(simulation_log["global_thigh_angle_vel_max"], 'r-')
+    plt.plot(simulation_log["global_thigh_angle_vel_min"], 'b-')
+    plt.ylabel("low-passed $\dot{\\theta_{th}}$ (deg/s)")
     plt.grid()
     plt.subplot(313)
-    plt.plot(dataOSL["Time"], simulation_log["Atan2"], 'k-')
+    plt.plot(simulation_log["Atan2"] / 2/np.pi, 'b-', label = 'Atan2/2pi')
+    plt.plot(simulation_log['phase_est'], 'r-', label = 'phase_est')
+    plt.plot(dataOSL['PV'] / 998, 'k-', alpha = 0.5, label = 'PV')
     plt.ylabel("Atan2")
     plt.xlabel("Time (s)")
-    plt.xlim((t_lower, t_upper))
     plt.grid()
 
     plt.figure("Atan2 Phase Portrait")
     t = np.linspace(0, 2*np.pi, 100)
-    plt.plot( a*np.cos(t) , b*np.sin(t), 'r--')
-    plt.plot(simulation_log["global_thigh_angle_bp"], -simulation_log["global_thigh_angle_vel_blp"])
-    plt.xlabel("Band-passed Global Thigh Angle (deg)")
-    plt.ylabel("Band-passed & Scaled Global Thigh Angle Vel (deg/s)")
+    plt.plot( c*np.cos(t) , d*np.sin(t), 'r--')
+    plt.plot(simulation_log["phase_x"], simulation_log["phase_y"])
+    plt.xlabel("phase_x")
+    plt.ylabel("phase_y")
     plt.grid()
 
     plt.figure()
-    plt.plot(dataOSL["Time"], simulation_log["atan2_radius"])
-    plt.axhline(y = 1, color='r', linestyle='-')
+    plt.plot(simulation_log["idx_min"], 'b-', label = 'min')
+    plt.plot(simulation_log["idx_min_prev"], 'g--', label = 'min_prev', alpha = 0.5)
+    plt.plot(simulation_log["idx_max"], 'r-', label = 'max')
+    plt.plot(simulation_log["idx_max_prev"], 'm--', label = 'max_prev', alpha = 0.5)
+    plt.legend()
     plt.grid()
 
     plt.figure("Joints Angles")

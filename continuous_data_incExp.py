@@ -132,11 +132,109 @@ def load_Conti_measurement_data(subject, trial, side):
     
     return globalThighAngle, globalThighVelocity, atan2, globalFootAngle, ankleMoment, tibiaForce
 
+def Continuous_atan2_scale_shift(subject, trial, side, plot = True):
+    with open('Continuous_data/Continuous_measurement_data.pickle', 'rb') as file:
+        Continuous_measurement_data = pickle.load(file)
+    
+    dt = 1/100
+    start_index, end_index = Conti_start_end(subject, trial, side)
+    globalThighAngle = Continuous_measurement_data[subject][trial][side]['globalThighAngles'][0, start_index:end_index]
+
+    globalThighAngle_lp = butter_lowpass_filter(globalThighAngle, 2, 1/dt, order = 1) # 1st/2nd/3rd order
+    globalThighVelocity_lp = np.insert(np.diff(globalThighAngle_lp) / dt, 0, 0)
+
+    globalThighAngle_max = np.zeros(np.shape(globalThighAngle)[0])
+    globalThighAngle_min = np.zeros(np.shape(globalThighAngle)[0])
+    globalThighVelocity_max = 50 * np.ones(np.shape(globalThighVelocity_lp)[0])
+    globalThighVelocity_min = -50 * np.ones(np.shape(globalThighVelocity_lp)[0])
+    atan2 = np.ones(np.shape(globalThighVelocity_lp)[0])
+    phase_y = np.ones(np.shape(globalThighVelocity_lp)[0])
+    phase_x = np.ones(np.shape(globalThighVelocity_lp)[0])
+    
+    t_min_prev = np.ones(np.shape(globalThighVelocity_lp)[0])
+    t_min = np.ones(np.shape(globalThighVelocity_lp)[0])
+    t_max_prev = np.ones(np.shape(globalThighVelocity_lp)[0])
+    t_max = np.ones(np.shape(globalThighVelocity_lp)[0])
+
+    idx_min_prev = 0
+    idx_min = 0
+    idx_max_prev = 0
+    idx_max = 0
+
+    for i in range(np.shape(globalThighAngle)[0]):
+        if i > 0:
+            globalThighAngle_max[i] = np.max(globalThighAngle_lp[idx_min_prev:i])
+            globalThighAngle_min[i] = np.min(globalThighAngle_lp[idx_max_prev:i])
+            globalThighVelocity_max[i] = np.max(globalThighVelocity_lp[idx_min_prev:i])
+            globalThighVelocity_min[i] = np.min(globalThighVelocity_lp[idx_max_prev:i])
+        
+        if i > idx_max + 1:
+            idx_min_temp = np.argmin(globalThighAngle_lp[idx_max:i]) + idx_max
+            if i > idx_min_temp + 1 and globalThighAngle_lp[idx_min_temp] < -5:
+                idx_min = idx_min_temp
+                idx_max_temp = np.argmax(globalThighAngle_lp[idx_min_temp:i]) + idx_min_temp
+                if i > idx_max_temp + 1 and globalThighAngle_lp[idx_max_temp] > 10: # new stride
+                    idx_max_prev = idx_max
+                    idx_max = idx_max_temp
+                    idx_min_prev = idx_min
+        
+        t_min_prev[i] = idx_min_prev
+        t_min[i] = idx_min
+        t_max_prev[i] = idx_max_prev
+        t_max[i] = idx_max
+
+        if idx_max_prev > 0 and idx_min_prev > 0:
+            globalThighAngle_shift = (globalThighAngle_max[i] + globalThighAngle_min[i]) / 2
+            globalThighAngle_scale = abs(globalThighVelocity_max[i] - globalThighVelocity_min[i]) / abs(globalThighAngle_max[i] - globalThighAngle_min[i])
+            globalThighVelocity_shift = (globalThighVelocity_max[i] + globalThighVelocity_min[i]) / 2
+
+            phase_y[i] = - (globalThighVelocity_lp[i] - globalThighVelocity_shift)
+            phase_x[i] = globalThighAngle_scale * (globalThighAngle_lp[i] - globalThighAngle_shift)
+        else:
+            phase_y[i] = - globalThighVelocity_lp[i] / (2*np.pi*0.8)
+            phase_x[i] = globalThighAngle_lp[i] 
+        
+        atan2[i] = np.arctan2(phase_y[i], phase_x[i])
+        if atan2[i] < 0:
+            atan2[i] = atan2[i] + 2 * np.pi
+    
+    if plot == False:
+        return atan2
+
+    else:
+        plt.figure()
+        plt.subplot(311)
+        plt.plot(globalThighAngle_lp, 'k-', linewidth = 2)
+        plt.plot(globalThighAngle_max)
+        plt.plot(globalThighAngle_min)
+        plt.plot(t_min, np.zeros(np.shape(t_min)[0]), 'bx', label = 'min')
+        plt.plot(t_min_prev, np.zeros(np.shape(t_min_prev)[0]), 'g.', label = 'min_prev')
+        plt.plot(t_max, np.zeros(np.shape(t_max)[0]), 'rx', label = 'max')
+        plt.plot(t_max_prev, np.zeros(np.shape(t_max_prev)[0]), 'm.', label = 'max_prev')
+        plt.grid()
+        plt.subplot(312)
+        plt.plot(globalThighVelocity_lp, 'k-', linewidth = 2)
+        plt.plot(globalThighVelocity_max, 'r-')
+        plt.plot(globalThighVelocity_min, 'b-')
+        plt.grid()
+        plt.subplot(313)
+        plt.plot(atan2)
+        plt.grid()
+
+        plt.figure("Atan2 phase plane")
+        plt.plot(phase_x, phase_y, 'k-', linewidth = 2)
+        plt.xlabel('X')
+        plt.ylabel('Y')
+        plt.grid()
+        plt.show()
+
 def plot_Conti_measurement_data(subject, trial, side):
     print("subject: ",  subject, "| trial: ",  trial, " | side: ", side)
 
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
-    globalThighAngle, globalThighVelocity, atan2, globalFootAngle, ankleMoment, tibiaForce = load_Conti_measurement_data(subject, trial, side)
+    globalThighAngle, globalThighVelocity, _, globalFootAngle, ankleMoment, tibiaForce = load_Conti_measurement_data(subject, trial, side)
+    
+    atan2 = Continuous_atan2_scale_shift(subject, trial, side, plot = False) # use the shifted & scalsed version
     
     m_model = model_loader('Measurement_model_012_NSL.pickle')
     Psi = load_Psi('Generic')
@@ -743,10 +841,10 @@ if __name__ == '__main__':
     """
     ##################################################################
     
-    subject = 'AB05'
-    trial = 's0x8i0'
+    subject = 'AB03'
+    trial = 's1x2i0'
     side = 'right'
-    
+    #Continuous_atan2_scale_shift(subject, trial, side, plot = True)
     #footAngles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]['foot'][0,:]
     #plt.figure()
     #plt.plot(-footAngles-90)

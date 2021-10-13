@@ -53,15 +53,20 @@ def Streaming_derivedMeasurements():
     streaming_atan2_tread = dict()
     for subject in get_subject_names():
         print("Subject: ", subject)
-
-        gt_Y = streaming_globalThighAngles_tread[subject]
-        v = np.diff(gt_Y) / dt
+        # compute golabal thigh velocity with a low-pass filter
+        gta_Y = streaming_globalThighAngles_tread[subject]
+        v = np.diff(gta_Y) / dt
         globalThighVelocities_Sagi = butter_lowpass_filter(np.insert(v, 0, 0), 2, 1/dt, order = 1)
-
-        gt_bp = butter_bandpass_filter(gt_Y, 0.5, 2, 1/dt, order = 2)
+        
+        # compute atan2 with a band-pass filter
+        gt_bp = butter_bandpass_filter(gta_Y, 0.5, 2, 1/dt, order = 2)
         v_bp = np.diff(gt_bp) / dt
         gtv_bp = butter_lowpass_filter(np.insert(v_bp, 0, 0), 2, 1/dt, order = 1)
         atan2 = np.arctan2(-gtv_bp/(2*np.pi*0.8), gt_bp) # scaled
+        
+        # compute shifted & scaled atan2 w/ a low-pass filter
+
+
         for i in range(np.shape(atan2)[0]):
             if atan2[i] < 0:
                 atan2[i] = atan2[i] + 2 * np.pi
@@ -163,6 +168,7 @@ def plot_Streaming_data(subject, speed):
 
     (phases, phase_dots, step_lengths, ramps, globalThighAngle, globalThighVelocity, atan2, kneeAngles, ankleAngles) \
                                     = load_Streaming_data(subject, speed)
+    atan2_ss = Streaming_atan2_scale_shift(subject, speed, plot = False)
 
     m_model = model_loader('Measurement_model_012_NSL.pickle')
     Psi = load_Psi('Generic')
@@ -170,9 +176,13 @@ def plot_Streaming_data(subject, speed):
     globalThighAngle_pred = model_prediction(m_model.models[0], Psi['globalThighAngles'], phases, phase_dots, step_lengths, ramps)
     globalThighVelocity_pred = model_prediction(m_model.models[1], Psi['globalThighVelocities'], phases, phase_dots, step_lengths, ramps)
     
+    ### HPF vs. derv + LPF #####
+    globalThighAngle_hp = butter_highpass_filter(globalThighAngle, 2, 100, order = 1) * 2*np.pi * 2 # 1st order
+    ############################
+
     atan2_pred = model_prediction(m_model.models[2], Psi['atan2'], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
     atan2_pred = wrapTo2pi(atan2_pred)
-    residuals_atan2 = atan2 - atan2_pred
+    residuals_atan2 = atan2_ss - atan2_pred
     residuals_atan2 = np.arctan2(np.sin(residuals_atan2), np.cos(residuals_atan2))
     
     print("Cov(globalThighAngle) = ", np.cov(globalThighAngle - globalThighAngle_pred))
@@ -244,10 +254,12 @@ def plot_Streaming_data(subject, speed):
     plt.subplot(413)
     plt.plot(tt, globalThighVelocity[0:total_step],'k-')
     plt.plot(tt, globalThighVelocity_pred[0:total_step], 'b--')
+    plt.plot(tt, globalThighAngle_hp[0:total_step], 'g--')
     plt.ylabel('$\dot{\\theta}_{Y_{2Hz}} ~(deg/s)$')
     plt.grid()
     plt.subplot(414)
-    plt.plot(tt, atan2[0:total_step],'k-')
+    #plt.plot(tt, atan2[0:total_step],'k-')
+    plt.plot(tt, atan2_ss[0:total_step],'k-')
     plt.plot(tt, atan2_pred[0:total_step], 'b--')
     plt.ylabel('$atan2~(rad)$')
     plt.xlabel('time (s)')
@@ -255,6 +267,14 @@ def plot_Streaming_data(subject, speed):
     plt.xlabel('time (s)')
     plt.grid()
 
+    plt.figure()
+    plt.plot(tt, phases[0:total_step] * 2 * np.pi, 'k-', linewidth = 2)
+    #plt.plot(tt, atan2[0:total_step],'b-', label = 'original')
+    plt.plot(tt, atan2_pred[0:total_step], 'g--', label = 'original-predicted')
+    plt.plot(tt, atan2_ss[0:total_step],'m-', label = 'shifted-scaled')
+    plt.ylabel('Atan$')
+    plt.xlabel('time (s)')
+    plt.grid()
 
     plt.figure('Joints')
     plt.subplot(211)
@@ -272,30 +292,12 @@ def plot_Streaming_data(subject, speed):
 
     plt.show()
 
-def atan2_analysis(subject, speed):
+def Streaming_atan2_scale_shift(subject, speed, plot = True):
     with open('Streaming_data_R01/streaming_globalThighAngles_tread.pickle', 'rb') as file:
-    	streaming_globalThighAngles_tread =  pickle.load(file)
-    print("Max = ", max(abs(streaming_globalThighAngles_tread[subject])))
-    dt = 1/100
-    gt_Y = streaming_globalThighAngles_tread[subject]
-    v = np.diff(gt_Y) / dt
-    globalThighVelocities_Sagi = butter_lowpass_filter(np.insert(v, 0, 0), 2, 1/dt, order = 1)
-
-    gt_Y = streaming_globalThighAngles_tread[subject]
-    gt_bp = butter_bandpass_filter(gt_Y, 0.4, 2, 1/dt, order = 2)
-    v_bp = np.diff(gt_bp) / dt
-    gtv_bp = butter_lowpass_filter(np.insert(v_bp, 0, 0), 2, 1/dt, order = 1)
-    atan2 = np.arctan2(-gtv_bp/(2*np.pi*0.8), gt_bp) # scaled
-    for i in range(np.shape(atan2)[0]):
-        if atan2[i] < 0:
-            atan2[i] = atan2[i] + 2 * np.pi
-
-    a = 10
-    b = 25
-    radius = (gt_bp / a)**2 + (gtv_bp / b)**2
-
+    	streaming_globalThighAngles_tread = pickle.load(file)
+    
     # Extract a particular section
-    cutPoints = Streaming_data['Streaming'][subject][mode]['i0']['events']['cutPoints'][:]
+    cutPoints = Streaming_data['Streaming'][subject]['Tread']['i0']['events']['cutPoints'][:]
     if speed == 'all':
         start_idx = min(int(cutPoints[0,0]), int(cutPoints[0,1]), int(cutPoints[0,2]))
         end_idx = max(int(cutPoints[1,0]), int(cutPoints[1,1]), int(cutPoints[1,2]))
@@ -315,27 +317,115 @@ def atan2_analysis(subject, speed):
         start_idx = int(cutPoints[0,4])
         end_idx = int(cutPoints[1,6])
 
+    dt = 1/100
+    globalThighAngle = streaming_globalThighAngles_tread[subject][start_idx:end_idx]
+    globalThighAngle_lp = butter_lowpass_filter(globalThighAngle, 2, 1/dt, order = 1) # 1st/2nd/3rd order
 
-    tt = dt * np.arange(len(gt_Y))
-    plt.figure("Atan2")
-    plt.subplot(311)
-    plt.plot(tt[start_idx:end_idx], gt_Y[start_idx:end_idx])
-    plt.plot(tt[start_idx:end_idx], gt_bp[start_idx:end_idx], '--')
-    plt.subplot(312)
-    plt.plot(tt[start_idx:end_idx], globalThighVelocities_Sagi[start_idx:end_idx])
-    plt.plot(tt[start_idx:end_idx], gtv_bp[start_idx:end_idx], '--')
-    plt.subplot(313)
-    plt.plot(tt[start_idx:end_idx], atan2[start_idx:end_idx])
+    #plt.figure()
+    #plt.plot(globalThighAngle, label = 'org')
+    #plt.plot(butter_lowpass_filter(globalThighAngle, 2, 1/dt, order = 1), label = '1st')
+    #plt.plot(globalThighAngle_lp, label = '2nd')
+    #plt.legend()
+    #plt.show()
+    
+    # globalThighVelocity = butter_lowpass_filter(np.insert(np.diff(globalThighAngle) / dt, 0, 0), 2, 1/dt, order = 1)
+    globalThighVelocity_lp = np.insert(np.diff(globalThighAngle_lp) / dt, 0, 0)
+    #plt.figure()
+    #plt.plot(butter_lowpass_filter(np.insert(np.diff(globalThighAngle) / dt, 0, 0), 2, 1/dt, order = 1), label = '1st')
+    #plt.plot(butter_lowpass_filter(np.insert(np.diff(globalThighAngle) / dt, 0, 0), 2, 1/dt, order = 2), label = '2nd')
+    #plt.legend()
+    #plt.show()
 
-    plt.figure("Atan2 phase plane")
-    plt.plot(gt_bp[start_idx:end_idx], gtv_bp[start_idx:end_idx], 'b-')
-    #plt.plot(gt_Y[start_idx:end_idx], globalThighVelocities_Sagi[start_idx:end_idx], 'r-')
-    theta = np.linspace(0, 2*np.pi, 100)
-    plt.plot( a*np.cos(theta ) , b*np.sin(theta), 'r--')
+    globalThighAngle_max = np.zeros(np.shape(globalThighAngle)[0])
+    globalThighAngle_min = np.zeros(np.shape(globalThighAngle)[0])
+    globalThighVelocity_max = 50 * np.ones(np.shape(globalThighVelocity_lp)[0])
+    globalThighVelocity_min = -50 * np.ones(np.shape(globalThighVelocity_lp)[0])
+    atan2 = np.ones(np.shape(globalThighVelocity_lp)[0])
+    phase_y = np.ones(np.shape(globalThighVelocity_lp)[0])
+    phase_x = np.ones(np.shape(globalThighVelocity_lp)[0])
+    
+    t_min_prev = np.ones(np.shape(globalThighVelocity_lp)[0])
+    t_min = np.ones(np.shape(globalThighVelocity_lp)[0])
+    t_max_prev = np.ones(np.shape(globalThighVelocity_lp)[0])
+    t_max = np.ones(np.shape(globalThighVelocity_lp)[0])
 
-    plt.figure("radius")
-    plt.plot(tt[start_idx:end_idx], radius[start_idx:end_idx])
-    plt.show()
+    idx_min_prev = 0
+    idx_min = 0
+    idx_max_prev = 0
+    idx_max = 0
+
+    for i in range(np.shape(globalThighAngle)[0]):
+        if i > 0:
+            globalThighAngle_max[i] = np.max(globalThighAngle_lp[idx_min_prev:i])
+            globalThighAngle_min[i] = np.min(globalThighAngle_lp[idx_max_prev:i])
+            globalThighVelocity_max[i] = np.max(globalThighVelocity_lp[idx_min_prev:i])
+            globalThighVelocity_min[i] = np.min(globalThighVelocity_lp[idx_max_prev:i])
+        
+        if i > idx_max + 1:
+            idx_min_temp = np.argmin(globalThighAngle_lp[idx_max:i]) + idx_max
+            if i > idx_min_temp + 1 and globalThighAngle_lp[idx_min_temp] < -5:
+                idx_min = idx_min_temp
+                idx_max_temp = np.argmax(globalThighAngle_lp[idx_min_temp:i]) + idx_min_temp
+                if i > idx_max_temp + 1 and globalThighAngle_lp[idx_max_temp] > 10: # new stride
+                    idx_max_prev = idx_max
+                    idx_max = idx_max_temp
+                    idx_min_prev = idx_min
+        
+        t_min_prev[i] = idx_min_prev
+        t_min[i] = idx_min
+        t_max_prev[i] = idx_max_prev
+        t_max[i] = idx_max
+
+        if idx_max_prev > 0 and idx_min_prev > 0:
+            globalThighAngle_shift = (globalThighAngle_max[i] + globalThighAngle_min[i]) / 2
+            globalThighAngle_scale = abs(globalThighVelocity_max[i] - globalThighVelocity_min[i]) / abs(globalThighAngle_max[i] - globalThighAngle_min[i])
+            globalThighVelocity_shift = (globalThighVelocity_max[i] + globalThighVelocity_min[i]) / 2
+
+            phase_y[i] = - (globalThighVelocity_lp[i] - globalThighVelocity_shift)
+            phase_x[i] = globalThighAngle_scale * (globalThighAngle_lp[i] - globalThighAngle_shift)
+            #phase_y[i] = - globalThighVelocity_lp[i]
+            #phase_x[i] = globalThighAngle_scale * globalThighAngle_lp[i]
+        else:
+            phase_y[i] = - globalThighVelocity_lp[i] / (2*np.pi*0.8)
+            phase_x[i] = globalThighAngle_lp[i] 
+        
+        atan2[i] = np.arctan2(phase_y[i], phase_x[i])
+        if atan2[i] < 0:
+            atan2[i] = atan2[i] + 2 * np.pi
+    
+    if plot == False:
+        return atan2
+
+    else:
+        plt.figure()
+        plt.subplot(311)
+        plt.plot(globalThighAngle_lp, 'k-', linewidth = 2)
+        plt.plot(globalThighAngle_max)
+        plt.plot(globalThighAngle_min)
+        plt.plot(t_min, np.zeros(np.shape(t_min)[0]), 'bx', label = 'min')
+        plt.plot(t_min_prev, np.zeros(np.shape(t_min_prev)[0]), 'g.', label = 'min_prev')
+        plt.plot(t_max, np.zeros(np.shape(t_max)[0]), 'rx', label = 'max')
+        plt.plot(t_max_prev, np.zeros(np.shape(t_max_prev)[0]), 'm.', label = 'max_prev')
+        plt.grid()
+        plt.subplot(312)
+        plt.plot(globalThighVelocity_lp, 'k-', linewidth = 2)
+        plt.plot(globalThighVelocity_max, 'r-')
+        plt.plot(globalThighVelocity_min, 'b-')
+        #plt.plot(globalThighVelocity_max2, 'r--')
+        #plt.plot(globalThighVelocity_min2, 'b--')
+        plt.grid()
+        plt.subplot(313)
+        plt.plot(atan2)
+        plt.grid()
+
+        plt.figure("Atan2 phase plane")
+        plt.plot(phase_x, phase_y, 'k-', linewidth = 2)
+        theta = np.linspace(0, 2*np.pi, 100)
+        #plt.plot(50 * np.cos(theta) , 50 * np.sin(theta), 'r--')
+        plt.xlabel('X')
+        plt.ylabel('Y')
+        plt.grid()
+        plt.show()
 
 """
 def load_Conti_joints_angles(subject, trial, side):
@@ -412,13 +502,13 @@ if __name__ == '__main__':
     #with open('Streaming_data_R01/streaming_globalThighAngles_tread.pickle', 'rb') as file:
     #	streaming_globalThighAngles_tread =  pickle.load(file)
     
-    subject = 'AB07'
+    subject = 'AB03'
     mode = 'Tread'
-    speed = 'a0x5'
-    atan2_analysis(subject, speed)
+    speed = 's0x8'
+    #atan2_scale_shift(subject, speed)
     plot_Streaming_data(subject, speed)
     
-
+    """
     jointAngles = Streaming_data['Streaming'][subject][mode]['i0']['jointAngles']
     globalThighAngles = jointAngles['LHipAngles'][:][0,:] - jointAngles['LPelvisAngles'][:][0,:]
     
@@ -517,4 +607,4 @@ if __name__ == '__main__':
     #plt.xlim((0, 15500))
     #plt.ylabel('speed command (m/s)')
     #plt.grid()
- 
+    """

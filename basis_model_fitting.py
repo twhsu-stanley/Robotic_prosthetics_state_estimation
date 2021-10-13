@@ -92,7 +92,13 @@ def basis_model_fitting(model, gait_data):
     #plt.ylabel('step_length')
     #plt.show()
 
-    if gait_data != 'atan2':
+    plt.figure()
+    plt.plot(np.arange(150), data.T)
+    plt.xlabel('normalized time (1/150)')
+    plt.ylabel('data')
+    plt.show()
+
+    if gait_data != 'atan2' and gait_data != 'atan2ss':
         (data_virtual, phase_virtual, phase_dot_virtual, step_length_virtual, ramp_virtual) = virtual_training_data(2000, gait_data)
         data = np.vstack((data, data_virtual))
         phase = np.vstack((phase, phase_virtual))
@@ -107,14 +113,14 @@ def basis_model_fitting(model, gait_data):
         print("Shape of ramp: ", np.shape(ramp))
 
     # Fit the model =====================================================================================================
-    if gait_data == 'atan2':
+    if gait_data == 'atan2' or gait_data == 'atan2ss':
         data_atan2 = data.ravel() - 2 * np.pi * phase.ravel()
         # wrap to [-pi, pi]
         for i in range(np.shape(data_atan2)[0]):
             data_atan2[i] = np.arctan2(np.sin(data_atan2[i]), np.cos(data_atan2[i]))
         Psi = least_squares(model, data_atan2,\
                             phase.ravel(), phase_dot.ravel(), step_length.ravel(), ramp.ravel())
-        with open('Psi/Psi_atan2_NSL.pickle', 'wb') as file:
+        with open('Psi/Psi_' + gait_data + '_NSL.pickle', 'wb') as file:
             pickle.dump(Psi, file)
     else:
         Psi = least_squares(model, data.ravel(),\
@@ -155,8 +161,8 @@ def basis_model_residuals(model, gait_data, heteroscedastic = False):
     print("  Range of step length: [%5.3f, %5.3f]" % (np.min(gait_training_dataset['step_length'].ravel()), np.max(gait_training_dataset['step_length'].ravel())))
     print("Shape of ramp: ", np.shape(ramp))
 
-    if gait_data == 'atan2':
-        with open('Psi/Psi_atan2_NSL.pickle', 'rb') as file:
+    if gait_data == 'atan2' or gait_data == 'atan2ss':
+        with open('Psi/Psi_' + gait_data + '_NSL.pickle', 'rb') as file:
             Psi = pickle.load(file)
         
         if heteroscedastic == False:
@@ -164,7 +170,7 @@ def basis_model_residuals(model, gait_data, heteroscedastic = False):
             data_pred = wrapTo2pi(data_pred)
             residuals = data.ravel() - data_pred
             residuals = np.arctan2(np.sin(residuals), np.cos(residuals))
-            with open(('Basis_model/atan2_NSL_residuals.pickle'), 'wb') as file:
+            with open(('Basis_model/' + gait_data + '_NSL_residuals.pickle'), 'wb') as file:
                 pickle.dump(residuals, file)
         
         elif heteroscedastic == True:
@@ -254,7 +260,8 @@ def measurement_noise_covariance(*sensors):
                 r = pickle.load(file)
                 covariance.append(np.cov(r))
         elif sensor == 'atan2':
-            with open(('Basis_model/' + sensor + '_NSL_residuals.pickle'), 'rb') as file:
+            with open(('Basis_model/' + sensor + 'ss_NSL_residuals.pickle'), 'rb') as file:
+            #with open(('Basis_model/' + sensor + '_NSL_residuals.pickle'), 'rb') as file:
                 r = pickle.load(file)
                 covariance.append(np.cov(r))
         elif sensor == 'ankleMoment' or sensor == 'tibiaForce':
@@ -397,12 +404,12 @@ if __name__ == '__main__':
     ramp_model = Berstein_Basis(0, 'ramp')
 
     model_atan2 = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
-    #psi_atan2 = basis_model_fitting(model_atan2, 'atan2')
-    #basis_model_residuals(model_atan2, 'atan2', heteroscedastic = False)
+    psi_atan2 = basis_model_fitting(model_atan2, 'atan2ss')
+    basis_model_residuals(model_atan2, 'atan2ss', heteroscedastic = False)
 
     # sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2, 'globalFootAngles':3, 'ankleMoment':4, 'tibiaForce':5}
-    m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities)#, model_atan2
-    model_saver(m_model, 'Measurement_model_01_NSL.pickle')
+    #m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities)#, model_atan2
+    #model_saver(m_model, 'Measurement_model_01_NSL.pickle')
     #c_model = Measurement_Model(model_kneeAngles, model_ankleAngles)
     #model_saver(c_model, 'Control_model_NSL_B20.pickle')
     

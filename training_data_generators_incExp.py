@@ -193,47 +193,74 @@ def derivedMeasurements_statistics():
             globalThighVelocities_left = np.zeros(np.shape(data_left))
             atan2_left = np.zeros(np.shape(data_left))
             for i in range(np.shape(data_left)[0]):
+                # compute golabal thigh velocity with a low-pass filter
+                """
                 v = np.diff(data_left[i, :]) / dt_left[i, 0]
                 gtv = np.insert(v, 0, 0)
                 gtv_stack = np.array([gtv, gtv, gtv, gtv, gtv]).reshape(-1)
                 gtv_lp_stack = butter_lowpass_filter(gtv_stack, 2, 1/dt_left[i, 0], order = 1)
                 globalThighVelocities_left[i, :] = gtv_lp_stack[2 * len(data_left[i, :]): 3 * len(data_left[i, :])]
+                """
 
                 # compute atan2 w/ a band-pass filter
-                gt_stack = np.array([data_left[i, :], data_left[i, :], data_left[i, :],\
+                gta_stack = np.array([data_left[i, :], data_left[i, :], data_left[i, :],\
                                    data_left[i, :], data_left[i, :]]).reshape(-1)
-                gt_bp_stack = butter_bandpass_filter(gt_stack, 0.5, 2, 1/dt_left[i, 0], order = 2)
-                gt_bp = gt_bp_stack[2 * len(data_left[i, :]): 3 * len(data_left[i, :])]
+                """
+                gta_bp_stack = butter_bandpass_filter(gta_stack, 0.5, 2, 1/dt_left[i, 0], order = 2)
+                gta_bp = gta_bp_stack[2 * len(data_left[i, :]): 3 * len(data_left[i, :])]
 
-                v_bp = np.diff(gt_bp) / dt_left[i, 0]
+                v_bp = np.diff(gta_bp) / dt_left[i, 0]
                 gtv_bp = np.insert(v_bp, 0, 0)
                 gtv_bp_stack = np.array([gtv_bp, gtv_bp, gtv_bp, gtv_bp, gtv_bp]).reshape(-1)
                 gtv_blp_stack = butter_lowpass_filter(gtv_bp_stack, 2, 1/dt_left[i, 0], order = 1)
                 gtv_blp = gtv_blp_stack[2 * len(data_left[i, :]): 3 * len(data_left[i, :])]
                 
-                atan2_left[i, :] = np.arctan2(-gtv_blp/(2*np.pi*0.8), gt_bp)  # arctan2 and scaling
+                atan2_left[i, :] = np.arctan2(-gtv_blp/(2*np.pi*0.8), gta_bp)  # arctan2 and scaling
+                """
+                # compute shifted & scaled atan2 w/ a low-pass filter
+                gta_lp_stack = butter_lowpass_filter(gta_stack, 2, 1 / dt_left[i, 0], order = 1) # 1st, 2nd or 3rd order? 
+                gta_lp = gta_lp_stack[2 * len(data_left[i, :]): 3 * len(data_left[i, :])]
+                gtv_lp = np.insert(np.diff(gta_lp) / dt_left[i, 0], 0, 0)
+                gta_max = max(gta_lp)
+                gta_min = min(gta_lp)
+                gtv_max = max(gtv_lp)
+                gtv_min = min(gtv_lp)
+
+                gta_shift = (gta_max + gta_min) / 2
+                gta_scale = abs(gtv_max - gtv_min) / abs(gta_max - gta_min)
+                gtv_shift = (gtv_max + gtv_min) / 2
+
+                phase_y = - (gtv_lp - gtv_shift)
+                phase_x = gta_scale * (gta_lp - gta_shift)
+                    
+                atan2_left[i, :] = np.arctan2(phase_y, phase_x)
+
                 for j in range(np.shape(atan2_left[i, :])[0]):
                     if atan2_left[i, j] < 0:
                         atan2_left[i, j] = atan2_left[i, j] + 2 * np.pi
                 
-                globalThighVelocities[trial][subject]['left'] = globalThighVelocities_left
+                #globalThighVelocities[trial][subject]['left'] = globalThighVelocities_left
                 atan2[trial][subject]['left'] = atan2_left
 
             # right
             globalThighVelocities_right = np.zeros(np.shape(data_right))
             atan2_right = np.zeros(np.shape(data_right))
             for i in range(np.shape(data_right)[0]):
+                # compute golabal thigh velocity with a low-pass filter
+                """
                 v = np.diff(data_right[i, :]) / dt_right[i, 0]
                 gtv = np.insert(v, 0, 0)
                 gtv_stack = np.array([gtv, gtv, gtv, gtv, gtv]).reshape(-1)
                 gtv_lp_stack = butter_lowpass_filter(gtv_stack, 2, 1/dt_right[i, 0], order = 1)
                 globalThighVelocities_right[i, :] = gtv_lp_stack[2 * len(data_right[i, :]): 3 * len(data_right[i, :])]
+                """
 
-                # compute atan2 w/ a band-pass filter
-                gt_stack = np.array([data_right[i, :], data_right[i, :], data_right[i, :],\
+                # compute atan2 with a band-pass filter
+                gta_stack = np.array([data_right[i, :], data_right[i, :], data_right[i, :],\
                                    data_right[i, :], data_right[i, :]]).reshape(-1)
-                gt_bp_stack = butter_bandpass_filter(gt_stack, 0.5, 2, 1/dt_right[i, 0], order = 2)
-                gt_bp = gt_bp_stack[2 * len(data_right[i, :]): 3 * len(data_right[i, :])]
+                """
+                gta_bp_stack = butter_bandpass_filter(gta_stack, 0.5, 2, 1/dt_right[i, 0], order = 2)
+                gta_bp = gta_bp_stack[2 * len(data_right[i, :]): 3 * len(data_right[i, :])]
 
                 v_bp = np.diff(gt_bp) / dt_right[i, 0]
                 gtv_bp = np.insert(v_bp, 0, 0)
@@ -242,28 +269,47 @@ def derivedMeasurements_statistics():
                 gtv_blp = gtv_blp_stack[2 * len(data_right[i, :]): 3 * len(data_right[i, :])]
                 
                 atan2_right[i, :] = np.arctan2(-gtv_blp/(2*np.pi*0.8), gt_bp)  # arctan2 and scaling
+                """
+
+                # compute shifted & scaled atan2 w/ a low-pass filter
+                gta_lp_stack = butter_lowpass_filter(gta_stack, 2, 1 / dt_right[i, 0], order = 1) # 1st, 2nd or 3rd order? 
+                gta_lp = gta_lp_stack[2 * len(data_right[i, :]): 3 * len(data_right[i, :])]
+                gtv_lp = np.insert(np.diff(gta_lp) / dt_right[i, 0], 0, 0)
+                gta_max = max(gta_lp)
+                gta_min = min(gta_lp)
+                gtv_max = max(gtv_lp)
+                gtv_min = min(gtv_lp)
+
+                gta_shift = (gta_max + gta_min) / 2
+                gta_scale = abs(gtv_max - gtv_min) / abs(gta_max - gta_min)
+                gtv_shift = (gtv_max + gtv_min) / 2
+
+                phase_y = - (gtv_lp - gtv_shift)
+                phase_x = gta_scale * (gta_lp - gta_shift)
+                    
+                atan2_right[i, :] = np.arctan2(phase_y, phase_x)
                 for j in range(np.shape(atan2_right[i, :])[0]):
                     if atan2_right[i, j] < 0:
                         atan2_right[i, j] = atan2_right[i, j] + 2 * np.pi
                 
-                globalThighVelocities[trial][subject]['right'] = globalThighVelocities_right
+                #globalThighVelocities[trial][subject]['right'] = globalThighVelocities_right
                 atan2[trial][subject]['right'] = atan2_right
 
             if subject == 'AB01':
-                data_1 = globalThighVelocities_left
-                data_1 = np.vstack((data_1, globalThighVelocities_right))
+                #data_1 = globalThighVelocities_left
+                #data_1 = np.vstack((data_1, globalThighVelocities_right))
 
                 data_2 = atan2_left
                 data_2 = np.vstack((data_2, atan2_right))
             else:
-                data_1 = np.vstack((data_1, globalThighVelocities_left))
-                data_1 = np.vstack((data_1, globalThighVelocities_right))
+                #data_1 = np.vstack((data_1, globalThighVelocities_left))
+                #data_1 = np.vstack((data_1, globalThighVelocities_right))
 
                 data_2 = np.vstack((data_2, atan2_left))
                 data_2 = np.vstack((data_2, atan2_right))
 
-        globalThighVelocities_mean_std[trial]['mean'] = np.mean(data_1, axis = 0)
-        globalThighVelocities_mean_std[trial]['std'] = np.std(data_1, axis = 0)
+        #globalThighVelocities_mean_std[trial]['mean'] = np.mean(data_1, axis = 0)
+        #globalThighVelocities_mean_std[trial]['std'] = np.std(data_1, axis = 0)
         atan2_mean_std[trial]['mean'] = np.mean(data_2, axis = 0)
         atan2_mean_std[trial]['std'] = np.std(data_2, axis = 0)
 
@@ -280,16 +326,16 @@ def derivedMeasurements_statistics():
         #plt.plot(range(150), atan2_mean_std[trial]['mean'] - 3 * atan2_mean_std[trial]['std'])
         #plt.show()
     
-    with open('Gait_data_statistics/globalThighVelocities_mean_std.pickle', 'wb') as file:
-    	pickle.dump(globalThighVelocities_mean_std, file)
+    #with open('Gait_data_statistics/globalThighVelocities_mean_std.pickle', 'wb') as file:
+    #	pickle.dump(globalThighVelocities_mean_std, file)
     
-    with open('Gait_data_statistics/atan2_mean_std.pickle', 'wb') as file:
+    with open('Gait_data_statistics/atan2ss_mean_std.pickle', 'wb') as file:
     	pickle.dump(atan2_mean_std, file)
 
-    with open('Gait_training_data/globalThighVelocities_original.pickle', 'wb') as file:
-    	pickle.dump(globalThighVelocities, file)
+    #with open('Gait_training_data/globalThighVelocities_original.pickle', 'wb') as file:
+    #	pickle.dump(globalThighVelocities, file)
     
-    with open('Gait_training_data/atan2_original.pickle', 'wb') as file:
+    with open('Gait_training_data/atan2ss_original.pickle', 'wb') as file:
     	pickle.dump(atan2, file)
 
 def ankleMoment_statistics():
@@ -413,14 +459,14 @@ def gait_training_data_generator(mode):
     Drived measurements should use the delete list of the origial data
     """
 
-    if mode == 'globalThighAngles' or mode == 'globalThighVelocities' or mode == 'atan2':
+    if mode == 'globalThighAngles' or mode == 'globalThighVelocities' or mode == 'atan2' or mode == 'atan2ss':
         with open(('Gait_data_statistics/globalThighAngles_mean_std.pickle'), 'rb') as file:
             data_stats = pickle.load(file)
     else:
         with open(('Gait_data_statistics/' + mode + '_mean_std.pickle'), 'rb') as file:
             data_stats = pickle.load(file)
     
-    if mode == 'globalThighAngles' or mode == 'globalThighVelocities' or mode == 'atan2':
+    if mode == 'globalThighAngles' or mode == 'globalThighVelocities' or mode == 'atan2' or mode == 'atan2ss':
         with open('Gait_training_data/globalThighAngles_original.pickle', 'rb') as file:
             globalThighAngles = pickle.load(file)
     
@@ -429,6 +475,9 @@ def gait_training_data_generator(mode):
             globalThighVelocities = pickle.load(file)
     elif mode == 'atan2':
         with open('Gait_training_data/atan2_original.pickle', 'rb') as file:
+            atan2 = pickle.load(file)
+    elif mode == 'atan2ss':
+        with open('Gait_training_data/atan2ss_original.pickle', 'rb') as file:
             atan2 = pickle.load(file)
 
     subject_names = get_subject_names()
@@ -455,7 +504,7 @@ def gait_training_data_generator(mode):
             elif mode == 'footAngles':
                 data_left = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['left']['foot']['x'][:]-90
                 data_right = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['right']['foot']['x'][:]-90
-            elif mode == 'globalThighAngles' or mode == 'globalThighVelocities' or mode == 'atan2':
+            elif mode == 'globalThighAngles' or mode == 'globalThighVelocities' or mode == 'atan2' or mode == 'atan2ss':
                 data_left = globalThighAngles[trial][subject]['left']
                 data_right = globalThighAngles[trial][subject]['right']
             elif mode == 'ankleMoment':
@@ -469,7 +518,7 @@ def gait_training_data_generator(mode):
                 derived_data_left = globalThighVelocities[trial][subject]['left']
                 derived_data_right = globalThighVelocities[trial][subject]['right']
 
-            elif mode == 'atan2':
+            elif mode == 'atan2' or mode == 'atan2ss':
                 derived_data_left = atan2[trial][subject]['left']
                 derived_data_right = atan2[trial][subject]['right']
             
@@ -545,7 +594,7 @@ def gait_training_data_generator(mode):
                 if outlier == True:
                     remove_left.append(i)
             
-            if mode == 'globalThighVelocities' or mode == 'atan2':
+            if mode == 'globalThighVelocities' or mode == 'atan2' or mode == 'atan2ss':
                 derived_data_left = np.delete(derived_data_left, remove_left, 0)
             data_left = np.delete(data_left, remove_left, 0) # remove rows
             phase_dot_left = np.delete(phase_dot_left, remove_left, 0)
@@ -562,7 +611,7 @@ def gait_training_data_generator(mode):
                 if outlier == True:
                     remove_right.append(i)
             
-            if mode == 'globalThighVelocities' or mode == 'atan2':
+            if mode == 'globalThighVelocities' or mode == 'atan2' or mode == 'atan2ss':
                 derived_data_right = np.delete(derived_data_right, remove_right, 0)
             data_right = np.delete(data_right, remove_right, 0) # remove rows
             phase_dot_right = np.delete(phase_dot_right, remove_right, 0)
@@ -587,7 +636,7 @@ def gait_training_data_generator(mode):
                 if has_nan == True:
                     remove_left.append(i)
             
-            if mode == 'globalThighVelocities' or mode == 'atan2':
+            if mode == 'globalThighVelocities' or mode == 'atan2' or mode == 'atan2ss':
                 derived_data_left = np.delete(derived_data_left, remove_left, 0)
             data_left = np.delete(data_left, remove_left, 0) # remove rows
             phase_dot_left = np.delete(phase_dot_left, remove_left, 0)
@@ -604,7 +653,7 @@ def gait_training_data_generator(mode):
                 if has_nan == True:
                     remove_right.append(i)
             
-            if mode == 'globalThighVelocities' or mode == 'atan2':
+            if mode == 'globalThighVelocities' or mode == 'atan2' or mode == 'atan2ss':
                 derived_data_right = np.delete(derived_data_right, remove_right, 0)
             data_right = np.delete(data_right, remove_right, 0) # remove rows
             phase_dot_right = np.delete(phase_dot_right, remove_right, 0)
@@ -615,7 +664,7 @@ def gait_training_data_generator(mode):
 
             # Step 3: Store to training data
             if num_trials == 0:
-                if mode == 'globalThighVelocities' or mode == 'atan2':
+                if mode == 'globalThighVelocities' or mode == 'atan2' or mode == 'atan2ss':
                     data = derived_data_left
                     data = np.vstack((data, derived_data_right))
                 else:
@@ -632,7 +681,7 @@ def gait_training_data_generator(mode):
                 ramp = np.vstack((ramp, ramp_right))
 
             else:
-                if mode == 'globalThighVelocities' or mode == 'atan2':
+                if mode == 'globalThighVelocities' or mode == 'atan2' or mode == 'atan2ss':
                     data = np.vstack((data, derived_data_left))
                     data = np.vstack((data, derived_data_right))
                 else:
@@ -666,8 +715,8 @@ def gait_training_data_generator(mode):
     print("Total # of used trials: ", num_trials)
     print("Total # of trials with errors: ", error_trials)
 
-    with open(('Gait_training_data/' + mode + '_NSL_training_dataset.pickle'), 'wb') as file:
-    	pickle.dump(gait_training_dataset, file)
+    #with open(('Gait_training_data/' + mode + '_NSL_training_dataset.pickle'), 'wb') as file:
+    #	pickle.dump(gait_training_dataset, file)
     
 def globalFootAngle_offset():
     subject_names = get_subject_names()
@@ -701,7 +750,7 @@ def globalFootAngle_offset():
 
 if __name__ == '__main__':
     #tibiaForce_statistics()
-    #derivedMeasurements_statistics()
+    derivedMeasurements_statistics()
     
     #jointAngles_statistics('knee')
     #jointAngles_statistics('ankle')
@@ -710,12 +759,12 @@ if __name__ == '__main__':
 
     #time.sleep(3)
 
-    gait_training_data_generator('kneeAngles')
-    gait_training_data_generator('ankleAngles')
+    #gait_training_data_generator('kneeAngles')
+    #gait_training_data_generator('ankleAngles')
     #gait_training_data_generator('footAngles')
     #gait_training_data_generator('globalThighAngles')
     #gait_training_data_generator('globalThighVelocities')
-    #gait_training_data_generator('atan2')
+    gait_training_data_generator('atan2ss')
 
     #ankleMoment_statistics()
     #gait_training_data_generator('ankleMoment')
