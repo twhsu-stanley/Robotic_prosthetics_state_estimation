@@ -100,7 +100,7 @@ try:
                'global_thigh_angle_max': 0.0, 'global_thigh_angle_min': 0.0,
                'global_thigh_vel_max': 0.0, 'global_thigh_vel_min': 0.0,
                'phase_x': 0.0, 'phase_y': 0.0, 'radius': 0.0, 'atan2': 0.0}
-    logger = loco.ini_log({**dataOSL, **cmd_log, **ekf_log}, sensors = "all_sensors", trialName = "OSL_benchtop_Swing_test")
+    logger = loco.ini_log({**dataOSL, **cmd_log, **ekf_log}, sensors = "all_sensors", trialName = "OSL_benchtop_swing_test")
 
     ## Initialize buffers for joints angles =============================================================================
     knee_angle_buffer = []   # in rad
@@ -426,13 +426,13 @@ try:
                          #ekf.x[2, 0], 'step_length', 'm',
                          #ekf.x[3, 0], 'ramp_angle', 'deg'
                          global_thigh_angle, ekf.z_hat[0], 'Global Thigh Angle', 'deg',
-                         #global_thigh_vel_lp, ekf.z_hat[1], 'Global Thigh Angle Vel', 'deg/s',
+                         global_thigh_vel_lp, ekf.z_hat[1], 'Global Thigh Angle Vel', 'deg/s',
                          Atan2, ekf.z_hat[2], 'Atan2', '--',
-                         radius, radius, 'phase plane radius', '--',
+                         #radius, radius, 'phase plane radius', '--',
                          #knee_angle, knee_angle_cmd, 'Knee Angle', 'deg',
                          #ankle_angle, ankle_angle_cmd, 'Ankle Angle', 'deg'
                          )
-        print("knee angle cmd: ", knee_angle_cmd, "; ankle angle cmd: ", ankle_angle_cmd, "; walking (T/F): ", walking)
+        print("knee angle cmd: ", knee_angle_cmd, "; ankle angle cmd: ", ankle_angle_cmd)
         #==========================================================================================================
         
         ptr += 1
@@ -445,7 +445,7 @@ finally:
     fxs.send_motor_command(ankID, fxe.FX_NONE, 0)
     fxs.send_motor_command(kneID, fxe.FX_NONE, 0)
     IMU.setToIdle()
-    time.sleep(0.5)    
+    time.sleep(1)    
     fxs.close(ankID)
     fxs.close(kneID)  
     print('Communication with ActPacks closed and IMU set to idle')

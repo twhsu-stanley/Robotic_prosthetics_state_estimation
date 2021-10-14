@@ -153,7 +153,7 @@ try:
     U = np.diag([1, 1, 1])
     R = U @ measurement_noise_covariance(*sensors) @ U.T
     R_org = np.copy(R)
-    sys.R = R
+    sys.R = np.copy(R)
 
     # initialize the state
     init = myStruct()
@@ -506,7 +506,6 @@ finally:
     plt.title("Measurements")
     plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle"], 'k-')
     plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle_pred"], 'r-')
-    #plt.plot(dataOSL["Time"], simulation_log["global_thigh_angle_bp"], 'm--')
     plt.legend(('actual', 'EKF predicted'))
     plt.ylabel("Global Thigh Angle (deg)")
     plt.xlim((t_lower, t_upper))
