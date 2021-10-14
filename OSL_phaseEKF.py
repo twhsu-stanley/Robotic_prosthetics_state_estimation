@@ -84,9 +84,6 @@ try:
     refTrajectory  = loco.loadTrajectory(trajectory = 'walking')
     refAnk = refTrajectory["ankl"]
     refKne = refTrajectory["knee"]
-    #refHip = refTrajectory["hip_"]
-    #maxHip = np.amax(refHip)
-    #minHip = np.amin(refHip)
 
     # Create encoder map
     kneSta  = fxs.read_device(kneID)
@@ -166,7 +163,7 @@ try:
     U = np.diag([1, 1, 1])
     R = U @ measurement_noise_covariance(*sensors) @ U.T
     R_org = np.copy(R)
-    sys.R = R
+    sys.R = np.copy(R)
 
     # initialize the state
     init = myStruct()
@@ -327,6 +324,7 @@ try:
         #==========================================================================================================
 
         ## EKF implementation  ====================================================================================
+        ekf.Q = np.diag([0, 5e-3, 5e-3, 0]) * dt 
         ekf.prediction(dt)
         ekf.state_saturation(saturation_range)
         ekf.correction(measurement, Psi, using_atan2)

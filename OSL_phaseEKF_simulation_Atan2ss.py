@@ -16,7 +16,7 @@ import sender_test as sender   # for real-time plotting
 
 ### A. Load Ross's pre-recorded walking data / EKF Tests 
 #"""
-logFile = r"OSL_walking_data/210617_121732_PV_Siavash_walk_300_1600.csv"
+logFile = r"OSL_walking_data/210714_113523_OSL_benchtop_test.csv"
 # 1) 210617_113644_PV_Siavash_walk_oscillations in phase
 # 2) 210617_121732_PV_Siavash_walk_300_1600
 # 3) 210617_122334_PV_Siavash_walk_500_2500
@@ -28,7 +28,7 @@ datatxt = np.genfromtxt(logFile , delimiter=',', names = True)
 dataOSL = {
     "Time": datatxt["Time"],
     "ThighSagi": datatxt["ThighSagi"],
-    "PV": datatxt['PV'],
+    #"PV": datatxt['PV'],
     'AnkleAngle': datatxt["ankJoiPos"],
     'AnkleAngleRef': datatxt["refAnk"],
     'KneeAngle': datatxt["kneJoiPos"],
@@ -348,8 +348,8 @@ try:
         if Atan2 < 0:
             Atan2 = Atan2 + 2 * np.pi
         
-        c = 20
-        d = 20
+        c = 40
+        d = 40
         radius = (phase_x / c) ** 2 + (phase_y / d) ** 2
         if radius >= 1:
             ekf.R = np.copy(R_org)
@@ -471,7 +471,7 @@ finally:
     plt.subplot(411)
     plt.title("EKF Gait State Estimate")
     plt.plot(dataOSL["Time"], simulation_log['phase_est'], 'r-')
-    plt.plot(dataOSL["Time"], dataOSL['PV'] / 998, 'k-', alpha = 0.5)
+    #plt.plot(dataOSL["Time"], dataOSL['PV'] / 998, 'k-', alpha = 0.5)
     plt.ylabel("Phase")
     plt.xlim((t_lower, t_upper))
     plt.legend(('EKF phase', 'phase variable'))
@@ -546,7 +546,7 @@ finally:
     plt.subplot(313)
     plt.plot(simulation_log["Atan2"] / 2/np.pi, 'b-', label = 'Atan2/2pi')
     plt.plot(simulation_log['phase_est'], 'r-', label = 'phase_est')
-    plt.plot(dataOSL['PV'] / 998, 'k-', alpha = 0.5, label = 'PV')
+    #plt.plot(dataOSL['PV'] / 998, 'k-', alpha = 0.5, label = 'PV')
     plt.ylabel("Atan2")
     plt.xlabel("Time (s)")
     plt.grid()

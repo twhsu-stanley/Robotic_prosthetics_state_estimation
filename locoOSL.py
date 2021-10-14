@@ -1063,13 +1063,13 @@ if __name__ == "__main__":
     IMU.resume()
     fxs.start_streaming(kneID, freq = 500, log_en = True)
     fxs.start_streaming(ankID, freq = 500, log_en = True)
-    time.sleep(1)                            # Healthy pause before using OSL
+    time.sleep(1)                             # Healthy pause before using OSL
 
     # ----------------------------- MAIN LOOP --------------------------------------------
     try:
         if ( len(sys.argv) > 1 and sys.argv[1] == "home" ):
-            home_joint(fxs, kneID, IMU, "knee" , jointVolt = 2000, motTorThr = 1.7)  # flex2ext 0.45
-            home_joint(fxs, ankID, IMU, "ankle", jointVolt = -1500, motTorThr = 0.6) # plan2dor 0.40
+            home_joint(fxs, kneID, IMU, "knee" , jointVolt = 2000, motTorThr = 0.5)  # flex2ext 0.45
+            home_joint(fxs, ankID, IMU, "ankle", jointVolt = -1500, motTorThr = 0.45) # plan2dor 0.40
         elif(  len(sys.argv) > 1 and sys.argv[1] == "move" ):
             test_motion(fxs, ankID, kneID, IMU)
         else:

@@ -321,8 +321,8 @@ try:
         if Atan2 < 0:
             Atan2 = Atan2 + 2 * np.pi
         
-        c = 30
-        d = 30
+        c = 45
+        d = 45
         radius = (phase_x / c) ** 2 + (phase_y / d) ** 2
         if radius >= 1:
             ekf.R = np.copy(R_org)
