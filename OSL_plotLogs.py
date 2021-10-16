@@ -4,7 +4,11 @@ from EKF import joints_control
 from model_framework import *
 import csv
 
-logFile = r"OSL_walking_data/210730_140347_OSL_parallelBar_test.csv"
+logFile = r"OSL_walking_data/211014_130906_OSL_benchtop_swing_test.csv"
+# 211014_130906_OSL_benchtop_swing_test
+# 211014_130313_OSL_benchtop_swing_test
+# 211014_124556_OSL_benchtop_swing_test
+
 datatxt = np.genfromtxt(logFile , delimiter=',', names = True)
 
 fs = 1 / np.average(np.diff(datatxt["Time"]))
@@ -38,7 +42,7 @@ ekfEstimates = {
     "global_thigh_vel_lp": datatxt["global_thigh_vel_lp"],
 
     "global_thigh_angle_lp": datatxt["global_thigh_angle_lp"],
-    "global_thigh_vel_lp2": datatxt["global_thigh_vel_lp2"],
+    "global_thigh_vel_lp_2": datatxt["global_thigh_vel_lp_2"],
     "global_thigh_angle_max": datatxt["global_thigh_angle_max"],
     "global_thigh_angle_min": datatxt["global_thigh_angle_min"],
     "global_thigh_vel_max": datatxt["global_thigh_vel_max"],
@@ -73,21 +77,24 @@ axs[0].set_ylabel('EKF phase')
 #axs[0].plot(time, actualTrajectory['PV'][ranA:ranB]/998)
 axs[0].plot(time, ekfEstimates['phase'][ranA:ranB], 'r-')
 #axs[0].legend(["PV/998","EKF Phase"])
+axs[0].grid()
 
 axs[1].set_ylabel('Ankle angle (Deg)')
-axs[1].plot(time, actualTrajectory['AnkleAngle'][ranA:ranB])
-axs[1].plot(time, referenceTrajectory['AnkleRef'][ranA:ranB], 'r-')
-#axs[1].plot(time, ankle_angle_kmodel[ranA:ranB], 'm-')
-#axs[1].set_ylim([-30,20])
-axs[1].legend(["Measured", "Commanded: Edgar\'s trajectory", "Command: kinematic model"])
+#axs[1].plot(time, actualTrajectory['AnkleAngle'][ranA:ranB], label = "Measured")
+#axs[1].plot(time, referenceTrajectory['AnkleRef'][ranA:ranB], 'r-', label = "Commanded: Prescribed trajectory")
+axs[1].plot(time, ankle_angle_kmodel[ranA:ranB], 'm-', label = "Command: kinematic model")
+axs[1].set_ylim([-20,30])
+axs[1].legend()
+axs[1].grid()
 
 axs[2].set_xlabel('Time(s)')
 axs[2].set_ylabel('Knee angle (Deg)')
-axs[2].plot(time, actualTrajectory['KneeAngle'][ranA:ranB])
-axs[2].plot(time, referenceTrajectory['KneeRef'][ranA:ranB], 'r-')
-#axs[2].plot(time, knee_angle_kmodel[ranA:ranB], 'm-')
+#axs[2].plot(time, actualTrajectory['KneeAngle'][ranA:ranB], label = "Measured")
+#axs[2].plot(time, referenceTrajectory['KneeRef'][ranA:ranB], 'r-', label = "Commanded: Prescribed trajectory")
+axs[2].plot(time, knee_angle_kmodel[ranA:ranB], 'm-', label = "Command: kinematic model")
 axs[2].set_ylim([-70,10])
-axs[2].legend(["Measured", "Commanded: Edgar\'s trajectory", "Command: kinematic model"])
+axs[2].legend()
+axs[2].grid()
 
 fig.set_size_inches(22, 13)
 plt.savefig(logFile + 'Joints_Commands.png', dpi=100)
@@ -119,14 +126,13 @@ plt.savefig(logFile + 'EKF_estimates.png', dpi=100)
 fig, axs = plt.subplots(3, 1)
 axs[0].set_title("Measurements")
 axs[0].set_ylabel('Global Thigh Angle (deg)')
-axs[0].plot(time, actualTrajectory["thigh_angle"][ranA:ranB] * 180 / np.pi, 'k-')
-axs[0].plot(time, ekfEstimates["thigh_angle_pred"][ranA:ranB], 'r-')
-#axs[0].plot(time, ekfEstimates["thigh_angle_bandpass"][ranA:ranB], 'm-')
+axs[0].plot(time, actualTrajectory["global_thigh_angle"][ranA:ranB] * 180 / np.pi, 'k-')
+axs[0].plot(time, ekfEstimates["global_thigh_angle_pred"][ranA:ranB], 'r-')
 axs[0].legend(["Actual", "EKF Predicted", "Band-pass filtered"])
 
 axs[1].set_ylabel('Global Thigh Angle Vel (deg/s)')
-axs[1].plot(time, ekfEstimates["thigh_angle_vel"][ranA:ranB], 'k-')
-axs[1].plot(time, ekfEstimates["thigh_angle_vel_pred"][ranA:ranB], 'r-')
+axs[1].plot(time, ekfEstimates["global_thigh_vel_lp"][ranA:ranB], 'k-')
+axs[1].plot(time, ekfEstimates["global_thigh_vel_pred"][ranA:ranB], 'r-')
 axs[1].legend(["Actual", "EKF Predicted"])
 
 axs[2].set_xlabel('Time(s)')
@@ -142,16 +148,16 @@ plt.savefig(logFile + 'EKF_measurements.png', dpi=100)
 fig, axs = plt.subplots(3, 1)
 axs[0].set_title("Atan2 Computation")
 axs[0].set_ylabel('Global Thigh Angle (deg)')
-axs[0].plot(time, ekfEstimates["global_thigh_angle_lp"][ranA:ranB], 'k-', lebel = 'low-passed')
-axs[0].plot(time, actualTrajectory["global_thigh_angle"][ranA:ranB], 'm-', alpha = 0.4, lebel = 'raw')
-axs[0].plot(time, actualTrajectory["global_thigh_angle_max"][ranA:ranB], 'r-', lebel = 'max')
-axs[0].plot(time, actualTrajectory["global_thigh_angle_min"][ranA:ranB], 'b-', lebel = 'min')
+axs[0].plot(time, ekfEstimates["global_thigh_angle_lp"][ranA:ranB], 'k-', label = 'low-passed')
+axs[0].plot(time, actualTrajectory["global_thigh_angle"][ranA:ranB] * 180 / np.pi, 'm-', alpha = 0.4, label = 'raw')
+axs[0].plot(time, ekfEstimates["global_thigh_angle_max"][ranA:ranB], 'r-', label = 'max')
+axs[0].plot(time, ekfEstimates["global_thigh_angle_min"][ranA:ranB], 'b-', label = 'min')
 
 axs[1].set_ylabel('Global Thigh Velocity (deg/s)')
-axs[1].plot(time, ekfEstimates["global_thigh_vel_lp_2"][ranA:ranB], 'k-', lebel = 'for atan2 computation')
-axs[1].plot(time, ekfEstimates["global_thigh_vel_lp"][ranA:ranB], 'm-', lebel = 'for vel measurement')
-axs[0].plot(time, actualTrajectory["global_thigh_vel_max"][ranA:ranB], 'r-', lebel = 'max')
-axs[0].plot(time, actualTrajectory["global_thigh_vel_min"][ranA:ranB], 'b-', lebel = 'min')
+axs[1].plot(time, ekfEstimates["global_thigh_vel_lp_2"][ranA:ranB], 'k-', label = 'for atan2 computation')
+axs[1].plot(time, ekfEstimates["global_thigh_vel_lp"][ranA:ranB], 'm-', label = 'for vel measurement')
+axs[1].plot(time, ekfEstimates["global_thigh_vel_max"][ranA:ranB], 'r-', label = 'max')
+axs[1].plot(time, ekfEstimates["global_thigh_vel_min"][ranA:ranB], 'b-', label = 'min')
 
 axs[2].set_xlabel('Time(s)')
 axs[2].set_ylabel('Atan2')
@@ -162,10 +168,10 @@ plt.savefig(logFile + 'EKF_atan2_computation.png', dpi=100)
 
 ## Figure 5
 plt.figure("Atan2 Phase Portrait")
-plt.plot(actualTrajectory["phase_x"][ranA:ranB], actualTrajectory["phase_y"][ranA:ranB])
+plt.plot(ekfEstimates["phase_x"][ranA:ranB], ekfEstimates["phase_y"][ranA:ranB])
 plt.xlabel("Phase X")
 plt.xlabel("Phase Y")
 plt.grid()
-plt.save(logFile + 'EKF_atan2_phasePortrait.png', dpi=100)
+plt.savefig(logFile + 'EKF_atan2_phasePortrait.png', dpi=100)
 
 plt.show()

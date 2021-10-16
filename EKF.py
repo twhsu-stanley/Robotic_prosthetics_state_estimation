@@ -112,6 +112,8 @@ class extended_kalman_filter:
         self.x = init.x  # state mean
         self.Sigma = init.Sigma  # state covariance
 
+        self.MD_residual = 0
+
     def prediction(self, dt):
         # EKF propagation (prediction) step
         self.x = self.f(self.x, dt)  # predicted state
@@ -165,37 +167,21 @@ class extended_kalman_filter:
         # correct the predicted state statistics
         self.x = self.x + K @ self.v
         self.x[0, 0] = warpToOne(self.x[0, 0])
-
-        # Compute MD using residuals
-        """
-        z_pred = self.h.evaluate_h_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
-        if direct_ramp != False:
-            z_pred = np.vstack((z_pred, np.array([self.x[3,0]])))
-        if using_atan2:
-            z_pred[2] += self.x[0,0] * 2 * np.pi
-            z_pred[2] = wrapTo2pi(z_pred[2])
-        self.residual = z - z_pred
-        if using_atan2:
-            self.residual[2] = np.arctan2(np.sin(self.residual[2]), np.cos(self.residual[2]))
-        self.MD_residual = np.sqrt(self.residual.T @ np.linalg.inv(self.R) @ self.residual) # Mahalanobis distance
-        """
-
-        """
-        if steady_state_walking and self.MD_residual > np.sqrt(18.5):
-            #self.Q = self.Q_static + self.Q_static * 0.2
-            self.R = np.diag([2, 1, 2, 1]) @ self.R_static @ np.diag([2, 1, 2, 1]).T
-        else:
-            #self.Q = self.Q_static
-            self.R = self.R_static
-        """
-
-        # Adaptive Q and R
-        #alpha = 0.3
-        #self.Q = alpha * self.Q + (1-alpha)*(K @ self.v @ self.v.T @ K.T)
-        #self.R = alpha * self.R + (1-alpha)*(self.residual @ self.residual.T + H @ self.Sigma @ H.T)
-
         I = np.eye(np.shape(self.x)[0])
         self.Sigma = (I - K @ H) @ self.Sigma
+
+        # Compute MD using residuals
+        self.z_pred = self.h.evaluate_h_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
+        #if direct_ramp != False:
+        #    self.z_pred = np.vstack((self.z_pred, np.array([self.x[3,0]])))
+        if using_atan2:
+            self.z_pred[2] += self.x[0,0] * 2 * np.pi
+            self.z_pred[2] = wrapTo2pi(self.z_pred[2])
+        residual = z - self.z_pred
+        if using_atan2:
+            residual[2] = np.arctan2(np.sin(residual[2]), np.cos(residual[2]))
+        #self.MD_residual = 0.2 * np.sqrt(residual.T @ np.linalg.inv(self.R) @ residual) + (1-0.2) * np.copy(self.MD_residual)
+        self.MD_residual = 1 * np.sqrt(residual[2] * 1/self.R[2,2] * residual[2]) + (1-1) * np.copy(self.MD_residual)
 
     def state_saturation(self, saturation_range):
         phase_dots_max = saturation_range[0]
@@ -213,8 +199,8 @@ class extended_kalman_filter:
         elif self.x[2, 0] < step_lengths_min:
             self.x[2, 0] = step_lengths_min
 
-        if self.x[3, 0] > 10:
-            self.x[3, 0] = 10
-        elif self.x[3, 0] < -10:
-            self.x[3, 0] = -10
+        #if self.x[3, 0] > 10:
+        #    self.x[3, 0] = 10
+        #elif self.x[3, 0] < -10:
+        #    self.x[3, 0] = -10
     

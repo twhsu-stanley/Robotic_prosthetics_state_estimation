@@ -10,6 +10,7 @@
 ## Comments with ## before them below indicate user can change to 
 ## his/her preference
 
+
 print('=============================================')
 print('Real-time data plotter using UDP')
 print('Created by A. Ma & U. Lee 2020 for the ')

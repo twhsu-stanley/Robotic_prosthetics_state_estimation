@@ -808,7 +808,7 @@ def home_joint(fxs, actPackID, IMU, joint, jointVolt = 1000, motTorThr = 0.35):
                 joiPosArray = np.append( joiPosArray, joiDict['JoiPos'])   
             elif (i > 5000):
                 raise Exception(f'Stopping homing routine after {i} samples')
-            print('Delta of time in the cycle: %8.6f [ms]'%deltaTime) 
+            #print('Delta of time in the cycle: %8.6f [ms]'%deltaTime) 
             i += 1
             deltaTime = (time.perf_counter_ns() - iniTime)/1e6
         time.sleep(1)     # Healthy pause before finishing

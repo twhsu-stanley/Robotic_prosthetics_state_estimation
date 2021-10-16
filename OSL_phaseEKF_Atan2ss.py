@@ -174,7 +174,7 @@ try:
     #==================================================================================================================
 
     ### Create filters ================================================================================================
-    fs = 500          # sampling rate = 100Hz (actual: dt ~ 0.0135 sec; 67Hz) 
+    fs = 80         # sampling rate = 100Hz (actual: dt ~ 0.0135 sec; 67Hz) 
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
     normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
     # Configure 1st order low-pass filters for computing velocity 
@@ -314,8 +314,8 @@ try:
             phase_y = - (global_thigh_vel_lp_2 - global_thigh_vel_shift)
             phase_x = global_thigh_angle_scale * (global_thigh_angle_lp - global_thigh_angle_shift)
         else:
-            phase_y = - global_thigh_vel_lp_2 / (2*np.pi*0.8)
-            phase_x = global_thigh_angle_lp
+            phase_y = - global_thigh_vel_lp_2 #/ (2*np.pi*0.8)
+            phase_x = global_thigh_angle_lp * (2*np.pi*0.8)
         
         Atan2 = np.arctan2(phase_y, phase_x)
         if Atan2 < 0:
@@ -381,11 +381,9 @@ try:
         #===========================================================================================================
         
         ## Move the OSL ============================================================================================
-        """
         ankMotCou, kneMotCou = loco.joi2motTic(encMap, knee_angle_cmd, ankle_angle_cmd)
         fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, ankMotCou)
         fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, kneMotCou)
-        """
         #===========================================================================================================
 
         ## Logging data ============================================================================================

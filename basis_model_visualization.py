@@ -9,13 +9,13 @@ from EKF import wrapTo2pi, load_Psi
 # Determine which sensors to be used
 sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2']#,'globalFootAngles','ankleMoment', 'tibiaForce']
 
-sensor_id = 2
+sensor_id = 0
 
 m_model = model_loader('Measurement_model_012_NSL.pickle')
 Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
 
 # load training data
-with open(('Gait_training_data/' + sensors[sensor_id] + 'ss_NSL_training_dataset.pickle'), 'rb') as file:
+with open(('Gait_training_data/' + sensors[sensor_id] + '_NSL_training_dataset.pickle'), 'rb') as file:
     gait_training_dataset = pickle.load(file)
 data_training = gait_training_dataset['training_data']
 phase_training = gait_training_dataset['phase']
@@ -23,7 +23,7 @@ phase_dot_training = gait_training_dataset['phase_dot']
 step_length_training = gait_training_dataset['step_length']
 ramp_training = gait_training_dataset['ramp']
 
-with open(('Gait_training_R01data/' + sensors[sensor_id] + 'ss_walking_NSL_training_dataset.pickle'), 'rb') as file:
+with open(('Gait_training_R01data/' + sensors[sensor_id] + '_walking_NSL_training_dataset.pickle'), 'rb') as file:
     gait_training_dataset = pickle.load(file)
 data_training = np.vstack((data_training, gait_training_dataset['training_data']))
 phase_training = np.vstack((phase_training, gait_training_dataset['phase']))
@@ -88,7 +88,7 @@ ax.set_ylabel('step_length')
 
 ## C. Visualize Measurement Model w.r.t. phase_dot & stpe_length ===========================================================================
 if sensors[sensor_id] != 'atan2':
-    phases = 1
+    phases = 0.3
     phase_dots = np.linspace(0, 1.5, num = 50)
     step_lengths = np.linspace(0, 2, num = 50)
     ramps = 0
@@ -250,7 +250,7 @@ ax.set_xlabel('phase')
 ax.set_ylabel('ramp')
 ax.set_zlabel('knee angle (deg)')
 ax.set_zlim(-50,100)
-"""
+
 #==============================================================================================================================
 
 ## D. Visualize Joint Model w.r.t. phase_dot ===============================================================================================
@@ -285,6 +285,6 @@ ax.plot_surface(X, Y, -knee_angle_model.T)
 ax.set_xlabel('phase')
 ax.set_ylabel('phase_dots')
 ax.set_zlabel('knee angle (deg)')
-
+"""
 #==============================================================================================================================
 plt.show()
