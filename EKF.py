@@ -181,7 +181,7 @@ class extended_kalman_filter:
         if using_atan2:
             residual[2] = np.arctan2(np.sin(residual[2]), np.cos(residual[2]))
         #self.MD_residual = 0.2 * np.sqrt(residual.T @ np.linalg.inv(self.R) @ residual) + (1-0.2) * np.copy(self.MD_residual)
-        self.MD_residual = 1 * np.sqrt(residual[2] * 1/self.R[2,2] * residual[2]) + (1-1) * np.copy(self.MD_residual)
+        self.MD_residual = np.sqrt(residual[2] * 1/self.R[2,2] * residual[2])
 
     def state_saturation(self, saturation_range):
         phase_dots_max = saturation_range[0]

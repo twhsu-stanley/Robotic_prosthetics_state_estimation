@@ -96,7 +96,7 @@ try:
     cmd_log = {'refAnk': 0.0, 'refKnee': 0.0}
     ekf_log = {'phase': 0.0, 'phase_dot': 0.0, 'stride_length': 0.0, 'ramp': 0.0,
                'global_thigh_angle_pred': 0.0, 'global_thigh_vel_pred': 0.0, 'atan2_pred': 0.0,
-               'global_thigh_vel_lp': 0.0, 'global_thigh_angle_lp': 0.0, 'global_thigh_vel_lp_2': 0.0, 
+               'global_thigh_angle_lp': 0.0, 'global_thigh_vel_lp_2': 0.0, 
                'global_thigh_angle_max': 0.0, 'global_thigh_angle_min': 0.0,
                'global_thigh_vel_max': 0.0, 'global_thigh_vel_min': 0.0,
                'phase_x': 0.0, 'phase_y': 0.0, 'radius': 0.0, 'atan2': 0.0}
@@ -174,12 +174,12 @@ try:
     #==================================================================================================================
 
     ### Create filters ================================================================================================
-    fs = 80         # sampling rate = 100Hz (actual: dt ~ 0.0135 sec; 67Hz) 
+    fs = 76         # sampling rate = 100Hz (actual: dt ~ 0.0135 sec; 67Hz) 
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
     normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
     # Configure 1st order low-pass filters for computing velocity 
-    b_lp_1, a_lp_1 = butter(1, normal_cutoff, btype = 'low', analog = False)
-    z_lp_1 = lfilter_zi(b_lp_1,  a_lp_1)
+    #b_lp_1, a_lp_1 = butter(1, normal_cutoff, btype = 'low', analog = False)
+    #z_lp_1 = lfilter_zi(b_lp_1,  a_lp_1)
     
     # Configure 1st/2nd/3rd order low-pass filters for computing atan2
     b_lp_2, a_lp_2 = butter(1, normal_cutoff, btype = 'low', analog = False)
@@ -203,6 +203,24 @@ try:
     idx_max = 0
     global_thigh_angle_window = np.zeros(500) # time window/ pre-allocate 1 sec
     global_thigh_vel_window = np.zeros(500)
+
+    MD_residual_prev = 0
+    lost = False
+    t_lost = 0
+    t_recover = 0
+
+    hold = True
+    hold_prev = True
+
+    peg = False
+    peg_prev = False
+    t_peg = 0
+    t_norm = 0
+
+    knee_angle_model_n = knee_angle_initial
+    ankle_angle_model_n = ankle_angle_initial
+    knee_angle_model_p = knee_angle_initial
+    ankle_angle_model_p = ankle_angle_initial
 
     # ================================================= MAIN LOOP ===================================================
     while True:
@@ -257,6 +275,7 @@ try:
         global_thigh_angle = dataOSL['ThighSagi'] * 180 / np.pi
 
         # 2) Global thigh angle velocity (deg/s)
+        """
         if ptr == 0:
             global_thigh_vel_lp = 0 
         else:
@@ -265,6 +284,7 @@ try:
             global_thigh_vel_lp, z_lp_1 = lfilter(b_lp_1, a_lp_1, [global_thigh_vel], zi = z_lp_1)
             global_thigh_vel_lp = global_thigh_vel_lp[0]
         global_thigh_angle_0 = global_thigh_angle
+        """
 
         ## 3) Compute Atan2
         global_thigh_angle_lp, z_lp_2 = lfilter(b_lp_2, a_lp_2, [global_thigh_angle], zi = z_lp_2) 
@@ -314,7 +334,7 @@ try:
             phase_y = - (global_thigh_vel_lp_2 - global_thigh_vel_shift)
             phase_x = global_thigh_angle_scale * (global_thigh_angle_lp - global_thigh_angle_shift)
         else:
-            phase_y = - global_thigh_vel_lp_2 #/ (2*np.pi*0.8)
+            phase_y = - global_thigh_vel_lp_2
             phase_x = global_thigh_angle_lp * (2*np.pi*0.8)
         
         Atan2 = np.arctan2(phase_y, phase_x)
@@ -323,13 +343,14 @@ try:
         
         c = 45
         d = 45
-        radius = (phase_x / c) ** 2 + (phase_y / d) ** 2
+        #radius = (phase_x / c) ** 2 + (phase_y / d) ** 2
+        radius = 0.15 * ((phase_x / c) ** 2 + (phase_y / d) ** 2) + (1-0.15) * radius
         if radius >= 1:
             ekf.R = np.copy(R_org)
         else:
             ekf.R[2, 2] = 1e30
 
-        measurement = np.array([[global_thigh_angle], [global_thigh_vel_lp], [Atan2]])
+        measurement = np.array([[global_thigh_angle], [global_thigh_vel_lp_2], [Atan2]])
         measurement = np.squeeze(measurement)
         #==========================================================================================================
 
@@ -340,23 +361,75 @@ try:
         ekf.correction(measurement, Psi, using_atan2)
         ekf.state_saturation(saturation_range)
         #==========================================================================================================
+        
+        ## Failure and position holding detectors
+        # Failure detector
+        if ekf.MD_residual > 4:
+            if MD_residual_prev <= 4:
+                t_lost = t
+            elif t - t_lost > 0.15:
+                lost = True
+        elif ekf.MD_residual <= 4:
+            if MD_residual_prev > 4:
+                t_recover = t
+            elif t - t_recover > 1:
+                lost = False
+        MD_residual_prev = ekf.MD_residual
+
+        # Position holding detector
+        if ekf.x[1, 0] < 0.1 or radius < 1:
+            hold = True
+        else:
+            hold = False
+
+        # Combine both detectors
+        if lost == True or hold == True:
+            peg = True
+            if peg_prev == False:
+                t_peg = t
+        else:
+            peg = False
+            if peg_prev == True:
+                t_norm = t
+        peg_prev = peg
+        #==========================================================================================================
 
         ## Generate joint control commands ========================================================================
         # 1) Control commands generated by the trainned model
-        """
         #joint_angles = joints_control(ekf.x[0, 0], ekf.x[1, 0], ekf.x[2, 0], ekf.x[3, 0])
         #knee_angle_model = joint_angles[0]
         #ankle_angle_model = joint_angles[1]
-        """
+        if peg == True:
+            pegleg_joint_angles = joints_control(0.3, 0, 0.1, 0)
+            if t - t_peg <= 1: # 1 sec fade-in 
+                alpha = t - t_peg
+                knee_angle_model = alpha * pegleg_joint_angles[0] + (1-alpha) * knee_angle_model_n
+                ankle_angle_model = alpha * pegleg_joint_angles[1] + (1-alpha) * ankle_angle_model_n
+            else:
+                knee_angle_model = pegleg_joint_angles[0]
+                ankle_angle_model = pegleg_joint_angles[1]
+            knee_angle_model_p = knee_angle_model
+            ankle_angle_model_p = ankle_angle_model
+        else:
+            joint_angles = joints_control(ekf.x[0, 0], ekf.x[1, 0], ekf.x[2, 0], ekf.x[3, 0])
+            if t - t_norm <= 1:
+                alpha = t - t_norm 
+                knee_angle_model = alpha * joint_angles[0] + (1-alpha) * knee_angle_model_p
+                ankle_angle_model = alpha * joint_angles[1] + (1-alpha) * ankle_angle_model_p
+            else:
+                knee_angle_model = joint_angles[0]
+                ankle_angle_model = joint_angles[1]
+            knee_angle_model_n = knee_angle_model
+            ankle_angle_model_n = ankle_angle_model
         
         # 2) Control commands generated by Edgar's trajectory (look-up table)
-        pv = int(ekf.x[0, 0] * 998)  # phase variable conversion (scaling)
-        knee_angle_traj = refKne[pv]
-        ankle_angle_traj = refAnk[pv]
+        #pv = int(ekf.x[0, 0] * 998)  # phase variable conversion (scaling)
+        #knee_angle_traj = refKne[pv]
+        #ankle_angle_traj = refAnk[pv]
 
         # cmd: traj or model
-        knee_angle_cmd = knee_angle_traj
-        ankle_angle_cmd = ankle_angle_traj
+        knee_angle_cmd = knee_angle_model
+        ankle_angle_cmd = ankle_angle_model
         #===========================================================================================================
 
         ## Set joint control commands: fade-in effect & saturation =================================================
@@ -399,7 +472,7 @@ try:
         ekf_log['global_thigh_vel_pred'] = ekf.z_hat[1][0]
         ekf_log['atan2_pred'] = ekf.z_hat[2][0]
         
-        ekf_log["global_thigh_vel_lp"] = global_thigh_vel_lp
+        #ekf_log["global_thigh_vel_lp"] = global_thigh_vel_lp
         ekf_log["global_thigh_angle_lp"] = global_thigh_angle_lp
         ekf_log["global_thigh_vel_lp_2"] = global_thigh_vel_lp_2
         if ptr > 0:
@@ -424,7 +497,7 @@ try:
                          #ekf.x[2, 0], 'step_length', 'm',
                          #ekf.x[3, 0], 'ramp_angle', 'deg'
                          global_thigh_angle, ekf.z_hat[0], 'Global Thigh Angle', 'deg',
-                         global_thigh_vel_lp, ekf.z_hat[1], 'Global Thigh Angle Vel', 'deg/s',
+                         global_thigh_vel_lp_2, ekf.z_hat[1], 'Global Thigh Angle Vel', 'deg/s',
                          Atan2, ekf.z_hat[2], 'Atan2', '--',
                          #radius, radius, 'phase plane radius', '--',
                          #knee_angle, knee_angle_cmd, 'Knee Angle', 'deg',
