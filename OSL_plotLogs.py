@@ -39,7 +39,7 @@ ekfEstimates = {
     "global_thigh_vel_pred": datatxt["global_thigh_vel_pred"],
     "atan2_pred": datatxt["atan2_pred"],
     
-    "global_thigh_vel_lp": datatxt["global_thigh_vel_lp"],
+    #"global_thigh_vel_lp": datatxt["global_thigh_vel_lp"],
 
     "global_thigh_angle_lp": datatxt["global_thigh_angle_lp"],
     "global_thigh_vel_lp_2": datatxt["global_thigh_vel_lp_2"],
@@ -50,7 +50,12 @@ ekfEstimates = {
     "phase_x": datatxt["phase_x"],
     "phase_y": datatxt["phase_y"],
     "radius": datatxt["radius"],
-    "atan2": datatxt["atan2"]
+    "atan2": datatxt["atan2"],
+    
+    "MD_residual": datatxt["MD_residual"],
+    "lost": datatxt["lost"],
+    "hold": datatxt["hold"],
+    "peg": datatxt["peg"]
 }
 
 ## Generating joints angles using the kinematics model ============================================
@@ -131,7 +136,7 @@ axs[0].plot(time, ekfEstimates["global_thigh_angle_pred"][ranA:ranB], 'r-')
 axs[0].legend(["Actual", "EKF Predicted", "Band-pass filtered"])
 
 axs[1].set_ylabel('Global Thigh Angle Vel (deg/s)')
-axs[1].plot(time, ekfEstimates["global_thigh_vel_lp"][ranA:ranB], 'k-')
+axs[1].plot(time, ekfEstimates["global_thigh_vel_lp_2"][ranA:ranB], 'k-')
 axs[1].plot(time, ekfEstimates["global_thigh_vel_pred"][ranA:ranB], 'r-')
 axs[1].legend(["Actual", "EKF Predicted"])
 
@@ -155,7 +160,7 @@ axs[0].plot(time, ekfEstimates["global_thigh_angle_min"][ranA:ranB], 'b-', label
 
 axs[1].set_ylabel('Global Thigh Velocity (deg/s)')
 axs[1].plot(time, ekfEstimates["global_thigh_vel_lp_2"][ranA:ranB], 'k-', label = 'for atan2 computation')
-axs[1].plot(time, ekfEstimates["global_thigh_vel_lp"][ranA:ranB], 'm-', label = 'for vel measurement')
+#axs[1].plot(time, ekfEstimates["global_thigh_vel_lp"][ranA:ranB], 'm-', label = 'for vel measurement')
 axs[1].plot(time, ekfEstimates["global_thigh_vel_max"][ranA:ranB], 'r-', label = 'max')
 axs[1].plot(time, ekfEstimates["global_thigh_vel_min"][ranA:ranB], 'b-', label = 'min')
 
@@ -173,5 +178,25 @@ plt.xlabel("Phase X")
 plt.xlabel("Phase Y")
 plt.grid()
 plt.savefig(logFile + 'EKF_atan2_phasePortrait.png', dpi=100)
+
+## Figure 6
+plt.figure("Failure and Position-holding Detectors")
+plt.subplot(411)
+plt.plot(time, ekfEstimates['MD_residual'][ranA:ranB])
+plt.ylabel("MD_residual")
+plt.grid()
+plt.subplot(412)
+plt.plot(time, ekfEstimates['lost'][ranA:ranB])
+plt.ylabel("lost (T/F)")
+plt.grid()
+plt.subplot(413)
+plt.plot(time, ekfEstimates['hold'][ranA:ranB])
+plt.ylabel("hold (T/F)")
+plt.grid()
+plt.subplot(414)
+plt.plot(time, ekfEstimates['peg'][ranA:ranB])
+plt.ylabel("peg (T/F)")
+plt.grid()
+plt.xlabel("Time (s)")
 
 plt.show()

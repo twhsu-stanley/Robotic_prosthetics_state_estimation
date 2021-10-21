@@ -99,7 +99,8 @@ try:
                'global_thigh_angle_lp': 0.0, 'global_thigh_vel_lp_2': 0.0, 
                'global_thigh_angle_max': 0.0, 'global_thigh_angle_min': 0.0,
                'global_thigh_vel_max': 0.0, 'global_thigh_vel_min': 0.0,
-               'phase_x': 0.0, 'phase_y': 0.0, 'radius': 0.0, 'atan2': 0.0}
+               'phase_x': 0.0, 'phase_y': 0.0, 'radius': 0.0, 'atan2': 0.0, 
+               'MD_residual': 0.0, 'lost': 0, 'hold': 0, 'peg': 0}
     logger = loco.ini_log({**dataOSL, **cmd_log, **ekf_log}, sensors = "all_sensors", trialName = "OSL_benchtop_swing_test")
 
     ## Initialize buffers for joints angles =============================================================================
@@ -454,9 +455,11 @@ try:
         #===========================================================================================================
         
         ## Move the OSL ============================================================================================
+        """
         ankMotCou, kneMotCou = loco.joi2motTic(encMap, knee_angle_cmd, ankle_angle_cmd)
         fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, ankMotCou)
         fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, kneMotCou)
+        """
         #===========================================================================================================
 
         ## Logging data ============================================================================================
@@ -483,7 +486,12 @@ try:
         ekf_log["phase_x"] = phase_x
         ekf_log["phase_y"] = phase_y
         ekf_log['atan2'] = Atan2
-        ekf_log['radius'] = radius
+        ekf_log['radius'] = radius  
+
+        ekf_log['MD_residual'] = ekf.MD_residual
+        ekf_log['lost'] = int(lost)
+        ekf_log['hold'] = int(hold)
+        ekf_log['peg'] = int(peg)
         loco.log_OSL({**dataOSL,**cmd_log, **ekf_log}, logger)
         #==========================================================================================================
 
@@ -516,7 +524,7 @@ finally:
     fxs.send_motor_command(ankID, fxe.FX_NONE, 0)
     fxs.send_motor_command(kneID, fxe.FX_NONE, 0)
     IMU.setToIdle()
-    time.sleep(1)    
+    time.sleep(1)
     fxs.close(ankID)
-    fxs.close(kneID)  
+    fxs.close(kneID)
     print('Communication with ActPacks closed and IMU set to idle')
