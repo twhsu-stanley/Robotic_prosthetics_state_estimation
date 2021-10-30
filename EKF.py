@@ -112,7 +112,7 @@ class extended_kalman_filter:
         self.x = init.x  # state mean
         self.Sigma = init.Sigma  # state covariance
 
-        self.MD_residual = 0
+        self.MD = 0
 
     def prediction(self, dt):
         # EKF propagation (prediction) step
@@ -138,13 +138,13 @@ class extended_kalman_filter:
         #print(z2 - self.z_hat)
         #print(H @ np.array([[-0.01], [-0.01], [0.01], [-0.01]]))
         ###########################################################################
-
+        """
         if direct_ramp != False:
             # add the direct ramp as the last element of the measurement vector
             H = np.vstack((H, np.array([0, 0, 0, 1])))
             self.z_hat = np.vstack((self.z_hat, np.array([self.x[3,0]])))
             z = np.concatenate((z, direct_ramp))
-
+        """
         if using_atan2:
             H[2, 0] += 2*np.pi
             self.z_hat[2] += self.x[0,0] * 2 * np.pi
@@ -167,10 +167,17 @@ class extended_kalman_filter:
         # correct the predicted state statistics
         self.x = self.x + K @ self.v
         self.x[0, 0] = warpToOne(self.x[0, 0])
-        I = np.eye(np.shape(self.x)[0])
-        self.Sigma = (I - K @ H) @ self.Sigma
+        #I = np.eye(np.shape(self.x)[0])
+        #self.Sigma = (I - K @ H) @ self.Sigma
+        self.Sigma = (np.eye(4) - K @ H) @ self.Sigma
+
+        # Compute MD using innovations
+        #self.MD = 0.2 * np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) + (1-0.2) * np.copy(self.MD_residual)
+        #self.MD = np.sqrt(self.v[2] * 1/self.R[2,2] * self.v[2])
+        self.MD = np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v)
 
         # Compute MD using residuals
+        """
         self.z_pred = self.h.evaluate_h_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
         #if direct_ramp != False:
         #    self.z_pred = np.vstack((self.z_pred, np.array([self.x[3,0]])))
@@ -182,6 +189,7 @@ class extended_kalman_filter:
             residual[2] = np.arctan2(np.sin(residual[2]), np.cos(residual[2]))
         #self.MD_residual = 0.2 * np.sqrt(residual.T @ np.linalg.inv(self.R) @ residual) + (1-0.2) * np.copy(self.MD_residual)
         self.MD_residual = np.sqrt(residual[2] * 1/self.R[2,2] * residual[2])
+        """
 
     def state_saturation(self, saturation_range):
         phase_dots_max = saturation_range[0]

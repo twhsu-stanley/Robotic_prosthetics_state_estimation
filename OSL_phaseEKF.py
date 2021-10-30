@@ -177,8 +177,8 @@ try:
     fs = 500          # sampling rate = 100Hz (actual: dt ~ 0.0135 sec; 67Hz) 
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
     # configure low-pass filter (1-order)
-    normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
-    b_lp, a_lp = butter(1, normal_cutoff, btype = 'low', analog = False)
+    fc_normal = 2 / nyq   #cut-off frequency = 2Hz
+    b_lp, a_lp = butter(1, fc_normal, btype = 'low', analog = False)
     z_lp_1 = lfilter_zi(b_lp,  a_lp)
     z_lp_2 = lfilter_zi(b_lp,  a_lp)
     

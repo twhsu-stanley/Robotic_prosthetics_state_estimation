@@ -12,8 +12,8 @@ def butter_lowpass_filter(data, cutoff, fs, order = 1):
   # cutoff: desired cutoff frequency of the filter (Hz)
   # fs: sampling rate (Hz)
   nyq = 0.5 * fs
-  normal_cutoff = cutoff / nyq
-  b, a = butter(order, normal_cutoff, btype='low', analog=False)
+  fc_normal = cutoff / nyq
+  b, a = butter(order, fc_normal, btype='low', analog=False)
   data_filtered = lfilter(b, a, data)
   return data_filtered
 
@@ -31,8 +31,8 @@ def butter_highpass_filter(data, cutoff, fs, order = 1):
   # cutoff: desired cutoff frequency of the filter (Hz)
   # fs: sampling rate (Hz)
   nyq = 0.5 * fs
-  normal_cutoff = cutoff / nyq
-  b, a = butter(order, normal_cutoff, btype='high', analog=False)
+  fc_normal = cutoff / nyq
+  b, a = butter(order, fc_normal, btype='high', analog=False)
   data_filtered = lfilter(b, a, data)
   return data_filtered
 

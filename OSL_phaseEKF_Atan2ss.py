@@ -131,7 +131,7 @@ try:
     knee_min = -65
     
     # Ankle angle limits (deg)
-    ankle_max = 20
+    ankle_max = 19
     ankle_min = -10
     #===================================================================================================================
 
@@ -175,15 +175,15 @@ try:
     #==================================================================================================================
 
     ### Create filters ================================================================================================
-    fs = 76         # sampling rate = 100Hz (actual: dt ~ 0.0135 sec; 67Hz) 
+    fs = 60       # sampling rate = 100Hz (actual: dt ~ 0.0135 sec; 67Hz) 
     nyq = 0.5 * fs    # Nyquist frequency = fs/2
-    normal_cutoff = 2 / nyq   #cut-off frequency = 2Hz
+    fc_normal = 2 / nyq   #cut-off frequency = 2Hz
     # Configure 1st order low-pass filters for computing velocity 
-    #b_lp_1, a_lp_1 = butter(1, normal_cutoff, btype = 'low', analog = False)
+    #b_lp_1, a_lp_1 = butter(1, fc_normal, btype = 'low', analog = False)
     #z_lp_1 = lfilter_zi(b_lp_1,  a_lp_1)
     
     # Configure 1st/2nd/3rd order low-pass filters for computing atan2
-    b_lp_2, a_lp_2 = butter(1, normal_cutoff, btype = 'low', analog = False)
+    b_lp_2, a_lp_2 = butter(1, fc_normal, btype = 'low', analog = False)
     z_lp_2 = lfilter_zi(b_lp_2,  a_lp_2)
     #==================================================================================================================
 
@@ -209,6 +209,7 @@ try:
     lost = False
     t_lost = 0
     t_recover = 0
+    radius = 0
 
     hold = True
     hold_prev = True
@@ -455,11 +456,11 @@ try:
         #===========================================================================================================
         
         ## Move the OSL ============================================================================================
-        """
+        
         ankMotCou, kneMotCou = loco.joi2motTic(encMap, knee_angle_cmd, ankle_angle_cmd)
         fxs.send_motor_command(ankID, fxe.FX_IMPEDANCE, ankMotCou)
         fxs.send_motor_command(kneID, fxe.FX_IMPEDANCE, kneMotCou)
-        """
+        
         #===========================================================================================================
 
         ## Logging data ============================================================================================
@@ -496,7 +497,8 @@ try:
         #==========================================================================================================
 
         ## Live plotting ==========================================================================================
-        #elapsed_time = t - start_time
+        """
+        elapsed_time = t - start_time
         if ptr % 2 == 0:
             sender.graph(elapsed_time,
                          ekf.x[0, 0], ekf.x[0, 0], 'Phase', '--',
@@ -511,7 +513,8 @@ try:
                          #knee_angle, knee_angle_cmd, 'Knee Angle', 'deg',
                          #ankle_angle, ankle_angle_cmd, 'Ankle Angle', 'deg'
                          )
-        print("knee angle cmd: ", knee_angle_cmd, "; ankle angle cmd: ", ankle_angle_cmd)
+        #print("knee angle cmd: ", knee_angle_cmd, "; ankle angle cmd: ", ankle_angle_cmd)
+        """
         #==========================================================================================================
         
         ptr += 1

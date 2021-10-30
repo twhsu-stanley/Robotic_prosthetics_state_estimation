@@ -7,6 +7,5 @@ import time
 import pickle
 
 a = np.array([0,-2,3,5])
-c =  np.array([0,4,27,15])
-b = np.array([1,5,-9,10])
-print(abs(a+c)/abs(b))
+ap = np.pad(a, (0,len(a)))
+print(ap)

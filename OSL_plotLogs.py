@@ -4,7 +4,10 @@ from EKF import joints_control
 from model_framework import *
 import csv
 
-logFile = r"OSL_walking_data/211014_130906_OSL_benchtop_swing_test.csv"
+logFile = r"OSL_walking_data/211021_184718_OSL_benchtop_swing_test.csv"
+# 211021_184718_OSL_benchtop_swing_test
+# 211021_184343_OSL_benchtop_swing_test
+
 # 211014_130906_OSL_benchtop_swing_test
 # 211014_130313_OSL_benchtop_swing_test
 # 211014_124556_OSL_benchtop_swing_test
@@ -52,10 +55,10 @@ ekfEstimates = {
     "radius": datatxt["radius"],
     "atan2": datatxt["atan2"],
     
-    "MD_residual": datatxt["MD_residual"],
-    "lost": datatxt["lost"],
-    "hold": datatxt["hold"],
-    "peg": datatxt["peg"]
+    #"MD_residual": datatxt["MD_residual"],
+    #"lost": datatxt["lost"],
+    #"hold": datatxt["hold"],
+    #"peg": datatxt["peg"]
 }
 
 ## Generating joints angles using the kinematics model ============================================
@@ -85,22 +88,22 @@ axs[0].plot(time, ekfEstimates['phase'][ranA:ranB], 'r-')
 axs[0].grid()
 
 axs[1].set_ylabel('Ankle angle (Deg)')
-#axs[1].plot(time, actualTrajectory['AnkleAngle'][ranA:ranB], label = "Measured")
-#axs[1].plot(time, referenceTrajectory['AnkleRef'][ranA:ranB], 'r-', label = "Commanded: Prescribed trajectory")
-axs[1].plot(time, ankle_angle_kmodel[ranA:ranB], 'm-', label = "Command: kinematic model")
+axs[1].plot(time, actualTrajectory['AnkleAngle'][ranA:ranB], label = "Measured")
+axs[1].plot(time, referenceTrajectory['AnkleRef'][ranA:ranB], 'r-', label = "Commanded")
+#axs[1].plot(time, ankle_angle_kmodel[ranA:ranB], 'm-', label = "Command: kinematic model")
 axs[1].set_ylim([-20,30])
 axs[1].legend()
 axs[1].grid()
 
 axs[2].set_xlabel('Time(s)')
 axs[2].set_ylabel('Knee angle (Deg)')
-#axs[2].plot(time, actualTrajectory['KneeAngle'][ranA:ranB], label = "Measured")
-#axs[2].plot(time, referenceTrajectory['KneeRef'][ranA:ranB], 'r-', label = "Commanded: Prescribed trajectory")
-axs[2].plot(time, knee_angle_kmodel[ranA:ranB], 'm-', label = "Command: kinematic model")
+axs[2].plot(time, actualTrajectory['KneeAngle'][ranA:ranB], label = "Measured")
+axs[2].plot(time, referenceTrajectory['KneeRef'][ranA:ranB], 'r-', label = "Commanded")
+#axs[2].plot(time, knee_angle_kmodel[ranA:ranB], 'm-', label = "Command: kinematic model")
 axs[2].set_ylim([-70,10])
 axs[2].legend()
 axs[2].grid()
-
+plt.show()
 fig.set_size_inches(22, 13)
 plt.savefig(logFile + 'Joints_Commands.png', dpi=100)
 
