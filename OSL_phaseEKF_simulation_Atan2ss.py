@@ -81,7 +81,7 @@ dataOSL = {
 
 ### C. Load Benchtop Test Data
 #"""
-logFile = r"OSL_walking_data/211014_130906_OSL_benchtop_swing_test.csv"
+logFile = r"OSL_walking_data/211021_184343_OSL_benchtop_swing_test.csv"
 # 211021_184718_OSL_benchtop_swing_test
 # 211021_184343_OSL_benchtop_swing_test
 # 211014_130906_OSL_benchtop_swing_test
@@ -221,32 +221,23 @@ try:
     walk_prev = False
     t_stop = 0
     t_walk = 0
-    t_stop_act = 0
-    t_walk_act = 0
+
+    t_nwalk_ref = 0
+    t_lwalk_ref = 0
+    t_stop_ref = 0
 
     MD_prev = 0
-    MD_threshold = 8
+    MD_threshold = 40 # 6.251(90%), 7.815(95%), 9.348(97.5%), 11.345(99%)
     lost = False
     t_lost = 0
     t_recover = 0
-
-    peg = False
-    peg_prev = False
-    t_peg = 0
-    t_norm = 0
 
     knee_angle_initial = dataOSL['KneeAngle'][0]
     ankle_angle_initial = dataOSL['AnkleAngle'][0]
     knee_angle_model = 0
     ankle_angle_model = 0
-    knee_angle_model_walk = 0
-    ankle_angle_model_walk = 0
-    knee_angle_model_stop = 0
-    ankle_angle_model_stop = 0
-    knee_angle_model_lost = 0
-    ankle_angle_model_lost = 0
-    knee_angle_model_recover = 0
-    ankle_angle_model_recover = 0
+    knee_angle_model_ref = 0
+    ankle_angle_model_ref = 0
 
     simulation_log = {
         # state estimates
@@ -255,7 +246,7 @@ try:
         "step_length_est": np.zeros((len(dataOSL["Time"]), 1)),
         "ramp_est": np.zeros((len(dataOSL["Time"]), 1)),
         #"Sigma": np.zeros((len(dataOSL["Time"]), 4)),
-        "MD_residual": np.zeros((len(dataOSL["Time"]), 1)),
+        "MD": np.zeros((len(dataOSL["Time"]), 1)),
         "lost": np.zeros((len(dataOSL["Time"]), 1)),
         
         "idx_min_prev": np.zeros((len(dataOSL["Time"]), 1)),
@@ -286,9 +277,7 @@ try:
         # Control commands
         "ankle_angle_model": np.zeros((len(dataOSL["Time"]), 1)),
         #"ankle_angle_cmd": np.zeros((len(dataOSL["Time"]), 1)),
-        "knee_angle_model": np.zeros((len(dataOSL["Time"]), 1)),
-        "knee_angle_model_stop": np.zeros((len(dataOSL["Time"]), 1)),
-        "knee_angle_model_walk": np.zeros((len(dataOSL["Time"]), 1)),
+        "knee_angle_model": np.zeros((len(dataOSL["Time"]), 1))
         #"knee_angle_cmd": np.zeros((len(dataOSL["Time"]), 1))
     }
 
@@ -380,7 +369,7 @@ try:
         if radius >= 1:
             if radius_prev < 1:
                 t_walk = t
-            elif t - t_walk > 0.75:
+            elif t - t_walk > 0.5:
                 ekf.R = np.copy(R_org)
                 walk = True
         elif radius < 1:
@@ -406,12 +395,12 @@ try:
         if ekf.MD > MD_threshold:
             if MD_prev <= MD_threshold:
                 t_lost = t
-            elif t - t_lost > 0.75:
+            elif t - t_lost > 0.5:
                 lost = True
         elif ekf.MD <= MD_threshold:
             if MD_prev > MD_threshold:
                 t_recover = t
-            elif t - t_recover > 1:
+            elif t - t_recover > 0.75:
                 lost = False
         MD_prev = ekf.MD
         
@@ -421,30 +410,45 @@ try:
             # use the thigh_angle-phase look-up table
             pegleg_joint_angles = joints_control(0.3, 0, 1, 0)
             if walk_prev == True:
-                t_walk_act = t
-            if t - t_walk_act <= 1: # 1-sec transition to stop 
-                trans_stop = t - t_walk_act
-                knee_angle_model = trans_stop * pegleg_joint_angles[0] + (1-trans_stop) * knee_angle_model_walk
-                ankle_angle_model = trans_stop * pegleg_joint_angles[1] + (1-trans_stop) * ankle_angle_model_walk
+                t_stop_ref = t
+                knee_angle_model_ref = knee_angle_model
+                ankle_angle_model_ref = ankle_angle_model
+            if t - t_stop_ref <= 1: # 1-sec transition to stop 
+                trans_stop = t - t_stop_ref
+                knee_angle_model = trans_stop * pegleg_joint_angles[0] + (1-trans_stop) * knee_angle_model_ref
+                ankle_angle_model = trans_stop * pegleg_joint_angles[1] + (1-trans_stop) * ankle_angle_model_ref
             else:
                 knee_angle_model = pegleg_joint_angles[0]
                 ankle_angle_model = pegleg_joint_angles[1]
-            knee_angle_model_stop = knee_angle_model
-            ankle_angle_model_stop = ankle_angle_model
 
-        elif walk == True:
+        elif walk == True and lost == False:
             joint_angles = joints_control(ekf.x[0, 0], ekf.x[1, 0], ekf.x[2, 0], ekf.x[3, 0])
-            if walk_prev == False:
-                t_stop_act = t
-            if t - t_stop_act <= 1: # 1-sec transition to normal walking 
-                trans_walk = t - t_stop_act
-                knee_angle_model = trans_walk * joint_angles[0] + (1-trans_walk) * knee_angle_model_stop
-                ankle_angle_model = trans_walk * joint_angles[1] + (1-trans_walk) * ankle_angle_model_stop
+            if walk_prev == False or (walk_prev == True and lost_prev == True):
+                t_nwalk_ref = t
+                knee_angle_model_ref = knee_angle_model
+                ankle_angle_model_ref = ankle_angle_model
+            if t - t_nwalk_ref <= 1: # 1-sec transition to normal walking 
+                trans_nwalk = t - t_nwalk_ref
+                knee_angle_model = trans_nwalk * joint_angles[0] + (1-trans_nwalk) * knee_angle_model_ref
+                ankle_angle_model = trans_nwalk * joint_angles[1] + (1-trans_nwalk) * ankle_angle_model_ref
             else:
                 knee_angle_model = joint_angles[0]
                 ankle_angle_model = joint_angles[1]
-            knee_angle_model_walk = knee_angle_model
-            ankle_angle_model_walk = ankle_angle_model
+        
+        elif walk == True and lost == True:
+            pegleg_joint_angles = joints_control(0.3, 0, 1, 0)
+            if walk_prev == False or (walk_prev == True and lost_prev == False):
+                t_lwalk_ref = t
+                knee_angle_model_ref = knee_angle_model
+                ankle_angle_model_ref = ankle_angle_model
+            if t - t_lwalk_ref <= 1: # 1-sec transition to normal walking 
+                trans_lwalk = t - t_lwalk_ref
+                knee_angle_model = trans_lwalk * pegleg_joint_angles[0] + (1-trans_lwalk) * knee_angle_model_ref
+                ankle_angle_model = trans_lwalk * pegleg_joint_angles[1] + (1-trans_lwalk) * ankle_angle_model_ref
+            else:
+                knee_angle_model = pegleg_joint_angles[0]
+                ankle_angle_model = pegleg_joint_angles[1]
+        lost_prev = lost
         walk_prev = walk
 
         ## 2) Control commands generated by the prescribed trajectory (lookup table) 
@@ -468,7 +472,7 @@ try:
         simulation_log['step_length_est'][indx] = ekf.x[2, 0]
         simulation_log['ramp_est'][indx] = ekf.x[3, 0]
         #simulation_log['Sigma'][indx] = np.diag(ekf.Sigma)
-        simulation_log['MD_residual'][indx] = ekf.MD
+        simulation_log['MD'][indx] = ekf.MD
         simulation_log['lost'][indx] = int(lost)
         simulation_log['walk'][indx] = int(walk)
 
@@ -500,8 +504,6 @@ try:
         simulation_log["ankle_angle_model"][indx] = ankle_angle_model
         #simulation_log["ankle_angle_cmd"][indx] = ankle_angle_cmd
         simulation_log["knee_angle_model"][indx] = knee_angle_model
-        simulation_log["knee_angle_model_stop"][indx] = knee_angle_model_stop
-        simulation_log["knee_angle_model_walk"][indx] = knee_angle_model_walk
         #simulation_log["knee_angle_cmd"][indx] = knee_angle_cmd
 
         ### Live plotting
@@ -617,10 +619,10 @@ finally:
     plt.legend()
     plt.grid()
 
-    plt.figure("MD_residual")
+    plt.figure("MD")
     plt.subplot(211)
-    plt.plot(dataOSL["Time"], simulation_log['MD_residual'])
-    plt.ylabel("MD_residual")
+    plt.plot(dataOSL["Time"], simulation_log['MD'])
+    plt.ylabel("MD")
     plt.xlim((t_lower, t_upper))
     plt.grid()
     plt.subplot(212)
@@ -688,7 +690,7 @@ finally:
     #plt.grid()
 
     plt.figure("Joints Angles")
-    plt.subplot(311)
+    plt.subplot(411)
     plt.title("Joints Angles Commands")
     plt.plot(dataOSL["Time"], simulation_log['phase_est'], 'r-')
     #plt.plot(dataOSL["Time"], dataOSL['PV'] / 998, 'k-')
@@ -696,7 +698,7 @@ finally:
     plt.xlim((t_lower, t_upper))
     plt.legend(('EKF phase', 'phase variable'))
     plt.grid()
-    plt.subplot(312)
+    plt.subplot(412)
     #plt.plot(dataOSL["Time"], dataOSL["AnkleAngleRef"], 'k-', label = 'recorded coomand')
     plt.plot(dataOSL["Time"], dataOSL["AnkleAngle"], 'k-', label = 'recorded actual')
     #plt.plot(dataOSL["Time"], simulation_log["ankle_angle_cmd"], 'r-', label = 'prescribed trajectories')
@@ -707,19 +709,24 @@ finally:
     plt.xlim((t_lower, t_upper))
     plt.ylim((-30, 30))
     plt.grid()
-    plt.subplot(313)
+    plt.subplot(413)
     #plt.plot(dataOSL["Time"], dataOSL["KneeAngleRef"], 'k-', label = 'recorded coomand')
     plt.plot(dataOSL["Time"], dataOSL["KneeAngle"], 'k-', label = 'recorded')
     #plt.plot(dataOSL["Time"], simulation_log["knee_angle_cmd"], 'r-', label = 'prescribed trajectories')
     plt.plot(dataOSL["Time"], simulation_log["knee_angle_model"], 'm-', label = 'kinematics model')
-    plt.plot(dataOSL["Time"], simulation_log["knee_angle_model_stop"], 'g--', label = 'stop')
-    plt.plot(dataOSL["Time"], simulation_log["knee_angle_model_walk"], 'r--', label = 'walk')
     #plt.plot(dataOSL["Time"], dataOSL['KneeAngle'], 'b-')
     plt.legend()
     plt.ylabel("Knee angle command(deg)")
-    plt.xlabel("Time (s)")
     plt.xlim((t_lower, t_upper))
     plt.ylim((-80, 5))
+    plt.grid()
+    plt.subplot(414)
+    plt.plot(dataOSL["Time"], simulation_log["lost"], 'r--', label = 'lost')
+    plt.plot(dataOSL["Time"], simulation_log["walk"], 'b-', label = 'walk')
+    plt.legend()
+    plt.xlabel("Time (s)")
+    plt.ylabel("Indicators(T/F)")
+    plt.xlim((t_lower, t_upper))
     plt.grid()
 
     """

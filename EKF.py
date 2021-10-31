@@ -174,7 +174,7 @@ class extended_kalman_filter:
         # Compute MD using innovations
         #self.MD = 0.2 * np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) + (1-0.2) * np.copy(self.MD_residual)
         #self.MD = np.sqrt(self.v[2] * 1/self.R[2,2] * self.v[2])
-        self.MD = np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v)
+        self.MD = self.v.T @ np.linalg.inv(self.R) @ self.v
 
         # Compute MD using residuals
         """
