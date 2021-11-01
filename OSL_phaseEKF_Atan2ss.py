@@ -17,7 +17,7 @@ from EKF import *
 from model_framework import *
 from scipy.signal import butter, lfilter, lfilter_zi
 from basis_model_fitting import measurement_noise_covariance
-#from collections import deque
+from phase_lookup import phase_lookup_table
 import sender_test as sender   # for real-time plotting
 
 # -----------------TODO: change these constants to match your setup ------------------------------------------------
@@ -85,6 +85,9 @@ try:
     refAnk = refTrajectory["ankl"]
     refKne = refTrajectory["knee"]
 
+    ## Create a lookup table that mpas global thigh angles to phases
+    inv_phase = phase_lookup_table(plot = True)
+
     # Create encoder map
     kneSta  = fxs.read_device(kneID)
     ankSta  = fxs.read_device(ankID)
@@ -96,11 +99,12 @@ try:
     cmd_log = {'refAnk': 0.0, 'refKnee': 0.0}
     ekf_log = {'phase': 0.0, 'phase_dot': 0.0, 'stride_length': 0.0, 'ramp': 0.0,
                'global_thigh_angle_pred': 0.0, 'global_thigh_vel_pred': 0.0, 'atan2_pred': 0.0,
-               'global_thigh_angle_lp': 0.0, 'global_thigh_vel_lp_2': 0.0, 
+               'global_thigh_angle_lp': 0.0, 'global_thigh_vel_lp': 0.0, 
                'global_thigh_angle_max': 0.0, 'global_thigh_angle_min': 0.0,
                'global_thigh_vel_max': 0.0, 'global_thigh_vel_min': 0.0,
-               'phase_x': 0.0, 'phase_y': 0.0, 'radius': 0.0, 'atan2': 0.0, 
-               'MD_residual': 0.0, 'lost': 0, 'hold': 0, 'peg': 0}
+               'global_thigh_angle_cline': 0.0,
+               'phase_x': 0.0, 'phase_y': 0.0, 'radius': 0.0, 'atan2': 0.0, 'walk': 0,
+               'MD': 0.0, 'lost': 0}
     logger = loco.ini_log({**dataOSL, **cmd_log, **ekf_log}, sensors = "all_sensors", trialName = "OSL_benchtop_swing_test")
 
     ## Initialize buffers for joints angles =============================================================================
@@ -175,16 +179,17 @@ try:
     #==================================================================================================================
 
     ### Create filters ================================================================================================
-    fs = 60       # sampling rate = 100Hz (actual: dt ~ 0.0135 sec; 67Hz) 
-    nyq = 0.5 * fs    # Nyquist frequency = fs/2
-    fc_normal = 2 / nyq   #cut-off frequency = 2Hz
+    #fs = 60       # sampling rate = 100Hz (actual: dt ~ 0.0135 sec; 67Hz) 
+    #nyq = 0.5 * fs    # Nyquist frequency = fs/2
+    fc = 2 #cut-off frequency = 2Hz
+    #fc_normal = fc / nyq   #cut-off frequency = 2Hz
     # Configure 1st order low-pass filters for computing velocity 
     #b_lp_1, a_lp_1 = butter(1, fc_normal, btype = 'low', analog = False)
     #z_lp_1 = lfilter_zi(b_lp_1,  a_lp_1)
     
     # Configure 1st/2nd/3rd order low-pass filters for computing atan2
-    b_lp_2, a_lp_2 = butter(1, fc_normal, btype = 'low', analog = False)
-    z_lp_2 = lfilter_zi(b_lp_2,  a_lp_2)
+    #b_lp_2, a_lp_2 = butter(1, fc_normal, btype = 'low', analog = False)
+    #z_lp_2 = lfilter_zi(b_lp_2,  a_lp_2)
     #==================================================================================================================
 
     if input('\n\nAbout to walk. Would you like to continue? (y/n): ').lower() == 'y':
@@ -198,31 +203,37 @@ try:
     
     fade_in_time = 2      # sec
 
+    global_thigh_angle_lp = 0
+
     idx_min_prev = 0
     idx_min = 0
     idx_max_prev = 0
     idx_max = 0
     global_thigh_angle_window = np.zeros(500) # time window/ pre-allocate 1 sec
     global_thigh_vel_window = np.zeros(500)
+    global_thigh_angle_shift = 0
 
-    MD_residual_prev = 0
+    radius = 0
+    radius_prev = 0
+    walk = False
+    walk_prev = False
+    t_stop = 0
+    t_walk = 0
+
+    MD_prev = 0
+    MD_threshold = 40
     lost = False
     t_lost = 0
     t_recover = 0
-    radius = 0
 
-    hold = True
-    hold_prev = True
+    t_nwalk_ref = 0
+    t_lwalk_ref = 0
+    t_stop_ref = 0
 
-    peg = False
-    peg_prev = False
-    t_peg = 0
-    t_norm = 0
-
-    knee_angle_model_n = knee_angle_initial
-    ankle_angle_model_n = ankle_angle_initial
-    knee_angle_model_p = knee_angle_initial
-    ankle_angle_model_p = ankle_angle_initial
+    knee_angle_model = 0
+    ankle_angle_model = 0
+    knee_angle_model_ref = 0
+    ankle_angle_model_ref = 0
 
     # ================================================= MAIN LOOP ===================================================
     while True:
@@ -235,10 +246,11 @@ try:
 
         ## Calculate knee and ankle angles ========================================================================
         # 1) Without buffers
-        #knee_angle = dataOSL['kneJoiPos'] * 180 / np.pi
-        #ankle_angle = dataOSL['ankJoiPos'] * 180 / np.pi
+        knee_angle = dataOSL['kneJoiPos'] * 180 / np.pi
+        ankle_angle = dataOSL['ankJoiPos'] * 180 / np.pi
 
         # 2) Use the buffers
+        """
         knee_angle_buffer = [dataOSL['kneJoiPos'], knee_angle_buffer[0], knee_angle_buffer[1]]
         ankle_angle_buffer = [dataOSL['ankJoiPos'], ankle_angle_buffer[0], ankle_angle_buffer[1]]
 
@@ -247,6 +259,7 @@ try:
 
         knee_angle = dataOSL['kneJoiPos'] * 180 / np.pi # deg
         ankle_angle = dataOSL['ankJoiPos'] * 180 / np.pi
+        """
         #==========================================================================================================
         
         ## Calculate loadCell Fz using the buffer =================================================================
@@ -289,6 +302,7 @@ try:
         """
 
         ## 3) Compute Atan2
+        """
         global_thigh_angle_lp, z_lp_2 = lfilter(b_lp_2, a_lp_2, [global_thigh_angle], zi = z_lp_2) 
         global_thigh_angle_lp = global_thigh_angle_lp[0]
         if ptr == 0:
@@ -296,28 +310,40 @@ try:
         else:
             global_thigh_vel_lp_2 = (global_thigh_angle_lp - global_thigh_angle_lp_0) / dt
         global_thigh_angle_lp_0 = global_thigh_angle_lp
+        """
+        alpha = 2 * np.pi * dt * fc / (2 * np.pi * dt * fc + 1) # for discrete-time 1st-order low-pass filter
+        global_thigh_angle_lp = alpha * global_thigh_angle + (1 - alpha) * global_thigh_angle_lp
+        if ptr == 0:
+            global_thigh_vel_lp = 0
+            global_thigh_angle_cline = global_thigh_angle_lp
+        else:
+            global_thigh_vel_lp = (global_thigh_angle_lp - global_thigh_angle_lp_0) / dt
+            global_thigh_angle_cline = 0.05 * global_thigh_angle_lp + (1 - 0.05) * global_thigh_angle_cline
+        global_thigh_angle_lp_0 = global_thigh_angle_lp
 
         # allocte more space if ptr exceed the bounds
-        if ptr - idx_max_prev >= np.shape(global_thigh_angle_window)[0]:
-            global_thigh_angle_window = np.concatenate((global_thigh_angle_window, np.zeros(np.shape(global_thigh_angle_window)[0])))
-            global_thigh_vel_window = np.concatenate((global_thigh_vel_window, np.zeros(np.shape(global_thigh_angle_window)[0])))
-
+        if ptr - idx_max_prev >= np.shape(global_thigh_angle_window)[0]: #np.shape(global_thigh_angle_window)[0]:
+            #global_thigh_angle_window = np.concatenate((global_thigh_angle_window, np.zeros(1*len(global_thigh_angle_window))))
+            #global_thigh_vel_window = np.concatenate((global_thigh_vel_window, np.zeros(1*len(global_thigh_angle_window))))
+            global_thigh_angle_window = np.pad(global_thigh_angle_window, (0, np.shape(global_thigh_angle_window)[0]))
+            global_thigh_vel_window = np.pad(global_thigh_vel_window, (0, np.shape(global_thigh_angle_window)[0]))
+                
         global_thigh_angle_window[ptr - idx_max_prev] = global_thigh_angle_lp
-        global_thigh_vel_window[ptr - idx_max_prev] = global_thigh_vel_lp_2
+        global_thigh_vel_window[ptr - idx_max_prev] = global_thigh_vel_lp
        
         if ptr > 0:
-            global_thigh_angle_max = np.max(global_thigh_angle_window[idx_min_prev - idx_max_prev:ptr - idx_max_prev])
-            global_thigh_angle_min = np.min(global_thigh_angle_window[idx_max_prev - idx_max_prev:ptr - idx_max_prev])
-            global_thigh_vel_max = np.max(global_thigh_vel_window[idx_min_prev - idx_max_prev:ptr - idx_max_prev])
-            global_thigh_vel_min = np.min(global_thigh_vel_window[idx_max_prev - idx_max_prev:ptr - idx_max_prev])
-        
+            global_thigh_angle_max = np.amax(global_thigh_angle_window[idx_min_prev - idx_max_prev:ptr - idx_max_prev])
+            global_thigh_angle_min = np.amin(global_thigh_angle_window[idx_max_prev - idx_max_prev:ptr - idx_max_prev])
+            global_thigh_vel_max = np.amax(global_thigh_vel_window[idx_min_prev - idx_max_prev:ptr - idx_max_prev])
+            global_thigh_vel_min = np.amin(global_thigh_vel_window[idx_max_prev - idx_max_prev:ptr - idx_max_prev])
+
         # compute the indices
         if ptr > idx_max + 1:
             idx_min_temp = np.argmin(global_thigh_angle_window[idx_max - idx_max_prev:ptr - idx_max_prev]) + idx_max
-            if ptr > idx_min_temp + 1 and global_thigh_angle_window[idx_min_temp - idx_max_prev] < -5:
+            if ptr > idx_min_temp + 1 and global_thigh_angle_window[idx_min_temp - idx_max_prev] < global_thigh_angle_cline:
                 idx_min = idx_min_temp
                 idx_max_temp = np.argmax(global_thigh_angle_window[idx_min_temp - idx_max_prev:ptr - idx_max_prev]) + idx_min_temp
-                if ptr > idx_max_temp + 1 and global_thigh_angle_window[idx_max_temp - idx_max_prev] > 5: # new stride
+                if ptr > idx_max_temp + 1 and global_thigh_angle_window[idx_max_temp - idx_max_prev] > global_thigh_angle_cline: # new stride
                     # reform the time windows
                     global_thigh_angle_window = global_thigh_angle_window[idx_max - idx_max_prev:-1]
                     global_thigh_vel_window = global_thigh_vel_window[idx_max - idx_max_prev:-1]
@@ -333,26 +359,34 @@ try:
             global_thigh_angle_scale = abs(global_thigh_vel_max - global_thigh_vel_min) / abs(global_thigh_angle_max - global_thigh_angle_min)
             global_thigh_vel_shift = (global_thigh_vel_max + global_thigh_vel_min) / 2
 
-            phase_y = - (global_thigh_vel_lp_2 - global_thigh_vel_shift)
+            phase_y = - (global_thigh_vel_lp - global_thigh_vel_shift)
             phase_x = global_thigh_angle_scale * (global_thigh_angle_lp - global_thigh_angle_shift)
         else:
-            phase_y = - global_thigh_vel_lp_2
-            phase_x = global_thigh_angle_lp * (2*np.pi*0.8)
+            phase_y = - global_thigh_vel_lp
+            phase_x = global_thigh_angle_lp  * (2 * np.pi * 0.8)
         
         Atan2 = np.arctan2(phase_y, phase_x)
         if Atan2 < 0:
             Atan2 = Atan2 + 2 * np.pi
         
-        c = 45
-        d = 45
-        #radius = (phase_x / c) ** 2 + (phase_y / d) ** 2
-        radius = 0.15 * ((phase_x / c) ** 2 + (phase_y / d) ** 2) + (1-0.15) * radius
+        c = 90
+        d = 90
+        radius = (phase_x / c) ** 2 + (phase_y / d) ** 2
         if radius >= 1:
-            ekf.R = np.copy(R_org)
-        else:
-            ekf.R[2, 2] = 1e30
+            if radius_prev < 1:
+                t_walk = t
+            elif t - t_walk > 0.5:
+                ekf.R = np.copy(R_org)
+                walk = True
+        elif radius < 1:
+            if radius_prev >= 1:
+                t_stop = t
+            elif t - t_stop > 0.5:
+                ekf.R[2, 2] = 1e20
+                walk = False
+        radius_prev = radius
 
-        measurement = np.array([[global_thigh_angle], [global_thigh_vel_lp_2], [Atan2]])
+        measurement = np.array([[global_thigh_angle], [global_thigh_vel_lp], [Atan2]])
         measurement = np.squeeze(measurement)
         #==========================================================================================================
 
@@ -364,65 +398,69 @@ try:
         ekf.state_saturation(saturation_range)
         #==========================================================================================================
         
-        ## Failure and position holding detectors
-        # Failure detector
-        if ekf.MD_residual > 4:
-            if MD_residual_prev <= 4:
+        ### Failure detector
+        if ekf.MD > MD_threshold:
+            if MD_prev <= MD_threshold:
                 t_lost = t
-            elif t - t_lost > 0.15:
+            elif t - t_lost > 0.5:
                 lost = True
-        elif ekf.MD_residual <= 4:
-            if MD_residual_prev > 4:
+        elif ekf.MD <= MD_threshold:
+            if MD_prev > MD_threshold:
                 t_recover = t
-            elif t - t_recover > 1:
+            elif t - t_recover > 0.75:
                 lost = False
-        MD_residual_prev = ekf.MD_residual
-
-        # Position holding detector
-        if ekf.x[1, 0] < 0.1 or radius < 1:
-            hold = True
-        else:
-            hold = False
-
-        # Combine both detectors
-        if lost == True or hold == True:
-            peg = True
-            if peg_prev == False:
-                t_peg = t
-        else:
-            peg = False
-            if peg_prev == True:
-                t_norm = t
-        peg_prev = peg
+        MD_prev = ekf.MD
         #==========================================================================================================
 
         ## Generate joint control commands ========================================================================
         # 1) Control commands generated by the trainned model
-        #joint_angles = joints_control(ekf.x[0, 0], ekf.x[1, 0], ekf.x[2, 0], ekf.x[3, 0])
-        #knee_angle_model = joint_angles[0]
-        #ankle_angle_model = joint_angles[1]
-        if peg == True:
-            pegleg_joint_angles = joints_control(0.3, 0, 0.1, 0)
-            if t - t_peg <= 1: # 1 sec fade-in 
-                alpha = t - t_peg
-                knee_angle_model = alpha * pegleg_joint_angles[0] + (1-alpha) * knee_angle_model_n
-                ankle_angle_model = alpha * pegleg_joint_angles[1] + (1-alpha) * ankle_angle_model_n
+        if walk == False:
+            # use the thigh_angle-phase look-up table
+            th = int( (global_thigh_angle + 180) / (360/(1000-1)) )
+            pegleg_joint_angles = joints_control(inv_phase[th], 0, 1.5, 0)
+            if walk_prev == True:
+                t_stop_ref = t
+                knee_angle_model_ref = knee_angle_model
+                ankle_angle_model_ref = ankle_angle_model
+            if t - t_stop_ref <= 1: # 1-sec transition to stop 
+                trans_stop = t - t_stop_ref
+                knee_angle_model = trans_stop * pegleg_joint_angles[0] + (1-trans_stop) * knee_angle_model_ref
+                ankle_angle_model = trans_stop * pegleg_joint_angles[1] + (1-trans_stop) * ankle_angle_model_ref
             else:
                 knee_angle_model = pegleg_joint_angles[0]
                 ankle_angle_model = pegleg_joint_angles[1]
-            knee_angle_model_p = knee_angle_model
-            ankle_angle_model_p = ankle_angle_model
-        else:
+
+        elif walk == True and lost == False:
+            # walk normally 
             joint_angles = joints_control(ekf.x[0, 0], ekf.x[1, 0], ekf.x[2, 0], ekf.x[3, 0])
-            if t - t_norm <= 1:
-                alpha = t - t_norm 
-                knee_angle_model = alpha * joint_angles[0] + (1-alpha) * knee_angle_model_p
-                ankle_angle_model = alpha * joint_angles[1] + (1-alpha) * ankle_angle_model_p
+            if walk_prev == False or (walk_prev == True and lost_prev == True):
+                t_nwalk_ref = t
+                knee_angle_model_ref = knee_angle_model
+                ankle_angle_model_ref = ankle_angle_model
+            if t - t_nwalk_ref <= 1: # 1-sec transition to normal walking 
+                trans_nwalk = t - t_nwalk_ref
+                knee_angle_model = trans_nwalk * joint_angles[0] + (1-trans_nwalk) * knee_angle_model_ref
+                ankle_angle_model = trans_nwalk * joint_angles[1] + (1-trans_nwalk) * ankle_angle_model_ref
             else:
                 knee_angle_model = joint_angles[0]
                 ankle_angle_model = joint_angles[1]
-            knee_angle_model_n = knee_angle_model
-            ankle_angle_model_n = ankle_angle_model
+        
+        elif walk == True and lost == True:
+            # set the joints to a pegleg configuration
+            pegleg_joint_angles = joints_control(0.288, 0, 1.5, 0)
+            if walk_prev == False or (walk_prev == True and lost_prev == False):
+                t_lwalk_ref = t
+                knee_angle_model_ref = knee_angle_model
+                ankle_angle_model_ref = ankle_angle_model
+            if t - t_lwalk_ref <= 1: # 1-sec transition to normal walking 
+                trans_lwalk = t - t_lwalk_ref
+                knee_angle_model = trans_lwalk * pegleg_joint_angles[0] + (1-trans_lwalk) * knee_angle_model_ref
+                ankle_angle_model = trans_lwalk * pegleg_joint_angles[1] + (1-trans_lwalk) * ankle_angle_model_ref
+            else:
+                knee_angle_model = pegleg_joint_angles[0]
+                ankle_angle_model = pegleg_joint_angles[1]
+        lost_prev = lost
+        walk_prev = walk
         
         # 2) Control commands generated by Edgar's trajectory (look-up table)
         #pv = int(ekf.x[0, 0] * 998)  # phase variable conversion (scaling)
@@ -476,23 +514,22 @@ try:
         ekf_log['global_thigh_vel_pred'] = ekf.z_hat[1][0]
         ekf_log['atan2_pred'] = ekf.z_hat[2][0]
         
-        #ekf_log["global_thigh_vel_lp"] = global_thigh_vel_lp
+        ekf_log["global_thigh_vel_lp"] = global_thigh_vel_lp
         ekf_log["global_thigh_angle_lp"] = global_thigh_angle_lp
-        ekf_log["global_thigh_vel_lp_2"] = global_thigh_vel_lp_2
         if ptr > 0:
             ekf_log["global_thigh_angle_max"] = global_thigh_angle_max
             ekf_log["global_thigh_angle_min"] = global_thigh_angle_min
             ekf_log["global_thigh_vel_max"] = global_thigh_vel_max
             ekf_log["global_thigh_vel_min"] = global_thigh_vel_min
+        ekf_log["global_thigh_angle_cline"] = global_thigh_angle_cline
         ekf_log["phase_x"] = phase_x
         ekf_log["phase_y"] = phase_y
         ekf_log['atan2'] = Atan2
         ekf_log['radius'] = radius  
+        ekf_log['walk'] = int(walk)
 
-        ekf_log['MD_residual'] = ekf.MD_residual
+        ekf_log['MD'] = ekf.MD
         ekf_log['lost'] = int(lost)
-        ekf_log['hold'] = int(hold)
-        ekf_log['peg'] = int(peg)
         loco.log_OSL({**dataOSL,**cmd_log, **ekf_log}, logger)
         #==========================================================================================================
 

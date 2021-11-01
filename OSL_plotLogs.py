@@ -42,23 +42,23 @@ ekfEstimates = {
     "global_thigh_vel_pred": datatxt["global_thigh_vel_pred"],
     "atan2_pred": datatxt["atan2_pred"],
     
-    #"global_thigh_vel_lp": datatxt["global_thigh_vel_lp"],
-
     "global_thigh_angle_lp": datatxt["global_thigh_angle_lp"],
+    #"global_thigh_vel_lp": datatxt["global_thigh_vel_lp"],
     "global_thigh_vel_lp_2": datatxt["global_thigh_vel_lp_2"],
     "global_thigh_angle_max": datatxt["global_thigh_angle_max"],
     "global_thigh_angle_min": datatxt["global_thigh_angle_min"],
     "global_thigh_vel_max": datatxt["global_thigh_vel_max"],
     "global_thigh_vel_min": datatxt["global_thigh_vel_min"],
+    # "global_thigh_angle_cline": datatxt[global_thigh_angle_cline,
     "phase_x": datatxt["phase_x"],
     "phase_y": datatxt["phase_y"],
     "radius": datatxt["radius"],
     "atan2": datatxt["atan2"],
+    #"walk": datatxt["walk"],
+
+    #"MD": datatxt["MD"],
+    #"lost": datatxt["lost"]
     
-    #"MD_residual": datatxt["MD_residual"],
-    #"lost": datatxt["lost"],
-    #"hold": datatxt["hold"],
-    #"peg": datatxt["peg"]
 }
 
 ## Generating joints angles using the kinematics model ============================================
@@ -160,6 +160,7 @@ axs[0].plot(time, ekfEstimates["global_thigh_angle_lp"][ranA:ranB], 'k-', label 
 axs[0].plot(time, actualTrajectory["global_thigh_angle"][ranA:ranB] * 180 / np.pi, 'm-', alpha = 0.4, label = 'raw')
 axs[0].plot(time, ekfEstimates["global_thigh_angle_max"][ranA:ranB], 'r-', label = 'max')
 axs[0].plot(time, ekfEstimates["global_thigh_angle_min"][ranA:ranB], 'b-', label = 'min')
+#axs[0].plot(time, ekfEstimates["global_thigh_angle_cline"][ranA:ranB], 'k-', label = 'center')
 
 axs[1].set_ylabel('Global Thigh Velocity (deg/s)')
 axs[1].plot(time, ekfEstimates["global_thigh_vel_lp_2"][ranA:ranB], 'k-', label = 'for atan2 computation')

@@ -48,7 +48,7 @@ dataOSL = {
 """
 
 ### B. Load Kevin's bypass-adapter walking data
-"""
+#"""
 mat = scipy.io.loadmat('OSL_walking_data/Treadmill_speed1_incline0_file2.mat')
 # Treadmill_speed1_incline0_file2
 # Treadmill_speed1_incline0_file1
@@ -78,11 +78,11 @@ dataOSL = {
     'LoadCellMy': mat['LoadCell'][0, 0]['My'].reshape(-1),
     'LoadCellMz': mat['LoadCell'][0, 0]['Mz'].reshape(-1),
 }
-"""
+#"""
 
 ### C. Load Benchtop Test Data
-#"""
-logFile = r"OSL_walking_data/211021_184718_OSL_benchtop_swing_test.csv"
+"""
+logFile = r"OSL_walking_data/211014_130906_OSL_benchtop_swing_test.csv"
 # 211021_184718_OSL_benchtop_swing_test
 # 211021_184343_OSL_benchtop_swing_test
 # 211014_130906_OSL_benchtop_swing_test
@@ -98,7 +98,7 @@ dataOSL = {
     'KneeAngle': datatxt["kneJoiPos"],
     'KneeAngleRef': datatxt["refKnee"]
 }
-#"""
+"""
 
 ## From loco_OSL.py: Load referenced trajectories
 def loadTrajectory(trajectory = 'walking'):
@@ -226,15 +226,15 @@ try:
     t_stop = 0
     t_walk = 0
 
-    t_nwalk_ref = 0
-    t_lwalk_ref = 0
-    t_stop_ref = 0
-
     MD_prev = 0
-    MD_threshold = 40 # 6.251(90%), 7.815(95%), 9.348(97.5%), 11.345(99%)
+    MD_threshold = 40
     lost = False
     t_lost = 0
     t_recover = 0
+
+    t_nwalk_ref = 0
+    t_lwalk_ref = 0
+    t_stop_ref = 0
 
     knee_angle_initial = dataOSL['KneeAngle'][0]
     ankle_angle_initial = dataOSL['AnkleAngle'][0]
