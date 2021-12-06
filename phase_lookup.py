@@ -10,7 +10,7 @@ def phase_lookup_table(plot = False):
     ## Create a lookup table that mpas global thigh angles to phases
     #  at normalized_stride_length = 1.5
     m_model = model_loader('Measurement_model_012_NSL.pickle')
-    Psi = load_Psi('Generic')
+    Psi = load_Psi()
 
     res = 1000
     phase = np.linspace(0, 0.5, res)

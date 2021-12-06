@@ -230,7 +230,7 @@ def Continuous_atan2_scale_shift(subject, trial, side, plot = True):
 
 def plot_Conti_measurement_data(subject, trial, side):
     print("subject: ",  subject, "| trial: ",  trial, " | side: ", side)
-
+    
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
     globalThighAngle, globalThighVelocity, _, globalFootAngle, ankleMoment, tibiaForce = load_Conti_measurement_data(subject, trial, side)
     
@@ -239,13 +239,13 @@ def plot_Conti_measurement_data(subject, trial, side):
     m_model = model_loader('Measurement_model_012_NSL.pickle')
     Psi = load_Psi('Generic')
 
-    globalThighAngle_pred = model_prediction(m_model.models[0], Psi['globalThighAngles'], phases, phase_dots, step_lengths, ramps)
-    globalThighVelocity_pred = model_prediction(m_model.models[1], Psi['globalThighVelocities'], phases, phase_dots, step_lengths, ramps)
+    globalThighAngle_pred = model_prediction(m_model.models[0], Psi['globalThighAngles'], phases, phase_dots, step_lengths)
+    globalThighVelocity_pred = model_prediction(m_model.models[1], Psi['globalThighVelocities'], phases, phase_dots, step_lengths)
     
     #ankleMoment_pred = model_prediction(m_model.models[4], Psi['ankleMoment'], phases, phase_dots, step_lengths, ramps)
     #tibiaForce_pred = model_prediction(m_model.models[5], Psi['tibiaForce'], phases, phase_dots, step_lengths, ramps)
     
-    atan2_pred = model_prediction(m_model.models[2], Psi['atan2'], phases, phase_dots, step_lengths, ramps) + 2*np.pi*phases
+    atan2_pred = model_prediction(m_model.models[2], Psi['atan2'], phases, phase_dots, step_lengths) + 2*np.pi*phases
     atan2_pred = wrapTo2pi(atan2_pred)
     residuals_atan2 = atan2 - atan2_pred
     residuals_atan2 = np.arctan2(np.sin(residuals_atan2), np.cos(residuals_atan2))
@@ -482,15 +482,15 @@ def plot_Conti_joints_angles(subject, trial, side):
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
     knee_angle, ankle_angle = load_Conti_joints_angles(subject, trial, side)
     
-    c_model = model_loader('Control_model_NSL_B10.pickle')
+    c_model = model_loader('Control_model.pickle')
 
-    with open('Psi_incExp/Psi_kneeAngles_NSL_B10.pickle', 'rb') as file:
+    with open('Psi_3states/Psi_kneeAngles', 'rb') as file:
         Psi_knee = pickle.load(file)
-    with open('Psi_incExp/Psi_ankleAngles_NSL_B10.pickle', 'rb') as file:
+    with open('Psi_3states/Psi_ankleAngles', 'rb') as file:
         Psi_ankle = pickle.load(file)
     
-    knee_angle_pred = model_prediction(c_model.models[0], Psi_knee, phases, phase_dots, step_lengths, ramps)
-    ankle_angle_pred = model_prediction(c_model.models[1], Psi_ankle, phases, phase_dots, step_lengths, ramps)
+    knee_angle_pred = model_prediction(c_model.models[0], Psi_knee, phases, phase_dots, step_lengths)
+    ankle_angle_pred = model_prediction(c_model.models[1], Psi_ankle, phases, phase_dots, step_lengths)
     
     plt.figure("Joint Angle Control")
     start = 0
@@ -850,8 +850,8 @@ if __name__ == '__main__':
     #plt.plot(-footAngles-90)
     #plt.show()
     #plot_Conti_kinetics_data(subject, trial, side)
-    #plot_Conti_joints_angles(subject, trial, side)
-    plot_Conti_measurement_data(subject, trial, side)
+    plot_Conti_joints_angles(subject, trial, side)
+    #plot_Conti_measurement_data(subject, trial, side)
 
     ######## test real0time filters #############
     """

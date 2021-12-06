@@ -59,7 +59,8 @@ time.sleep(2/100)
 #G_A = {"kp": 40, "ki": 400, "K": 600, "B": 300, "FF": 128}  # Ankle controller gains
 
 # 4) Actual Use
-G_K = {"kp": 40, "ki": 400, "K": 500, "B": 1500, "FF": 128}
+#G_K = {"kp": 40, "ki": 400, "K": 500, "B": 1500, "FF": 128}
+G_K = {"kp": 40, "ki": 400, "K": 750, "B": 1500, "FF": 128}
 #G_K = {"kp": 40, "ki": 400, "K": 300, "B": 1600, "FF": 128}  # Knee controller gains
 G_A = {"kp": 40, "ki": 400, "K": 600, "B": 300, "FF": 128}  # Ankle controller gains
 
@@ -96,7 +97,7 @@ try:
 
     ## Joints Commands setting ===============================================================================================
     # Natural frequency of the sine wave (rad/s)
-    freq = 2 * np.pi * 0.2 # 0.2 Hz
+    freq = 2 * np.pi * 0.5 # 0.2 Hz
 
     # Fade-in time (sec)
     fade_in_time = 3

@@ -3,60 +3,43 @@ from model_framework import *
 
 # Process model for the EKF
 def A(dt):
-    return np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+    return np.array([[1, dt, 0], [0, 1, 0], [0, 0, 1]])
 
 def process_model(x, dt):
     #dt = 0.01 # data sampling rate: 100 Hz
-    return A(dt) @ x
+    return A(dt) @ x.T
 
 ## Load control model & coefficients (for OSL implementation)
-c_model = model_loader('Control_model_NSL_B20.pickle')
-with open('Psi/Psi_kneeAngles_NSL_B20_const.pickle', 'rb') as file:#_withoutNan
+c_model = model_loader('Control_model.pickle')
+with open('Psi_3states/Psi_kneeAngles', 'rb') as file:#_withoutNan
     Psi_knee = pickle.load(file)
-with open('Psi/Psi_ankleAngles_NSL_B20_const.pickle', 'rb') as file:
+with open('Psi_3states/Psi_ankleAngles', 'rb') as file:
     Psi_ankle = pickle.load(file)
 
 ## Load model coefficients
-def load_Psi(subject = 'Generic'):
-    if subject == 'Generic':
-        with open('Psi/Psi_globalThighAngles_NSL_B10_const.pickle', 'rb') as file:
-            Psi_globalThighAngles = pickle.load(file)
+def load_Psi():
+    with open('Psi_3states/Psi_globalThighAngles', 'rb') as file:
+        Psi_globalThighAngles = pickle.load(file)
+    with open('Psi_3states/Psi_globalThighVelocities', 'rb') as file:
+        Psi_globalThighVelocities = pickle.load(file)
+    with open('Psi_3states/Psi_atan2ss', 'rb') as file:
+        Psi_atan2 = pickle.load(file)
+    """
+    with open('Psi/Psi_globalThighAngles_NSL_B10_const.pickle', 'rb') as file:
+        Psi_globalThighAngles = pickle.load(file)
         
-        with open('Psi/Psi_globalThighVelocities_NSL_B10_const.pickle', 'rb') as file:
-            Psi_globalThighVelocities = pickle.load(file)
+    with open('Psi/Psi_globalThighVelocities_NSL_B10_const.pickle', 'rb') as file:
+        Psi_globalThighVelocities = pickle.load(file)
         
-        #with open('Psi_incExp/Psi_ankleMoment_NSL_B33.pickle', 'rb') as file:
-        #    Psi_ankleMoment = pickle.load(file)
+    #with open('Psi_incExp/Psi_ankleMoment_NSL_B33.pickle', 'rb') as file:
+    #    Psi_ankleMoment = pickle.load(file)
         
-        #with open('Psi_incExp/Psi_tibiaForce_NSL_B33.pickle', 'rb') as file:
-        #    Psi_tibiaForce = pickle.load(file)
+    #with open('Psi_incExp/Psi_tibiaForce_NSL_B33.pickle', 'rb') as file:
+    #    Psi_tibiaForce = pickle.load(file)
         
-        with open('Psi/Psi_atan2ss_NSL.pickle', 'rb') as file:
-            Psi_atan2 = pickle.load(file)
-
-    else:
-        print("Subject-specific model is not available at this time.")
-        """
-        with open('Psi/Psi_thigh_Y.pickle', 'rb') as file:
-            p = pickle.load(file)
-            Psi_globalThighAngles = p[subject]
-        with open('Psi/Psi_force_Z.pickle', 'rb') as file:
-            p = pickle.load(file)
-            Psi_force_Z = p[subject]
-        with open('Psi/Psi_force_X.pickle', 'rb') as file:
-            p = pickle.load(file)
-            Psi_force_X = p[subject]
-        with open('Psi/Psi_moment_Y.pickle', 'rb') as file:
-            p = pickle.load(file)
-            Psi_ankleMoment = p[subject]
-        with open('Psi/Psi_thighVel_2hz.pickle', 'rb') as file:
-            p = pickle.load(file)
-            Psi_globalThighVelocities = p[subject]
-        with open('Psi/Psi_atan2.pickle', 'rb') as file:
-            p = pickle.load(file)
-            Psi_atan2 = p[subject]
-        """
-           
+    with open('Psi/Psi_atan2ss_NSL.pickle', 'rb') as file:
+        Psi_atan2 = pickle.load(file)
+    """
     Psi = {'globalThighAngles': Psi_globalThighAngles, 'globalThighVelocities': Psi_globalThighVelocities,
            'atan2': Psi_atan2}
     return Psi
@@ -88,8 +71,8 @@ def phase_error(phase_est, phase_truth):
             phase_error[i] = 1 - abs(phase_est[i] - phase_truth[i])
     return phase_error
 
-def joints_control(phases, phase_dots, step_lengths, ramps):
-    joint_angles = c_model.evaluate_h_func([Psi_knee, Psi_ankle], phases, phase_dots, step_lengths, ramps)
+def joints_control(phases, phase_dots, step_lengths):
+    joint_angles = c_model.evaluate_h_func([Psi_knee, Psi_ankle], phases, phase_dots, step_lengths)
     return joint_angles
     
 class myStruct:
@@ -117,19 +100,19 @@ class extended_kalman_filter:
     def prediction(self, dt):
         # EKF propagation (prediction) step
         self.x = self.f(self.x, dt)  # predicted state
-        self.x[0, 0] = warpToOne(self.x[0, 0]) # wrap to be between 0 and 1
+        self.x[0] = warpToOne(self.x[0]) # wrap to [0,1)
         self.Sigma = self.A(dt) @ self.Sigma @ self.A(dt).T + self.Q  # predicted state covariance
 
-    def correction(self, z, Psi, using_atan2 = False, direct_ramp = False):
+    def correction(self, z, Psi, using_atan2 = False):
         # EKF correction step
         # Inputs:
         #   z:  measurement
 
         # evaluate measurement Jacobian at current operating point
-        H = self.h.evaluate_dh_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
+        H = self.h.evaluate_dh_func(Psi, self.x[0], self.x[1], self.x[2])
         
         # predicted measurements
-        self.z_hat = self.h.evaluate_h_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
+        self.z_hat = self.h.evaluate_h_func(Psi, self.x[0], self.x[1], self.x[2])[:,0]
 
         ### Jacobian test #########################################################
         #print("HPH=",  H @ self.Sigma @ H.T)
@@ -138,21 +121,14 @@ class extended_kalman_filter:
         #print(z2 - self.z_hat)
         #print(H @ np.array([[-0.01], [-0.01], [0.01], [-0.01]]))
         ###########################################################################
-        """
-        if direct_ramp != False:
-            # add the direct ramp as the last element of the measurement vector
-            H = np.vstack((H, np.array([0, 0, 0, 1])))
-            self.z_hat = np.vstack((self.z_hat, np.array([self.x[3,0]])))
-            z = np.concatenate((z, direct_ramp))
-        """
+
         if using_atan2:
             H[2, 0] += 2*np.pi
-            self.z_hat[2] += self.x[0,0] * 2 * np.pi
-            # wrap to 2pi
-            self.z_hat[2] = wrapTo2pi(self.z_hat[2])
+            self.z_hat[2] += self.x[0] * 2 * np.pi
+            #self.z_hat[2] = wrapTo2pi(self.z_hat[2])
         
         # innovation
-        z = np.array([z]).T
+        #z = np.array([z]).T
         self.v = z - self.z_hat
         if using_atan2:
             # wrap to pi
@@ -166,15 +142,15 @@ class extended_kalman_filter:
 
         # correct the predicted state statistics
         self.x = self.x + K @ self.v
-        self.x[0, 0] = warpToOne(self.x[0, 0])
+        self.x[0] = warpToOne(self.x[0])
         #I = np.eye(np.shape(self.x)[0])
         #self.Sigma = (I - K @ H) @ self.Sigma
-        self.Sigma = (np.eye(4) - K @ H) @ self.Sigma
+        self.Sigma = (np.eye(3) - K @ H) @ self.Sigma
 
         # Compute MD using innovations
         #self.MD = 0.2 * np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) + (1-0.2) * np.copy(self.MD_residual)
         #self.MD = np.sqrt(self.v[2] * 1/self.R[2,2] * self.v[2])
-        self.MD = self.v.T @ np.linalg.inv(self.R) @ self.v
+        self.MD = (self.v.T @ np.linalg.inv(self.R) @ self.v)#[0, 0]
 
         # Compute MD using residuals
         """
@@ -197,18 +173,13 @@ class extended_kalman_filter:
         step_lengths_max = saturation_range[2]
         step_lengths_min = saturation_range[3]
         
-        if self.x[1, 0] > phase_dots_max:
-            self.x[1, 0] = phase_dots_max
-        elif self.x[1, 0] < phase_dots_min:
-            self.x[1, 0] = phase_dots_min
+        if self.x[1] > phase_dots_max:
+            self.x[1] = phase_dots_max
+        elif self.x[1] < phase_dots_min:
+            self.x[1] = phase_dots_min
 
-        if self.x[2, 0] > step_lengths_max:
-            self.x[2, 0] = step_lengths_max
-        elif self.x[2, 0] < step_lengths_min:
-            self.x[2, 0] = step_lengths_min
-
-        #if self.x[3, 0] > 10:
-        #    self.x[3, 0] = 10
-        #elif self.x[3, 0] < -10:
-        #    self.x[3, 0] = -10
+        if self.x[2] > step_lengths_max:
+            self.x[2] = step_lengths_max
+        elif self.x[2] < step_lengths_min:
+            self.x[2] = step_lengths_min
     

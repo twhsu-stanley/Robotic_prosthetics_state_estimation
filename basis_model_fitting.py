@@ -56,7 +56,7 @@ def basis_model_fitting(model, gait_data):
     phase = gait_training_dataset['phase']
     phase_dot = gait_training_dataset['phase_dot']
     step_length = gait_training_dataset['step_length']
-    ramp = gait_training_dataset['ramp']
+    #ramp = gait_training_dataset['ramp']
 
     print("Shape of data: ", np.shape(data))
     print("Shape of phase: ", np.shape(phase))
@@ -64,7 +64,7 @@ def basis_model_fitting(model, gait_data):
     print("  Range of phase dot: [%5.3f, %5.3f]" % (np.min(gait_training_dataset['phase_dot'].ravel()), np.max(gait_training_dataset['phase_dot'].ravel())))
     print("Shape of step length: ", np.shape(step_length))
     print("  Range of step length: [%5.3f, %5.3f]" % (np.min(gait_training_dataset['step_length'].ravel()), np.max(gait_training_dataset['step_length'].ravel())))
-    print("Shape of ramp: ", np.shape(ramp))
+    #print("Shape of ramp: ", np.shape(ramp))
     
     #plt.figure()
     #plt.plot(phase_dot.ravel(), step_length.ravel(), 'r.')
@@ -76,7 +76,7 @@ def basis_model_fitting(model, gait_data):
     phase = np.vstack((phase, gait_training_dataset['phase']))
     phase_dot = np.vstack((phase_dot, gait_training_dataset['phase_dot']))
     step_length = np.vstack((step_length, gait_training_dataset['step_length']))
-    ramp = np.vstack((ramp, gait_training_dataset['ramp']))
+    #ramp = np.vstack((ramp, gait_training_dataset['ramp']))
 
     print("Shape of data: ", np.shape(data))
     print("Shape of phase: ", np.shape(phase))
@@ -84,7 +84,7 @@ def basis_model_fitting(model, gait_data):
     print("  Range of phase dot: [%5.3f, %5.3f]" % (np.min(gait_training_dataset['phase_dot'].ravel()), np.max(gait_training_dataset['phase_dot'].ravel())))
     print("Shape of step length: ", np.shape(step_length))
     print("  Range of step length: [%5.3f, %5.3f]" % (np.min(gait_training_dataset['step_length'].ravel()), np.max(gait_training_dataset['step_length'].ravel())))
-    print("Shape of ramp: ", np.shape(ramp))
+    #print("Shape of ramp: ", np.shape(ramp))
 
     #plt.plot(gait_training_dataset['phase_dot'].ravel(), gait_training_dataset['step_length'].ravel(), 'b.')
     #plt.grid()
@@ -104,13 +104,13 @@ def basis_model_fitting(model, gait_data):
         phase = np.vstack((phase, phase_virtual))
         phase_dot = np.vstack((phase_dot, phase_dot_virtual))
         step_length = np.vstack((step_length, step_length_virtual))
-        ramp = np.vstack((ramp, ramp_virtual))
+        #ramp = np.vstack((ramp, ramp_virtual))
 
         print("Shape of data: ", np.shape(data))
         print("Shape of phase: ", np.shape(phase))
         print("Shape of phase dot: ", np.shape(phase_dot))
         print("Shape of step length: ", np.shape(step_length))
-        print("Shape of ramp: ", np.shape(ramp))
+        #print("Shape of ramp: ", np.shape(ramp))
 
     # Fit the model =====================================================================================================
     if gait_data == 'atan2' or gait_data == 'atan2ss':
@@ -119,13 +119,13 @@ def basis_model_fitting(model, gait_data):
         for i in range(np.shape(data_atan2)[0]):
             data_atan2[i] = np.arctan2(np.sin(data_atan2[i]), np.cos(data_atan2[i]))
         Psi = least_squares(model, data_atan2,\
-                            phase.ravel(), phase_dot.ravel(), step_length.ravel(), ramp.ravel())
-        with open('Psi/Psi_' + gait_data + '_NSL.pickle', 'wb') as file:
+                            phase.ravel(), phase_dot.ravel(), step_length.ravel())#, ramp.ravel())
+        with open('Psi_3states/Psi_' + gait_data, 'wb') as file:
             pickle.dump(Psi, file)
     else:
         Psi = least_squares(model, data.ravel(),\
-                            phase.ravel(), phase_dot.ravel(), step_length.ravel(), ramp.ravel())
-        with open('Psi/Psi_' + gait_data + '_NSL_B20_const.pickle', 'wb') as file:
+                            phase.ravel(), phase_dot.ravel(), step_length.ravel())#, ramp.ravel())
+        with open('Psi_3states/Psi_' + gait_data, 'wb') as file:
             pickle.dump(Psi, file)
     #with open('Psi_R01/Psi_' + gait_data + '_walking_NSL_B10.pickle', 'wb') as file:
     #    pickle.dump(Psi, file)
@@ -306,26 +306,6 @@ def heteroscedastic_measurement_noise_covariance(*sensors):
     return covariance
     #return R
 
-def F_test(sensor, order1 = 1, order2 = 2):
-    # order2 > order1
-    with open(('Basis_model/' + sensor + '_NSL_B' + str(order1) + '0_const_residuals.pickle'), 'rb') as file:
-        r1 = pickle.load(file)
-    with open(('Basis_model/' + sensor + '_NSL_B' + str(order2) + '0_const_residuals.pickle'), 'rb') as file:
-        r2 = pickle.load(file)
-    n = len(r1) # = len(r2)
-    RSS1 = sum(r1**2)
-    RSS2 = sum(r2**2)
-    RMSE1 = np.sqrt(RSS1/n)
-    RMSE2 = np.sqrt(RSS2/n)
-    p1 = 21 * 1 * (order1+1) * (order1+1)
-    p2 = 21 * 1 * (order2+1) * (order2+1)
-    df1 = n - p1
-    df2 = n - p2
-    F = (RSS1 - RSS2) / (df1 - df2) / (RSS2/df2)
-    p_value = 1 - stats.f.cdf(F, (df1 - df2), df2)
-    print("RMSE1=", RMSE1, "| RMSE2 = ", RMSE2)
-    print("F = ", F, "| p-value = ", p_value)
-
 def saturation_bounds():
     with open(('Gait_training_data/globalThighAngles_NSL_training_dataset.pickle'), 'rb') as file:
         gait_training_dataset = pickle.load(file)
@@ -365,35 +345,35 @@ if __name__ == '__main__':
     phase_model = Fourier_Basis(F, 'phase')
     phase_dot_model = Polynomial_Basis(0, 'phase_dot')
     step_length_model = Berstein_Basis(B,'step_length')
-    ramp_model = Berstein_Basis(0, 'ramp')
+    #ramp_model = Berstein_Basis(0, 'ramp')
 
-    model_globalThighAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    model_globalThighAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model)#, ramp_model)
     #psi_globalThighAngles = basis_model_fitting(model_globalThighAngles, 'globalThighAngles')
     #basis_model_residuals(model_globalThighAngles, 'globalThighAngles', heteroscedastic = False)
 
-    model_ankleMoment = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    model_ankleMoment = Kronecker_Model(phase_model, phase_dot_model, step_length_model)#, ramp_model)
     #psi_ankleMoment = basis_model_fitting(model_ankleMoment, 'ankleMoment')
     #basis_model_residuals(model_ankleMoment, 'ankleMoment', heteroscedastic = True)
 
-    model_tibiaForce = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    model_tibiaForce = Kronecker_Model(phase_model, phase_dot_model, step_length_model)#, ramp_model)
     #psi_tibiaForce = basis_model_fitting(model_tibiaForce, 'tibiaForce')
     #basis_model_residuals(model_tibiaForce, 'tibiaForce', heteroscedastic = True)
 
-    model_kneeAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    model_kneeAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model)#, ramp_model)
     #psi_kneeAngles = basis_model_fitting(model_kneeAngles, 'kneeAngles')
 
-    model_ankleAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    model_ankleAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model)#, ramp_model)
     #psi_ankleAngles = basis_model_fitting(model_ankleAngles, 'ankleAngles')
     
     phase_dot_model = Polynomial_Basis(1, 'phase_dot')
-    model_globalThighVelocities = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    model_globalThighVelocities = Kronecker_Model(phase_model, phase_dot_model, step_length_model)#, ramp_model)
     #psi_globalThighVelocities = basis_model_fitting(model_globalThighVelocities, 'globalThighVelocities')
     #basis_model_residuals(model_globalThighVelocities, 'globalThighVelocities', heteroscedastic = False)
 
-    phase_dot_model = Polynomial_Basis(0, 'phase_dot')
-    step_length_model = Berstein_Basis(0,'step_length')
-    ramp_model = Berstein_Basis(1, 'ramp')
-    model_footAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
+    #phase_dot_model = Polynomial_Basis(0, 'phase_dot')
+    #step_length_model = Berstein_Basis(0,'step_length')
+    #ramp_model = Berstein_Basis(1, 'ramp')
+    #model_footAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_footAngles = basis_model_fitting(model_footAngles, 'globalFootAngles')
     #basis_model_residuals(model_footAngles, 'globalFootAngles', heteroscedastic = True)
 
@@ -401,15 +381,15 @@ if __name__ == '__main__':
     phase_model = Fourier_Basis(F, 'phase')
     phase_dot_model = Polynomial_Basis(0, 'phase_dot')
     step_length_model = Berstein_Basis(0,'step_length')
-    ramp_model = Berstein_Basis(0, 'ramp')
+    #ramp_model = Berstein_Basis(0, 'ramp')
 
-    model_atan2 = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
-    psi_atan2 = basis_model_fitting(model_atan2, 'atan2ss')
-    basis_model_residuals(model_atan2, 'atan2ss', heteroscedastic = False)
+    model_atan2 = Kronecker_Model(phase_model, phase_dot_model, step_length_model)#, ramp_model)
+    #psi_atan2 = basis_model_fitting(model_atan2, 'atan2ss')
+    #basis_model_residuals(model_atan2, 'atan2ss', heteroscedastic = False)
 
     # sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2, 'globalFootAngles':3, 'ankleMoment':4, 'tibiaForce':5}
-    #m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities)#, model_atan2
-    #model_saver(m_model, 'Measurement_model_01_NSL.pickle')
+    m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities, model_atan2)#
+    model_saver(m_model, 'Measurement_model_012_NSL.pickle')
     #c_model = Measurement_Model(model_kneeAngles, model_ankleAngles)
-    #model_saver(c_model, 'Control_model_NSL_B20.pickle')
+    #model_saver(c_model, 'Control_model.pickle')
     

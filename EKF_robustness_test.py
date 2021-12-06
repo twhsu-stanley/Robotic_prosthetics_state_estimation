@@ -1,6 +1,4 @@
-from pickle import FALSE
 import numpy as np
-from numpy.core.numeric import ones
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -8,7 +6,7 @@ from EKF import *
 from model_framework import *
 from continuous_data_incExp import *
 from streaming_data_R01 import *
-from basis_model_fitting import measurement_noise_covariance, heteroscedastic_measurement_noise_covariance, saturation_bounds
+from basis_model_fitting import measurement_noise_covariance, heteroscedastic_measurement_noise_covariance
 import csv
 
 # Dictionary of all sensors
@@ -27,52 +25,21 @@ for i in range(len(sensor_id)):
 m_model = model_loader('Measurement_model_' + sensor_id_str +'_NSL.pickle')
     
 using_atan2 = np.any(np.array(sensors) == 'atan2')
-using_ankleMoment = np.any(np.array(sensors) == 'ankleMoment')
-using_tibiaForce = np.any(np.array(sensors) == 'tibiaForce')
-using_footAngles = np.any(np.array(sensors) == 'globalFootAngles')
 
-tibiaForce_threshold = -1.2
+print("Using sensors:", sensors)
 
-# 2) direct measurement
-using_directRamp = False
-R_directRamp = 8
-L_cop_lower = 0.03
-L_cop_upper = 0.07
-
-print("Using sensors:", sensors, "| using direct ramp:", using_directRamp)
-
-Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
+Psi = np.array([load_Psi()[key] for key in sensors], dtype = object)
 
 dt = 1/100
-inital_Sigma = np.diag([1e-3, 1e-3, 1e-3, 1e-20])
-Q = np.diag([0, 5e-3, 5e-3, 0]) * dt # p1) 5e-3, 5e-3; p2) 5e-4, 1e-3
-U = np.diag([1, 1, 1])
+inital_Sigma = np.diag([1e-3, 1e-3, 1e-3])
+#Q = np.diag([0, 5e-2, 5e-3]) * dt
+Q = np.array([[0, 0, 0], [0, 1e-2, 1e-2], [0, 1e-2, 1e-2]]) * dt
+U = np.diag([2, 2, 2])
 R = U @ measurement_noise_covariance(*sensors) @ U.T
-
-if using_directRamp == True:
-    R = np.diag(np.append(np.diag(R), R_directRamp))
 
 #hetero_cov = heteroscedastic_measurement_noise_covariance(*sensors)
 
 saturation_range = np.array([1.3, 0, 1.9, 0])
-
-if using_ankleMoment or using_tibiaForce or using_footAngles or using_directRamp:
-    sensors_swing = []
-    for i in range(len(sensors)):
-        if sensors[i] == 'ankleMoment' or sensors[i] == 'tibiaForce' or sensors[i] == 'globalFootAngles':
-            continue
-        else:
-            sensors_swing.append(sensors[i])
-    sensor_swing_id = [sensors_dict[key] for key in sensors_swing]
-    sensor_swing_id_str = ""
-    for i in range(len(sensor_swing_id)):
-        sensor_swing_id_str += str(sensor_swing_id[i])
-    Psi_swing = np.array([load_Psi('Generic')[key] for key in sensors_swing], dtype = object)
-    m_model_swing = model_loader('Measurement_model_' + sensor_swing_id_str +'_NSL.pickle')
-    U_swing = np.diag(np.diag(U)[sensor_swing_id])
-    R_swing = U_swing @ measurement_noise_covariance(*sensors_swing) @ U_swing.T
-    if using_directRamp == True:
-        R_swing = np.diag(np.append(np.diag(R_swing), R_directRamp))
 
 # Skip trials with problematic measurements
 with open('Continuous_data/Measurements_with_Nan.pickle', 'rb') as file:
@@ -85,7 +52,6 @@ total_strides = 15
 # Roecover Criteria
 phase_recover_thr = 0.05
 step_length_recover_thr = 0.1
-ramp_recover_thr = 1
 
 ## From loco_OSL.py: Load referenced trajectories
 def loadTrajectory(trajectory = 'walking'):
@@ -122,7 +88,6 @@ def loadTrajectory(trajectory = 'walking'):
 
     return trajectory
 
-#def ekf_test(subject, trial, side, heteroscedastic = False, kidnap = False, plot = False):
 def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, kidnap = False, plot = False):
     print("EKF Test: ", dataset,"/",subject, "/", trial, '/', side , "| Heteroscedastic R:", heteroscedastic)
     
@@ -189,15 +154,13 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
     kneeAngle = kneeAngle[0 : total_step]
     ankleAngle = ankleAngle[0 : total_step]
 
-    #### Joint Control ############################################################
-    ### Load reference trajectory
-    refTrajectory = loadTrajectory(trajectory = 'walking')
-    refAnk = refTrajectory["ankl"]
-    refKne = refTrajectory["knee"]
+    #### Joint Control:Load reference trajectory ###################################
+    #refTrajectory = loadTrajectory(trajectory = 'walking')
+    #refAnk = refTrajectory["ankl"]
+    #refKne = refTrajectory["knee"]
     ################################################################################
 
-    z_full = np.array([[globalThighAngle], [globalThighVelocity], [atan2]])#, [globalFootAngle], [ankleMoment], [tibiaForce]])
-    z_full = np.squeeze(z_full) 
+    z_full = np.array([globalThighAngle, globalThighVelocity, atan2])
     z = z_full[sensor_id, :]
 
     # build the system
@@ -210,8 +173,8 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
 
     # initialize the state
     init = myStruct()
-    #init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [ramps[0]]])
-    init.x = np.array([[0.3], [0], [0], [0]])
+    #init.x = np.array([phases[0], phase_dots[0], step_lengths[0]])
+    init.x = np.array([0.3, 0, 0])
     init.Sigma = inital_Sigma
 
     ekf = extended_kalman_filter(sys, init)
@@ -222,118 +185,39 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
         phase_kidnap =  np.random.uniform(0, 1)
         phase_dot_kidnap = np.random.uniform(0, 5)
         step_length_kidnap = np.random.uniform(0, 2)
-        ramp_kidnap = np.random.uniform(-45, 45)
-        state_kidnap = np.array([[phase_kidnap], [phase_dot_kidnap], [step_length_kidnap], [ramp_kidnap]])
-        print("state_kidnap = [%4.2f, %4.2f, %4.2f, %5.2f]" % (state_kidnap[0], state_kidnap[1], state_kidnap[2], state_kidnap[3]))
+        state_kidnap = np.array([phase_kidnap, phase_dot_kidnap, step_length_kidnap])
+        print("state_kidnap = [%4.2f, %4.2f, %4.2f]" % (state_kidnap[0], state_kidnap[1], state_kidnap[2]))
 
-    x = np.zeros((total_step, 4))  # state estimate
-    z_pred = np.zeros((total_step, len(sensors) + int(using_directRamp)))
+    x = np.zeros((total_step, 3))  # state estimate
+    std = np.zeros((total_step, 3))  # state estimate
+    z_pred = np.zeros((total_step, len(sensors)))
     
-    #directRamp = np.zeros((total_step, 1))
-    #L_cop = np.zeros((total_step, 1))
-    
-    estimate_error = np.zeros((total_step, 4))
+    estimate_error = np.zeros((total_step, 3))
     
     kneeAngle_kmd = np.zeros((total_step, 1))
     ankleAngle_kmd = np.zeros((total_step, 1))
-    kneeAngle_cmd = np.zeros((total_step, 1))
-    ankleAngle_cmd = np.zeros((total_step, 1))
-    
-    #stance = False
-    #stance_prev = False
-    #stance_idxs = 0
-    #stance_idx1 = 0
-    #stance_idx2 = 0
+    #kneeAngle_cmd = np.zeros((total_step, 1))
+    #ankleAngle_cmd = np.zeros((total_step, 1))
     
     for i in range(total_step):
         if kidnap != False:
             if i == kidnap_index:
                 ekf.x[kidnap] = state_kidnap[kidnap]
-        
         ekf.prediction(dt)
         ekf.state_saturation(saturation_range)
-
-        
-        """
-        if using_ankleMoment or using_tibiaForce or using_footAngles or using_directRamp:
-            
-            # Compute L_cop; here, "stance" means that the foot is flat on the ground 
-            if tibiaForce[i] <= tibiaForce_threshold:
-                # Location of the centoer of pressure
-                L_cop[i] = -ankleMoment[i] / tibiaForce[i]
-                if stance_prev == False and L_cop[i] > L_cop_lower and L_cop[i] <= L_cop_upper and (i - stance_idxs) > 0.5/dt:
-                    stance_idxs = i
-                    stance = True
-                    stance_prev = stance
-                    
-                elif stance_prev == True and L_cop[i] > L_cop_upper:
-                    stance_idx2 = i
-                    stance_idx1 = stance_idxs
-                    stance = False
-                    stance_prev = stance
-            else:
-                L_cop[i] = -1 # arbitraty number
-                if stance_prev == True:
-                    stance_idx2 = i
-                    stance_idx1 = stance_idxs
-                stance = False
-                stance_prev = stance
-            
-            if stance_idx1 < stance_idx2:
-                directRamp[i] = np.mean(globalFootAngle[stance_idx1:stance_idx2])
-            else:
-                directRamp[i] = 1e-4
-            
-            #if stance == True: # stance
-            if tibiaForce[i] <= tibiaForce_threshold:
-                ekf.h = m_model
-                if heteroscedastic == True:
-                    ekf.R = np.diag(hetero_cov[:, int(ekf.x[0, 0]*150)]) ## WRONG? pass by reference? 
-                    if using_directRamp:
-                        ## WRONG? pass by reference? 
-                        ekf.R = np.diag(np.append(np.diag(ekf.R), R_directRamp))               
-                else:
-                    ## WRONG? pass by reference? 
-                    ekf.R = R
-
-                if using_directRamp:
-                    ekf.correction(z[:, i], Psi, using_atan2, direct_ramp = directRamp[i])
-                else:
-                    ekf.correction(z[:, i], Psi, using_atan2, direct_ramp = False)
-                z_pred[i,:] = ekf.z_hat.T
-            else: # swing
-                ekf.h = m_model_swing
-                if heteroscedastic == True:
-                    ekf.R = np.diag(hetero_cov[sensor_swing_id, int(ekf.x[0, 0]*150)])
-                    if using_directRamp:
-                        ## WRONG? pass by reference? 
-                        ekf.R = np.diag(np.append(np.diag(ekf.R), R_directRamp))
-                else:
-                    ## WRONG? pass by reference? 
-                    ekf.R = R_swing
-                
-                if using_directRamp :
-                    ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, direct_ramp = directRamp[i])
-                    z_pred[i, np.append(sensor_swing_id, len(sensors))] = ekf.z_hat.T
-                else:
-                    ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, direct_ramp = False)
-                    z_pred[i, sensor_swing_id] = ekf.z_hat.T
-              
-                #==============================================================================================================
-        else:
-        """ 
-            #if heteroscedastic == True:
-                ## WRONG? pass by reference? 
-                #ekf.R = np.diag(hetero_cov[:, int(ekf.x[0, 0]*150)])
-            #else:
-                ## WRONG? pass by reference? 
-                #ekf.R = R
+        #if heteroscedastic == True:
+            ## WRONG? pass by reference? 
+            #ekf.R = np.diag(hetero_cov[:, int(ekf.x[0, 0]*150)])
+        #else:
+            ## WRONG? pass by reference? 
+            #ekf.R = R
         ekf.correction(z[:, i], Psi, using_atan2)
         ekf.state_saturation(saturation_range)
 
         z_pred[i,:] = ekf.z_hat.T
-        x[i,:] = ekf.x.T
-        estimate_error[i, :] = (ekf.x - np.array([[phases[i]], [phase_dots[i]], [step_lengths[i]], [ramps[i]]])).reshape(-1)
+        x[i,:] = ekf.x
+        std[i, :] = np.sqrt(np.diag(ekf.Sigma))
+        estimate_error[i, :] = (ekf.x - np.array([phases[i], phase_dots[i], step_lengths[i]]))#.reshape(-1)
         if estimate_error[i, 0] > 0.5:
             estimate_error[i, 0] = estimate_error[i, 0] - 1
         elif estimate_error[i, 0] < -0.5:
@@ -341,36 +225,28 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
 
         ## Joints control commands 
         # 1) generated by the kinematic model
-        joint_angles = joints_control(x[i,0], x[i,1], x[i,2], x[i,3])
+        joint_angles = joints_control(x[i,0], x[i,1], x[i,2])
         kneeAngle_kmd[i] = joint_angles[0]
         ankleAngle_kmd[i] = joint_angles[1]
         # 2) generated by Edgar's prescribed trajectories
-        pv = int(ekf.x[0, 0] * 998)  # phase variable conversion (scaling)
-        ankleAngle_cmd[i] = refAnk[pv]
-        kneeAngle_cmd[i] = refKne[pv]
+        #pv = int(ekf.x[0] * 998)  # phase variable conversion (scaling)
+        #ankleAngle_cmd[i] = refAnk[pv]
+        #kneeAngle_cmd[i] = refKne[pv]
 
     if kidnap == False:
         start_check_idx = int(3/np.average(phase_dots)/dt)
         SE_phase = np.sum(estimate_error[start_check_idx:, 0] ** 2)
         SE_phase_dot = np.sum(estimate_error[start_check_idx:, 1] ** 2)
         SE_step_length = np.sum(estimate_error[start_check_idx:, 2] ** 2)
-        SE_ramp = np.sum(estimate_error[start_check_idx:, 3] ** 2)
-        SE_directRamp = np.sum((directRamp[start_check_idx:, 0] - ramps[start_check_idx:]) ** 2)
         T = len(estimate_error[start_check_idx:, 0])
-
         RMSE_phase = np.sqrt(SE_phase/T)
         RMSE_phase_dot = np.sqrt(SE_phase_dot/T)
         RMSE_step_length = np.sqrt(SE_step_length/T)
-        RMSE_ramp = np.sqrt(SE_ramp/T)
-        RMSE_directRamp = np.sqrt(SE_directRamp/T) 
-        
         print("RMSE phase = %5.3f" % RMSE_phase)
         print("RMSE phase_dot = %5.3f" % RMSE_phase_dot)
         print("RMSE step_length = %5.3f" % RMSE_step_length)
-        #print("RMSE ramp = %5.3f" % RMSE_ramp)
-        #print("RMSE direct ramp = %5.3f" % RMSE_directRamp)
-        
-        result = (SE_phase, SE_phase_dot, SE_step_length, SE_ramp, SE_directRamp, T)
+
+        result = (SE_phase, SE_phase_dot, SE_step_length, T)
 
     if plot == True:
         #th = heel_strike_index[0:25, 0].astype(int) # time step of heel strikes
@@ -378,72 +254,53 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
         # plot results
         tt = dt * np.arange(len(phases))
         plt.figure("State Estimate")
-        plt.subplot(411)
+        plt.subplot(311)
         plt.title('EKF Robustness Test')
         plt.plot(tt, phases, 'k-')
         plt.plot(tt, x[:, 0], 'r--')
-        #plt.plot(tt, x[:, 0] + Sigma_diag[:, 0]*nu, 'b-')
-        #plt.plot(tt, x[:, 0] - Sigma_diag[:, 0]*nu, 'g-')
-        #plt.plot(th* dt, np.zeros((len(th), 1)), "rx")
+        plt.fill_between(tt, x[:, 0]-3*std[:, 0], x[:, 0]+3*std[:, 0], color='red', alpha=0.3)
         plt.legend(('ground truth', 'estimate'))
-        #plt.legend(('ground truth', 'estimate'), bbox_to_anchor=(1, 1.05))
         plt.ylabel('$\phi$')
         plt.ylim([0, 2])
         plt.xlim([0, tt[-1]+0.1])
         plt.grid()
-        plt.subplot(412)
+        plt.subplot(312)
         plt.plot(tt, phase_dots, 'k-')
         plt.plot(tt, x[:, 1], 'r--')
-        #plt.plot(tt, x[:, 1] + Sigma_diag[:, 1]*nu, 'b-')
-        #plt.plot(tt, x[:, 1] - Sigma_diag[:, 1]*nu, 'g-')
+        plt.fill_between(tt, x[:, 1]-3*std[:, 1], x[:, 1]+3*std[:, 1], color='red', alpha=0.3)
         plt.ylabel('$\dot{\phi}~(s^{-1})$')
         plt.xlim([0, tt[-1]+0.1])
         plt.ylim([-0.01, 1.5])
         plt.grid()
-        plt.subplot(413)
+        plt.subplot(313)
         plt.plot(tt, step_lengths, 'k-')
         plt.plot(tt, x[:, 2], 'r--')
-        #plt.plot(tt, x[:, 2] + Sigma_diag[:, 2]*nu, 'b-')
-        #plt.plot(tt, x[:, 2] - Sigma_diag[:, 2]*nu, 'g-')
+        plt.fill_between(tt, x[:, 2]-3*std[:, 2], x[:, 2]+3*std[:, 2], color='red', alpha=0.3)
         plt.ylabel('$l~(m)$')
+        plt.xlabel('time (s)')
         plt.xlim([0, tt[-1]+0.1])
         plt.ylim([-0.01, 2])
         plt.grid()
-        plt.subplot(414)
-        plt.plot(tt, ramps, 'k-')
-        plt.plot(tt, x[:, 3], 'r--')
-        #plt.plot(tt, x[:, 3] + Sigma_diag[:, 3]*nu, 'b-')
-        #plt.plot(tt, x[:, 3] - Sigma_diag[:, 3]*nu, 'g-')
-        plt.ylabel('$\\alpha~(deg)$')
-        plt.xlabel('time (s)')
-        plt.xlim([0, tt[-1]+0.1])
-        plt.ylim([-15, 15])
-        plt.grid()
 
         plt.figure("Estimation Errors")
-        plt.subplot(411)
+        plt.subplot(311)
         plt.title('Estimation Errors')
         plt.plot(tt, abs(estimate_error[:, 0].T))
         plt.ylabel('$\phi$ error')
         plt.ylim([0, 0.5])
         plt.xlim([0, tt[-1]+0.1])
         plt.grid()
-        plt.subplot(412)
+        plt.subplot(312)
         plt.plot(tt, abs(estimate_error[:, 1].T))
         plt.ylabel('$\dot{\phi}$ error (1/s)')
         plt.xlim([0, tt[-1]+0.1])
         plt.grid()
-        plt.subplot(413)
+        plt.subplot(313)
         plt.plot(tt, abs(estimate_error[:, 2].T))
         plt.ylabel('$l$ error (m)')
         plt.xlim([0, tt[-1]+0.1])
         plt.ylim([0, 1])
         plt.grid()
-        plt.subplot(414)
-        plt.plot(tt, abs(estimate_error[:, 3].T))
-        plt.ylabel('$\\alpha$ error (deg)')
-        plt.xlim([0, tt[-1]+0.1])
-        #plt.ylim([5, 0.5])
         plt.xlabel('time (s)')
         plt.grid()
 
@@ -479,16 +336,12 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
         """
         
         plt.figure("Measurements")
-        for i in range(len(sensors) + int(using_directRamp)):
-            plt.subplot(int(str(len(sensors) + int(using_directRamp)) + "1" + str(i+1)))
-            if using_directRamp == True and i == len(sensors):
-                plt.plot(tt, directRamp, 'k-')
-            else:
-                plt.plot(tt, z[i, :], 'k-')
+        for i in range(len(sensors)):
+            plt.subplot(int(str(len(sensors)) + "1" + str(i+1)))
+            plt.plot(tt, z[i, :], 'k-')
             plt.plot(tt, z_pred[:, i], 'r--')
             plt.xlim([0, tt[-1]+0.1])
             plt.grid()
-
             if i == 0:
                 plt.title("Measurements")
                 plt.legend(('actual', 'predicted'))
@@ -529,13 +382,13 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
         plt.subplot(211)
         plt.plot(tt, kneeAngle, 'k-')
         plt.plot(tt, kneeAngle_kmd, 'm-')
-        plt.plot(tt, kneeAngle_cmd, 'r-')
+        #plt.plot(tt, kneeAngle_cmd, 'r-')
         plt.legend(('actual', 'kinematic model', 'prescribed trajectory'))
         plt.ylabel('knee angle (deg)')
         plt.subplot(212)
         plt.plot(tt, ankleAngle, 'k-')
         plt.plot(tt, ankleAngle_kmd, 'm-')
-        plt.plot(tt, ankleAngle_cmd, 'r-')
+        #plt.plot(tt, ankleAngle_cmd, 'r-')
         plt.legend(('actual', 'kinematic model', 'prescribed trajectory'))
         plt.ylabel('ankle angle (deg)')
         plt.xlabel('time (s)')

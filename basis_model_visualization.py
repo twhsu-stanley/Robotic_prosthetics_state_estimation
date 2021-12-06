@@ -9,7 +9,7 @@ from EKF import wrapTo2pi, load_Psi
 # Determine which sensors to be used
 sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2']#,'globalFootAngles','ankleMoment', 'tibiaForce']
 
-sensor_id = 0
+sensor_id = 1
 
 m_model = model_loader('Measurement_model_012_NSL.pickle')
 Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
