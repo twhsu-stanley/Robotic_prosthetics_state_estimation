@@ -3,11 +3,16 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from EKF import *
+from UKF import *
 from model_framework import *
 from continuous_data_incExp import *
 from streaming_data_R01 import *
 from basis_model_fitting import measurement_noise_covariance, heteroscedastic_measurement_noise_covariance
 import csv
+
+# Skip trials with problematic measurements
+with open('Continuous_data/Measurements_with_Nan.pickle', 'rb') as file:
+    nan_dict = pickle.load(file)
 
 # Dictionary of all sensors
 # All measurements use the basis model, except for directRamp
@@ -31,65 +36,30 @@ print("Using sensors:", sensors)
 Psi = np.array([load_Psi()[key] for key in sensors], dtype = object)
 
 dt = 1/100
-inital_Sigma = np.diag([1e-3, 1e-3, 1e-3])
-#Q = np.diag([0, 5e-2, 5e-3]) * dt
-Q = np.array([[0, 0, 0], [0, 1e-2, 1e-2], [0, 1e-2, 1e-2]]) * dt
-U = np.diag([2, 2, 2])
+initial_x = np.array([0.3, 0, 0]) # mid-stance
+initial_Sigma = np.diag([1e-1, 1e-1, 1e-1])
+Q = np.array([[1e-10, 1e-10, 1e-10], [1e-10, 1e-2, 1e-2], [1e-10, 1e-2, 1e-2]]) * dt
+U = np.diag([1, 1, 1])
 R = U @ measurement_noise_covariance(*sensors) @ U.T
-
 #hetero_cov = heteroscedastic_measurement_noise_covariance(*sensors)
-
 saturation_range = np.array([1.3, 0, 1.9, 0])
-
-# Skip trials with problematic measurements
-with open('Continuous_data/Measurements_with_Nan.pickle', 'rb') as file:
-    nan_dict = pickle.load(file)
 
 # Stride in which kidnapping occurs
 kidnap_stride = 4
 total_strides = 15
 
+kidnap_percent_gait = np.random.uniform(0, 1)
+phase_kidnap =  np.random.uniform(0, 1)
+phase_dot_kidnap = np.random.uniform(0, 2)
+step_length_kidnap = np.random.uniform(0, 2)
+state_kidnap = np.array([phase_kidnap, phase_dot_kidnap, step_length_kidnap])
+
 # Roecover Criteria
 phase_recover_thr = 0.05
 step_length_recover_thr = 0.1
 
-## From loco_OSL.py: Load referenced trajectories
-def loadTrajectory(trajectory = 'walking'):
-    # Create path to the reference csv trajectory
-    if trajectory.lower() == 'walking':
-        # walking data uses convention from D. A. Winter, “Biomechanical Motor Patterns in Normal Walking,”  
-        # J. Mot. Behav., vol. 15, no. 4, pp. 302–330, Dec. 1983.
-        pathFile = r'OSL_walking_data/walkingWinter_deg.csv'
-        # Gains to scale angles to OSL convention
-        ankGain = -1
-        ankOffs = -0.15 # [deg] Small offset to take into accoun that ankle ROM is -10 deg< ankle < 19.65 deg
-        kneGain = -1
-        kneOffs = 0
-        hipGain = 1
-        hipOffs = 0
-    else:
-        raise ValueError('Please select a suported trajectory type')
-    # Extract content from csv
-    with open(pathFile, 'r') as f:
-        datasetReader = csv.reader(f, quoting = csv.QUOTE_NONNUMERIC)
-        data = np.transpose( np.array([row for row in datasetReader ]) )
-    # Parse data to knee-ankle trajectories using OSL angle convention (+ ankle = plantarflexion. + knee = flexion)
-    trajectory = dict(ankl = ankGain*data[0] + ankOffs)
-    trajectory["ankd"] = ankGain*data[1]
-    trajectory["andd"] = ankGain*data[2]
-    trajectory["knee"] = kneGain*data[3] + kneOffs
-    trajectory["kned"] = kneGain*data[4]
-    trajectory["kndd"] = kneGain*data[5]
-    trajectory["hip_"] = hipGain*data[6] + hipOffs
-    trajectory["hipd"] = hipGain*data[7]
-    trajectory["hidd"] = hipGain*data[8]
-    trajectory["phas"] = data[9]
-    trajectory["time"] = data[10]
-
-    return trajectory
-
-def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, kidnap = False, plot = False):
-    print("EKF Test: ", dataset,"/",subject, "/", trial, '/', side , "| Heteroscedastic R:", heteroscedastic)
+def kf_test(dataset, subject, trial, side = 'left', kalman_filter = 'ekf', kidnap = False, plot = False):
+    print(kalman_filter, "test: ", dataset,"/",subject, "/", trial, '/', side)
     
     # 1) Use the incine experiment dataset
     if dataset == 'inclineExp':
@@ -145,7 +115,7 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
     phases = phases[0 : total_step]
     phase_dots = phase_dots[0 : total_step]
     step_lengths = step_lengths[0 : total_step]
-    ramps = ramps[0 : total_step]
+    #ramps = ramps[0 : total_step]
     
     globalThighAngle = globalThighAngle[0 : total_step]
     globalThighVelocity = globalThighVelocity[0 : total_step]
@@ -154,38 +124,49 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
     kneeAngle = kneeAngle[0 : total_step]
     ankleAngle = ankleAngle[0 : total_step]
 
-    #### Joint Control:Load reference trajectory ###################################
-    #refTrajectory = loadTrajectory(trajectory = 'walking')
-    #refAnk = refTrajectory["ankl"]
-    #refKne = refTrajectory["knee"]
-    ################################################################################
-
     z_full = np.array([globalThighAngle, globalThighVelocity, atan2])
     z = z_full[sensor_id, :]
 
-    # build the system
+    # Create an EKF 
     sys = myStruct()
     sys.f = process_model
     sys.A = A
     sys.h = m_model
+    sys.Psi = Psi
+    Q = np.array([[1e-10, 1e-10, 1e-10], [1e-10, 1e-3, 1e-4], [1e-10, 1e-4, 1e-3]]) * dt
     sys.Q = Q
     sys.R = R
-
-    # initialize the state
     init = myStruct()
-    #init.x = np.array([phases[0], phase_dots[0], step_lengths[0]])
-    init.x = np.array([0.3, 0, 0])
-    init.Sigma = inital_Sigma
-
+    init.x = initial_x
+    init.Sigma = initial_Sigma
     ekf = extended_kalman_filter(sys, init)
     
+    # Create an UKF 
+    sys = myStruct()
+    sys.f = process_model
+    sys.h = m_model
+    sys.Psi = Psi
+    Q = np.array([[1e-10, 1e-10, 1e-10], [1e-10, 1e-3, 1e-4], [1e-10, 1e-4, 1e-3]]) * dt
+    sys.Q = Q
+    sys.R = R
+    sys.alpha = 1
+    sys.beta = 0
+    sys.kappa = 0
+    init = myStruct()
+    init.x = initial_x
+    init.Sigma = initial_Sigma
+    ukf = unscented_kalman_filter(sys, init)
+    
+    if kalman_filter == 'ekf':
+        filter = ekf
+    elif kalman_filter == 'ukf':
+        filter = ukf
+    else:
+        exit("Select a filter to be used: EKF or UKF")
+    
     if kidnap != False:
-        kidnap_index = np.random.randint(heel_strike_index[kidnap_stride], heel_strike_index[kidnap_stride+1])
-        #print("kidnap_index(%) = ", (kidnap_index - heel_strike_index[3, 0])/(heel_strike_index[4, 0]- heel_strike_index[3, 0])*100)
-        phase_kidnap =  np.random.uniform(0, 1)
-        phase_dot_kidnap = np.random.uniform(0, 5)
-        step_length_kidnap = np.random.uniform(0, 2)
-        state_kidnap = np.array([phase_kidnap, phase_dot_kidnap, step_length_kidnap])
+        kidnap_index = int(heel_strike_index[kidnap_stride] +
+                           kidnap_percent_gait* (heel_strike_index[kidnap_stride+1] - heel_strike_index[kidnap_stride]))
         print("state_kidnap = [%4.2f, %4.2f, %4.2f]" % (state_kidnap[0], state_kidnap[1], state_kidnap[2]))
 
     x = np.zeros((total_step, 3))  # state estimate
@@ -196,42 +177,29 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
     
     kneeAngle_kmd = np.zeros((total_step, 1))
     ankleAngle_kmd = np.zeros((total_step, 1))
-    #kneeAngle_cmd = np.zeros((total_step, 1))
-    #ankleAngle_cmd = np.zeros((total_step, 1))
     
     for i in range(total_step):
         if kidnap != False:
             if i == kidnap_index:
-                ekf.x[kidnap] = state_kidnap[kidnap]
-        ekf.prediction(dt)
-        ekf.state_saturation(saturation_range)
-        #if heteroscedastic == True:
-            ## WRONG? pass by reference? 
-            #ekf.R = np.diag(hetero_cov[:, int(ekf.x[0, 0]*150)])
-        #else:
-            ## WRONG? pass by reference? 
-            #ekf.R = R
-        ekf.correction(z[:, i], Psi, using_atan2)
-        ekf.state_saturation(saturation_range)
+                filter.x[kidnap] = state_kidnap[kidnap]
+        filter.prediction(dt)
+        #filter.state_saturation(saturation_range)
+        filter.correction(z[:, i], using_atan2)
+        filter.state_saturation(saturation_range)
 
-        z_pred[i,:] = ekf.z_hat.T
-        x[i,:] = ekf.x
-        std[i, :] = np.sqrt(np.diag(ekf.Sigma))
-        estimate_error[i, :] = (ekf.x - np.array([phases[i], phase_dots[i], step_lengths[i]]))#.reshape(-1)
+        z_pred[i,:] = filter.z_hat.T
+        x[i,:] = filter.x
+        std[i, :] = np.sqrt(np.diag(filter.Sigma))
+        estimate_error[i, :] = (filter.x - np.array([phases[i], phase_dots[i], step_lengths[i]]))#.reshape(-1)
         if estimate_error[i, 0] > 0.5:
             estimate_error[i, 0] = estimate_error[i, 0] - 1
         elif estimate_error[i, 0] < -0.5:
             estimate_error[i, 0] = 1 + estimate_error[i, 0]
 
         ## Joints control commands 
-        # 1) generated by the kinematic model
         joint_angles = joints_control(x[i,0], x[i,1], x[i,2])
         kneeAngle_kmd[i] = joint_angles[0]
         ankleAngle_kmd[i] = joint_angles[1]
-        # 2) generated by Edgar's prescribed trajectories
-        #pv = int(ekf.x[0] * 998)  # phase variable conversion (scaling)
-        #ankleAngle_cmd[i] = refAnk[pv]
-        #kneeAngle_cmd[i] = refKne[pv]
 
     if kidnap == False:
         start_check_idx = int(3/np.average(phase_dots)/dt)
@@ -249,13 +217,11 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
         result = (SE_phase, SE_phase_dot, SE_step_length, T)
 
     if plot == True:
-        #th = heel_strike_index[0:25, 0].astype(int) # time step of heel strikes
-        nu = np.sqrt(18.5)
         # plot results
         tt = dt * np.arange(len(phases))
-        plt.figure("State Estimate")
+        plt.figure()
         plt.subplot(311)
-        plt.title('EKF Robustness Test')
+        plt.title('State Estimation')
         plt.plot(tt, phases, 'k-')
         plt.plot(tt, x[:, 0], 'r--')
         plt.fill_between(tt, x[:, 0]-3*std[:, 0], x[:, 0]+3*std[:, 0], color='red', alpha=0.3)
@@ -282,7 +248,7 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
         plt.ylim([-0.01, 2])
         plt.grid()
 
-        plt.figure("Estimation Errors")
+        plt.figure()
         plt.subplot(311)
         plt.title('Estimation Errors')
         plt.plot(tt, abs(estimate_error[:, 0].T))
@@ -310,23 +276,7 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
         plt.plot(tt, MD_residual)
         plt.ylabel('MD of Residuals')
         plt.xlabel('time (s)')
-        
-        plt.figure("Process Noise Covariance")
-        plt.subplot(411)
-        plt.title("diag Q")
-        plt.plot(tt, Q_diag[:, 0])
-        plt.ylabel('$Q(1,1)$')
-        plt.subplot(412)
-        plt.plot(tt, Q_diag[:, 1])
-        plt.ylabel('$Q(2,2)$')
-        plt.subplot(413)
-        plt.plot(tt, Q_diag[:, 2])
-        plt.ylabel('$Q(3,3)$')
-        plt.subplot(414)
-        plt.plot(tt, Q_diag[:, 3])
-        plt.ylabel('$Q(4,4)$')
-        plt.xlabel('time (s)')
-        
+
         plt.figure("Mahalanobis Distance of State Estimate")
         plt.title("Mahalanobis Distance of State Estimate")
         plt.plot(tt, MD_estimate)
@@ -335,7 +285,7 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
         plt.xlabel('time (s)')
         """
         
-        plt.figure("Measurements")
+        plt.figure()
         for i in range(len(sensors)):
             plt.subplot(int(str(len(sensors)) + "1" + str(i+1)))
             plt.plot(tt, z[i, :], 'k-')
@@ -348,59 +298,28 @@ def ekf_test(dataset, subject, trial, side = 'left', heteroscedastic = False, ki
             elif i == len(sensors)-1:
                 plt.xlabel("time (s)")
         
-        """
-        plt.figure("Kinetics")
-        plt.subplot(411)
-        plt.title("Kinetics")
-        plt.plot(tt, tibiaForce[0:total_step], 'k-')
-        plt.plot(tt, tibiaForce_threshold*np.ones((len(tt),1)), 'b--')
-        plt.xlim([0, tt[-1]+0.1])
-        plt.ylabel('Tibia Axial Force')
-        plt.grid()
-        plt.subplot(412)
-        plt.plot(tt, ankleMoment[0:total_step], 'k-')
-        plt.xlim([0, tt[-1]+0.1])
-        plt.ylabel('Ankle Moment')
-        plt.grid()
-        plt.subplot(413)
-        plt.plot(tt, L_cop[0:total_step], 'k-')
-        plt.xlim([0, tt[-1]+0.1])
-        plt.ylabel('L cop')
-        plt.grid()
-        plt.subplot(414)
-        plt.plot(tt, ramps, 'k-')
-        plt.plot(tt, x[:, 3], 'r--')
-        plt.plot(tt, globalFootAngle[0:total_step], 'm-')
-        plt.plot(tt, directRamp, 'g-')
-        plt.legend(('Ground truth ramp', 'EKF ramp est','foot angles','backup ramp'))
-        plt.ylabel('Ramp Est & Foot Angle')
-        plt.xlim([0, tt[-1]+0.1])
-        plt.grid()
-        """
-        plt.figure("Control Commands: Joint Angles")
+        plt.figure()
         plt.title("Control Commands: Joint Angles")
         plt.subplot(211)
         plt.plot(tt, kneeAngle, 'k-')
         plt.plot(tt, kneeAngle_kmd, 'm-')
-        #plt.plot(tt, kneeAngle_cmd, 'r-')
-        plt.legend(('actual', 'kinematic model', 'prescribed trajectory'))
+        plt.legend(('actual', 'kinematic model'))
         plt.ylabel('knee angle (deg)')
         plt.subplot(212)
         plt.plot(tt, ankleAngle, 'k-')
         plt.plot(tt, ankleAngle_kmd, 'm-')
-        #plt.plot(tt, ankleAngle_cmd, 'r-')
-        plt.legend(('actual', 'kinematic model', 'prescribed trajectory'))
+        plt.legend(('actual', 'kinematic model'))
         plt.ylabel('ankle angle (deg)')
         plt.xlabel('time (s)')
         
-        plt.show()
+        #plt.show()
     
     if kidnap == False:
         return result
     else:
-        exit("The ekf_test program does not return anything for the kidnapping case.")
+        print("The test program does not return anything for the kidnapping case")
 
-def ekf_bank_test(dataset, subject, trial, side, N = 30, heteroscedastic = False, kidnap = [0, 1, 2, 3], plot = True):
+def kf_bank_test(dataset, subject, trial, side, N = 30, kalman_filter = 'ekf', kidnap = [0, 1, 2, 3], plot = True):
     # N: number of EKFs in the EKF-bank
     print("Monte-Carlo Test: ", dataset, "/", subject, "/", trial, 'i0/', side)
 
@@ -476,7 +395,7 @@ def ekf_bank_test(dataset, subject, trial, side, N = 30, heteroscedastic = False
         #init.x = np.array([[phases[0]], [phase_dots[0]], [step_lengths[0]], [0]])
         init.Sigma = inital_Sigma
         # build EKF
-        ekf = extended_kalman_filter(sys, init)
+        filter = extended_kalman_filter(sys, init)
         
         phase_kidnap = np.random.uniform(0, 1)
         phase_dot_kidnap = np.random.uniform(0, 5)
@@ -494,10 +413,10 @@ def ekf_bank_test(dataset, subject, trial, side, N = 30, heteroscedastic = False
         for i in range(total_step):
             # kidnap
             if i == kidnap_index and n > 0:
-                ekf.x[kidnap] = state_kidnap[kidnap]
+                filter.x[kidnap] = state_kidnap[kidnap]
             
-            ekf.prediction(dt)
-            ekf.state_saturation(saturation_range)
+            filter.prediction(dt)
+            filter.state_saturation(saturation_range)
             """
             if using_ankleMoment or using_tibiaForce or using_footAngles or using_directRamp:
                 if tibiaForce[i] <= tibiaForce_threshold:
@@ -528,44 +447,44 @@ def ekf_bank_test(dataset, subject, trial, side, N = 30, heteroscedastic = False
                 
                 #if stance == True:
                 if tibiaForce[i] <= tibiaForce_threshold:
-                    ekf.h = m_model
+                    filter.h = m_model
                     if heteroscedastic == True:
-                        ekf.R = np.diag(hetero_cov[:, int(ekf.x[0, 0]*150)])
+                        filter.R = np.diag(hetero_cov[:, int(filter.x[0, 0]*150)])
                         if using_directRamp:
-                            ekf.R = np.diag(np.append(np.diag(ekf.R), R_directRamp))               
+                            filter.R = np.diag(np.append(np.diag(filter.R), R_directRamp))               
                     else:
-                        ekf.R = R
+                        filter.R = R
 
                     if using_directRamp:
-                        ekf.correction(z[:, i], Psi, using_atan2, direct_ramp = directRamp[i])
+                        filter.correction(z[:, i], Psi, using_atan2, direct_ramp = directRamp[i])
                     else:
-                        ekf.correction(z[:, i], Psi, using_atan2, direct_ramp = False)
+                        filter.correction(z[:, i], Psi, using_atan2, direct_ramp = False)
                 else: # swing
-                    ekf.h = m_model_swing
+                    filter.h = m_model_swing
                     if heteroscedastic == True:
-                        ekf.R = np.diag(hetero_cov[sensor_swing_id, int(ekf.x[0, 0]*150)])
+                        filter.R = np.diag(hetero_cov[sensor_swing_id, int(filter.x[0, 0]*150)])
                         if using_directRamp:
-                            ekf.R = np.diag(np.append(np.diag(ekf.R), R_directRamp))
+                            filter.R = np.diag(np.append(np.diag(filter.R), R_directRamp))
                     else:
-                        ekf.R = R_swing
+                        filter.R = R_swing
                     
                     if using_directRamp:
-                        ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, direct_ramp = directRamp[i])
+                        filter.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, direct_ramp = directRamp[i])
                     else:
-                        ekf.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, direct_ramp = False)       
+                        filter.correction(z_full[sensor_swing_id, i], Psi_swing, using_atan2, direct_ramp = False)       
 
             else:
                 if heteroscedastic == True:
-                    ekf.R = np.diag(hetero_cov[:, int(ekf.x[0, 0]*150)])
+                    filter.R = np.diag(hetero_cov[:, int(filter.x[0, 0]*150)])
                 else:
-                    ekf.R = R
+                    filter.R = R
             """
-            ekf.correction(z[:, i], Psi, using_atan2)
-            ekf.state_saturation(saturation_range)
+            filter.correction(z[:, i], Psi, using_atan2)
+            filter.state_saturation(saturation_range)
 
-            x[n, i,:] = ekf.x.T
+            x[n, i,:] = filter.x.T
 
-            estimate_error[n, i, :] = (ekf.x - np.array([[phases[i]], [phase_dots[i]], [step_lengths[i]], [ramps[i]]])).reshape(-1)
+            estimate_error[n, i, :] = (filter.x - np.array([[phases[i]], [phase_dots[i]], [step_lengths[i]], [ramps[i]]])).reshape(-1)
             if estimate_error[n, i, 0] > 0.5:
                 estimate_error[n, i, 0] = estimate_error[n, i, 0] - 1
             elif estimate_error[n, i, 0] < -0.5:
@@ -745,7 +664,7 @@ def ekf_bank_test(dataset, subject, trial, side, N = 30, heteroscedastic = False
     
     return (robustness_11, robustness_13, robustness_33, robustness_15, robustness_55)
 
-def ekf_robustness(kidnap = True, heteroscedastic = False):
+def kf_robustness(kidnap = True, kalman_filter = 'ekf',):
     total_trials = 0
     robustness_11 = 0
     robustness_13 = 0 
@@ -863,7 +782,7 @@ def ekf_robustness(kidnap = True, heteroscedastic = False):
 if __name__ == '__main__':
     dataset = 'inclineExp'
     subject = 'AB05'
-    trial = 's1x2'
+    trial = 's1'
     side = 'left'
 
     if nan_dict[subject][trial+'i0'][side] == False:
@@ -873,7 +792,6 @@ if __name__ == '__main__':
     #subject = 'AB07'
     #trial = 's1'
 
-    ekf_test(dataset, subject, trial, side, heteroscedastic = False, kidnap = [0, 1, 2], plot = True)
-    #ekf_bank_test(dataset, subject, trial, side, N = 5, heteroscedastic = False, kidnap = [0, 1, 2], plot = True)
-    #ekf_robustness(kidnap = [0, 1, 2], heteroscedastic = False)
-    #ekf_robustness(kidnap = False, heteroscedastic = False)
+    kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = [0, 1, 2], plot = True)
+    kf_test(dataset, subject, trial, side, kalman_filter = 'ukf', kidnap = [0, 1, 2], plot = True)
+    plt.show()

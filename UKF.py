@@ -1,6 +1,6 @@
 import numpy as np
 
-def unscented_points(mean, cov, alpha = 1, beta = 2, kappa = 0, alg = 'chol'):
+def unscented_points(mean, cov, alpha = 1, beta = 0, kappa = 0, alg = 'chol'):
     ## Generate unscented points
     dim = cov.shape[0]
     lam = alpha * alpha * (dim + kappa) - dim
@@ -37,16 +37,16 @@ class unscented_kalman_filter:
         self.f = system.f  # process model
         self.Q = system.Q  # input noise covariance
         self.h = system.h  # measurement model
+        self.Psi = system.Psi
         self.R = system.R  # measurement noise covariance
-        
+        self.alpha = system.alpha
+        self.beta = system.beta
+        self.kappa = system.kappa
+        self.alg = 'chol'
+
         self.x = init.x  # state vector
         self.Sigma = init.Sigma  # state covariance
         self.dim = self.Sigma.shape[0]
-        
-        self.alpha = 1
-        self.beta = 2
-        self.kappa = 0
-        self.alg = 'chol'
 
     def prediction(self, dt):
         ## UKF propagation (prediction) step
@@ -55,77 +55,68 @@ class unscented_kalman_filter:
         pts, (W0m, Wim, W0c, Wic) = unscented_points(self.x, self.Sigma, self.alpha, self.beta, self.kappa, self.alg)
         
         # transform the unscented points using the process model
-        mean = np.zeros(np.shape(self.x))
+        mean_x = np.zeros(np.shape(self.x))
         self.x_pts_p = np.array(np.zeros((2 * self.dim + 1, self.dim)))
         for i in range(2 * self.dim + 1):
             pp = self.f(pts[i, :], dt)
             if i == 0:
-                mean += pp * W0m
+                mean_x += pp * W0m
             else:
-                mean += pp * Wim
+                mean_x += pp * Wim
             self.x_pts_p[i,:] = pp
-        self.x = mean  # predicted state
-        self.x[0] = warpToOne(self.x[0]) # wrap to be between 0 and 1
+        self.x = mean_x  # predicted state
 
-        cov = np.zeros(np.shape(self.Sigma))
+        cov_xx = np.zeros(np.shape(self.Sigma))
         for i in range(2 * self.dim + 1):
-            x_temp = (self.x_pts_p[i,:] - self.x).reshape(self.dim,1)
-            if x_temp[0] > 0.5:
-                x_temp[0] = x_temp[0]-1
-            elif x_temp[0] < -0.5:
-                x_temp[0] = 1+x_temp[0]
-                
+            x_temp = (self.x_pts_p[i,:] - self.x).reshape(self.dim, 1)
             if i == 0:
-                cov += x_temp @ x_temp.T * W0c
+                cov_xx += x_temp @ x_temp.T * W0c
             else:
-                cov += x_temp @ x_temp.T * Wic
-        self.Sigma = cov + self.Q  # predicted state covariance
+                cov_xx += x_temp @ x_temp.T * Wic
+        self.Sigma = cov_xx + self.Q # predicted state covariance
 
-    def correction(self, z, Psi, using_atan2 = False):
+    def correction(self, z, using_atan2 = False):
         ## UKF correction step
         #  z:  measurement
-        #z = np.array([z])
 
         pts, (W0m, Wim, W0c, Wic) = unscented_points(self.x, self.Sigma, self.alpha, self.beta, self.kappa, self.alg)
         
         # transform the unscented points using the measurement model
-        mean = np.zeros(np.shape(z))
+        mean_z = np.zeros(np.shape(z))
         self.z_pts_p = np.array(np.zeros((2 * self.dim + 1, 3)))
         for i in range(2 * self.dim + 1):
-            pts[i, 0] = warpToOne(pts[i, 0])
-            pp = self.h.evaluate_h_func(Psi, pts[i, 0], pts[i, 1], pts[i, 2], pts[i, 3])[:,0]
+            pp = self.h.evaluate_h_func(self.Psi,pts[i, 0], pts[i, 1], pts[i, 2])[:,0]
             if i == 0:
-                mean += pp * W0m
+                mean_z += pp * W0m
             else:
-                mean += pp * Wim
+                mean_z += pp * Wim
             self.z_pts_p[i,:] = pp
-        self.z_hat = mean  # predicted measurement
+        self.z_hat = mean_z  # predicted measurement
         
         if using_atan2:
             self.z_hat[2] += self.x[0] * 2 * np.pi
 
-        cov = np.zeros((np.shape(z)[0], np.shape(z)[0]))
+        cov_zz = np.zeros((np.shape(z)[0], np.shape(z)[0]))
         cov_xz = np.zeros((np.shape(self.x)[0], np.shape(z)[0]))
         for i in range(2 * self.dim + 1):
             z_temp = (self.z_pts_p[i,:] - self.z_hat).reshape(np.shape(z)[0],1)
             x_temp = (self.x_pts_p[i,:] - self.x).reshape(self.dim,1)
             if i == 0:
-                cov += z_temp @ z_temp.T * W0c
+                cov_zz += z_temp @ z_temp.T * W0c
                 cov_xz += x_temp @ z_temp.T * W0c
             else:
-                cov += z_temp @ z_temp.T * Wic
+                cov_zz += z_temp @ z_temp.T * Wic
                 cov_xz += x_temp @ z_temp.T * Wic
-        self.S = cov + self.R  # innovation covariance
+        self.S = cov_zz + self.R  # innovation covariance
         self.Cov_xz = cov_xz  # state-measurement cross covariance
 
         # filter gain
-        K = self.Cov_xz @ np.linalg.inv(self.S) # Kalman (filter) gain
+        K = self.Cov_xz @ np.linalg.pinv(self.S) # Kalman (filter) gain
 
         # correct the predicted state statistics
         v = z - self.z_hat
         if using_atan2:
-            # wrap to pi
-            v[2] = np.arctan2(np.sin(v[2]), np.cos(v[2]))
+            v[2] = np.arctan2(np.sin(v[2]), np.cos(v[2]))# wrap to pi
         self.x = self.x + K @ v
         self.x[0] = warpToOne(self.x[0])
         self.Sigma = self.Sigma - K @ self.S @ K.T

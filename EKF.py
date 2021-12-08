@@ -6,7 +6,6 @@ def A(dt):
     return np.array([[1, dt, 0], [0, 1, 0], [0, 0, 1]])
 
 def process_model(x, dt):
-    #dt = 0.01 # data sampling rate: 100 Hz
     return A(dt) @ x.T
 
 ## Load control model & coefficients (for OSL implementation)
@@ -59,7 +58,6 @@ def phase_error(phase_est, phase_truth):
         data_len = len(phase_est)
     else:
         exit("Error in phase_error(phase_est, phase_truth): lengths of input data did not match.")
-    
     phase_error = np.zeros(data_len)
     for i in range(data_len):
         # measure error between estimated and ground-truth phase
@@ -90,8 +88,9 @@ class extended_kalman_filter:
         self.Q = self.Q_static    # process model noise covariance
 
         self.h = system.h  # measurement model
+        self.Psi = system.Psi
         self.R = system.R  # measurement noise covariance
-
+        
         self.x = init.x  # state mean
         self.Sigma = init.Sigma  # state covariance
 
@@ -103,16 +102,16 @@ class extended_kalman_filter:
         self.x[0] = warpToOne(self.x[0]) # wrap to [0,1)
         self.Sigma = self.A(dt) @ self.Sigma @ self.A(dt).T + self.Q  # predicted state covariance
 
-    def correction(self, z, Psi, using_atan2 = False):
+    def correction(self, z, using_atan2 = False):
         # EKF correction step
         # Inputs:
         #   z:  measurement
 
         # evaluate measurement Jacobian at current operating point
-        H = self.h.evaluate_dh_func(Psi, self.x[0], self.x[1], self.x[2])
+        H = self.h.evaluate_dh_func(self.Psi, self.x[0], self.x[1], self.x[2])
         
         # predicted measurements
-        self.z_hat = self.h.evaluate_h_func(Psi, self.x[0], self.x[1], self.x[2])[:,0]
+        self.z_hat = self.h.evaluate_h_func(self.Psi, self.x[0], self.x[1], self.x[2])[:,0]
 
         ### Jacobian test #########################################################
         #print("HPH=",  H @ self.Sigma @ H.T)
@@ -143,14 +142,10 @@ class extended_kalman_filter:
         # correct the predicted state statistics
         self.x = self.x + K @ self.v
         self.x[0] = warpToOne(self.x[0])
-        #I = np.eye(np.shape(self.x)[0])
-        #self.Sigma = (I - K @ H) @ self.Sigma
         self.Sigma = (np.eye(3) - K @ H) @ self.Sigma
 
         # Compute MD using innovations
-        #self.MD = 0.2 * np.sqrt(self.v.T @ np.linalg.inv(self.R) @ self.v) + (1-0.2) * np.copy(self.MD_residual)
-        #self.MD = np.sqrt(self.v[2] * 1/self.R[2,2] * self.v[2])
-        self.MD = (self.v.T @ np.linalg.inv(self.R) @ self.v)#[0, 0]
+        self.MD = (self.v.T @ np.linalg.inv(self.R) @ self.v)
 
         # Compute MD using residuals
         """
