@@ -348,7 +348,7 @@ if __name__ == '__main__':
     #ramp_model = Berstein_Basis(0, 'ramp')
 
     model_globalThighAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model)#, ramp_model)
-    #psi_globalThighAngles = basis_model_fitting(model_globalThighAngles, 'globalThighAngles')
+    psi_globalThighAngles = basis_model_fitting(model_globalThighAngles, 'globalThighAngles')
     #basis_model_residuals(model_globalThighAngles, 'globalThighAngles', heteroscedastic = False)
 
     model_ankleMoment = Kronecker_Model(phase_model, phase_dot_model, step_length_model)#, ramp_model)

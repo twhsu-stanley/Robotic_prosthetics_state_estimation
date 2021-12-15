@@ -176,10 +176,13 @@ try:
     sys.Psi = Psi
     sys.Q = np.array([[0, 0, 0], [0, 1e-2, 1e-2], [0, 1e-2, 1e-2]]) * 1e-2
     # measurement noise covariance
-    U = np.diag([2, 2, 2])
+    U = np.diag([1, 1, 1])
     R = U @ measurement_noise_covariance(*sensors) @ U.T
     R_org = np.copy(R)
     sys.R = np.copy(R)
+    sys.alpha = 1
+    sys.beta = 0
+    sys.kappa = 0
 
     # initialize the state
     init = myStruct()

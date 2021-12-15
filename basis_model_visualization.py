@@ -1,3 +1,4 @@
+from pickle import FROZENSET
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import StrMethodFormatter
@@ -12,7 +13,7 @@ sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2']#,'globalFootAn
 sensor_id = 1
 
 m_model = model_loader('Measurement_model_012_NSL.pickle')
-Psi = np.array([load_Psi('Generic')[key] for key in sensors], dtype = object)
+Psi = np.array([load_Psi()[key] for key in sensors], dtype = object)
 
 # load training data
 with open(('Gait_training_data/' + sensors[sensor_id] + '_NSL_training_dataset.pickle'), 'rb') as file:
@@ -41,7 +42,7 @@ measurement = np.zeros((len(phases), len(phase_dots)))
 
 for i in range(len(phases)):
     for j in range(len(phase_dots)):
-        z = m_model.evaluate_h_func(Psi, phases[i], phase_dots[j], step_lengths, ramps)
+        z = m_model.evaluate_h_func(Psi, phases[i], phase_dots[j], step_lengths)
         if sensors[sensor_id] == 'atan2':
             measurement[i,j] = z[sensor_id] + 2*np.pi*phases[i]
             measurement[i,j] = wrapTo2pi(measurement[i,j])
@@ -55,8 +56,12 @@ for p in range(np.shape(data_training)[0]):
     if p % 10 == 0:
         ax.plot(phase_training[p,:], phase_dot_training[p,:], data_training[p,:], 'r')
 ax.plot_surface(X, Y, measurement.T, alpha = 0.7)
-ax.set_xlabel('phase')
-ax.set_ylabel('phase_dot')
+ax.set_xlabel('$\phi$', fontsize = 14)
+ax.set_ylabel('$\dot{\phi}$', fontsize = 14)
+if sensor_id == 0:
+    ax.set_zlabel('$\\theta_{th}$', fontsize = 14)
+elif sensor_id == 1:
+    ax.set_zlabel('$\dot{\\theta}_{th}$', fontsize = 14)
 # ==========================================================================================================================
 
 ## B. Visualize Measurement Model w.r.t. stpe_length ===========================================================================
@@ -69,7 +74,7 @@ measurement = np.zeros((len(phases), len(step_lengths)))
 
 for i in range(len(phases)):
     for j in range(len(step_lengths)):
-        z = m_model.evaluate_h_func(Psi, phases[i], phase_dots, step_lengths[j], ramps)
+        z = m_model.evaluate_h_func(Psi, phases[i], phase_dots, step_lengths[j])#, ramps
         if sensors[sensor_id] == 'atan2':
             measurement[i,j] = z[sensor_id] + 2*np.pi*phases[i]
             measurement[i,j] = wrapTo2pi(measurement[i,j])
@@ -83,8 +88,12 @@ for p in range(np.shape(data_training)[0]):
     if p % 10 == 0:
         ax.plot(phase_training[p,:], step_length_training[p,:], data_training[p,:], 'r')
 ax.plot_surface(X, Y, measurement.T, alpha = 0.7)
-ax.set_xlabel('phase')
-ax.set_ylabel('step_length')
+ax.set_xlabel('$\phi$', fontsize = 14)
+ax.set_ylabel('$l$', fontsize = 14)
+if sensor_id == 0:
+    ax.set_zlabel('$\\theta_{th}$', fontsize = 14)
+elif sensor_id == 1:
+    ax.set_zlabel('$\dot{\\theta}_{th}$', fontsize = 14)
 
 ## C. Visualize Measurement Model w.r.t. phase_dot & stpe_length ===========================================================================
 if sensors[sensor_id] != 'atan2':
@@ -110,32 +119,6 @@ if sensors[sensor_id] != 'atan2':
     ax.set_ylabel('step_length')
 # ==========================================================================================================================
 
-## C. Visualize Measurement Model w.r.t. ramp ===========================================================================
-"""
-phases = np.linspace(0, 1, num = 50)
-phase_dots = 0.8
-step_lengths = 1.1
-ramps = np.linspace(-10, 10, num = 50)
-
-measurement = np.zeros((len(phases), len(ramps)))
-
-for i in range(len(phases)):
-    for j in range(len(ramps)):
-        z = m_model.evaluate_h_func(Psi, phases[i], phase_dots, step_lengths, ramps[j])
-        if sensors[sensor_id] == 'atan2':
-            measurement[i,j] = z[sensor_id] + 2*np.pi*phases[i]
-            measurement[i,j] = wrapTo2pi(measurement[i,j])
-        else:
-            measurement[i,j] = z[sensor_id]
-
-fig = plt.figure()
-X, Y = np.meshgrid(phases, ramps)
-ax = plt.axes(projection='3d')
-ax.plot_surface(X, Y, measurement.T)
-ax.set_xlabel('phase')
-ax.set_ylabel('ramp')
-"""
-# ==========================================================================================================================
 # Visualization of joint models
 
 c_model = model_loader('Control_model_NSL_B20.pickle')
@@ -181,9 +164,9 @@ for p in range(np.shape(data_training)[0]):
     if p % 10 == 0:
         ax.plot(phase_training[p,:], step_length_training[p,:], data_training[p,:], 'r')
 ax.plot_surface(X, Y, ankle_angle_model.T, alpha = 0.7)
-ax.set_xlabel('phase')
-ax.set_ylabel('step_length')
-ax.set_zlabel('ankle angle (deg)')
+ax.set_xlabel('$\phi$', fontsize = 14)
+ax.set_ylabel('$l$', fontsize = 14)
+ax.set_zlabel('$\\theta_{a}$', fontsize = 14)
 ax.set_zlim(-20,40)
 
 
@@ -210,81 +193,9 @@ for p in range(np.shape(data_training)[0]):
     if p % 10 == 0:
         ax.plot(phase_training[p,:], step_length_training[p,:], data_training[p,:], 'r')
 ax.plot_surface(X, Y, knee_angle_model.T, alpha = 0.7)
-ax.set_xlabel('phase')
-ax.set_ylabel('step_length')
-ax.set_zlabel('knee angle (deg)')
-
+ax.set_xlabel('$\phi$', fontsize = 14)
+ax.set_ylabel('$l$', fontsize = 14)
+ax.set_zlabel('$\\theta_{k}$', fontsize = 14)
 #==============================================================================================================================
 
-## D. Visualize Joint Model w.r.t. ramp ===============================================================================================
-"""
-phases = np.linspace(0, 1, num = 50)
-phase_dots = 0.8
-step_lengths = 1.3
-ramps = np.linspace(-10, 10, num = 50)
-
-knee_angle_model = np.zeros((len(phases), len(ramps)))
-ankle_angle_model = np.zeros((len(phases), len(ramps)))
-
-for i in range(len(phases)):
-    for j in range(len(ramps)):
-        joint_angles = c_model.evaluate_h_func([Psi_knee, Psi_ankle], phases[i], phase_dots, step_lengths, ramps[j])
-        knee_angle_model[i,j] = joint_angles[0]
-        ankle_angle_model[i,j] = joint_angles[1]
-        
-
-fig = plt.figure()
-X, Y = np.meshgrid(phases, ramps)
-ax = plt.axes(projection='3d')
-ax.plot_surface(X, Y, -ankle_angle_model.T) # flip the sign to compare to Kyle's figures
-ax.set_xlabel('phase')
-ax.set_ylabel('ramp')
-ax.set_zlabel('ankle angle (deg)')
-ax.set_zlim(-20,40)
-
-fig = plt.figure()
-X, Y = np.meshgrid(phases, ramps)
-ax = plt.axes(projection='3d')
-ax.plot_surface(X, Y, -knee_angle_model.T) # flip the sign to compare to Kyle's figures
-ax.set_xlabel('phase')
-ax.set_ylabel('ramp')
-ax.set_zlabel('knee angle (deg)')
-ax.set_zlim(-50,100)
-
-#==============================================================================================================================
-
-## D. Visualize Joint Model w.r.t. phase_dot ===============================================================================================
-phases = np.linspace(0, 1, num = 50)
-phase_dots = np.linspace(0.8, 1.2, num = 50)
-step_lengths = 0.9
-ramps = 0
-
-knee_angle_model = np.zeros((len(phases), len(phase_dots)))
-ankle_angle_model = np.zeros((len(phases), len(phase_dots)))
-
-for i in range(len(phases)):
-    for j in range(len(phase_dots)):
-        joint_angles = c_model.evaluate_h_func([Psi_knee, Psi_ankle], phases[i], phase_dots[j], step_lengths, ramps)
-        knee_angle_model[i,j] = joint_angles[0]
-        ankle_angle_model[i,j] = joint_angles[1]
-        
-
-fig = plt.figure()
-X, Y = np.meshgrid(phases, phase_dots)
-ax = plt.axes(projection='3d')
-ax.plot_surface(X, Y, -ankle_angle_model.T)
-ax.set_xlabel('phase')
-ax.set_ylabel('phase_dots')
-ax.set_zlabel('ankle angle (deg)')
-ax.set_zlim(-20,40)
-
-fig = plt.figure()
-X, Y = np.meshgrid(phases, phase_dots)
-ax = plt.axes(projection='3d')
-ax.plot_surface(X, Y, -knee_angle_model.T)
-ax.set_xlabel('phase')
-ax.set_ylabel('phase_dots')
-ax.set_zlabel('knee angle (deg)')
-"""
-#==============================================================================================================================
 plt.show()

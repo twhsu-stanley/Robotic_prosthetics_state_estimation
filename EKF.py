@@ -84,13 +84,20 @@ class extended_kalman_filter:
         #   init:   initial state mean and covariance
         self.f = system.f  # process model
         self.A = system.A  # system matrix Jacobian
-        self.Q_static = system.Q
-        self.Q = self.Q_static    # process model noise covariance
+        self.Q = system.Q
+        self.Q_init = np.copy(system.Q)
 
         self.h = system.h  # measurement model
         self.Psi = system.Psi
         self.R = system.R  # measurement noise covariance
+
+        self.saturation = system.saturation
+        self.saturation_range = system.saturation_range
         
+        self.adapt_Q = system.adapt_Q
+        fc = 0.2
+        self.a = 2 * np.pi * 0.01 * fc / (2 * np.pi * 0.01 * fc + 1) # forgetting factor for averaging
+
         self.x = init.x  # state mean
         self.Sigma = init.Sigma  # state covariance
 
@@ -101,6 +108,8 @@ class extended_kalman_filter:
         self.x = self.f(self.x, dt)  # predicted state
         self.x[0] = warpToOne(self.x[0]) # wrap to [0,1)
         self.Sigma = self.A(dt) @ self.Sigma @ self.A(dt).T + self.Q  # predicted state covariance
+        if self.saturation == True:
+            self.state_saturation(self.saturation_range)
 
     def correction(self, z, using_atan2 = False):
         # EKF correction step
@@ -113,21 +122,12 @@ class extended_kalman_filter:
         # predicted measurements
         self.z_hat = self.h.evaluate_h_func(self.Psi, self.x[0], self.x[1], self.x[2])[:,0]
 
-        ### Jacobian test #########################################################
-        #print("HPH=",  H @ self.Sigma @ H.T)
-        #print("R=", self.R)
-        #z2 = self.h.evaluate_h_func(Psi, self.x[0,0]-0.01, self.x[1,0]-0.01, self.x[2,0]+0.01, self.x[3,0]-0.01)
-        #print(z2 - self.z_hat)
-        #print(H @ np.array([[-0.01], [-0.01], [0.01], [-0.01]]))
-        ###########################################################################
-
         if using_atan2:
             H[2, 0] += 2*np.pi
             self.z_hat[2] += self.x[0] * 2 * np.pi
             #self.z_hat[2] = wrapTo2pi(self.z_hat[2])
         
         # innovation
-        #z = np.array([z]).T
         self.v = z - self.z_hat
         if using_atan2:
             # wrap to pi
@@ -144,8 +144,15 @@ class extended_kalman_filter:
         self.x[0] = warpToOne(self.x[0])
         self.Sigma = (np.eye(3) - K @ H) @ self.Sigma
 
-        # Compute MD using innovations
-        self.MD = (self.v.T @ np.linalg.inv(self.R) @ self.v)
+        d = K @ self.v[:,None]
+        self.MD = np.sqrt(d.T @ np.linalg.pinv(self.Q) @ d)[0,0]
+        if self.adapt_Q == True:
+            self.Q = self.a * d @ d.T + (1 - self.a) * self.Q
+            #r =  z - self.h.evaluate_h_func(self.Psi, self.x[0], self.x[1], self.x[2])[:,0]
+            #self.R = self.a * self.R + (1-self.a) * (r[:,None] @ r[:,None].T + H @ self.Sigma @ H.T)        
+        
+        if self.saturation == True:
+            self.state_saturation(self.saturation_range)
 
         # Compute MD using residuals
         """

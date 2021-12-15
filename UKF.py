@@ -43,6 +43,8 @@ class unscented_kalman_filter:
         self.beta = system.beta
         self.kappa = system.kappa
         self.alg = 'chol'
+        self.saturation = system.saturation
+        self.saturation_range = system.saturation_range
 
         self.x = init.x  # state vector
         self.Sigma = init.Sigma  # state covariance
@@ -58,12 +60,12 @@ class unscented_kalman_filter:
         mean_x = np.zeros(np.shape(self.x))
         self.x_pts_p = np.array(np.zeros((2 * self.dim + 1, self.dim)))
         for i in range(2 * self.dim + 1):
-            pp = self.f(pts[i, :], dt)
+            pp_x = self.f(pts[i, :], dt)
             if i == 0:
-                mean_x += pp * W0m
+                mean_x += pp_x * W0m
             else:
-                mean_x += pp * Wim
-            self.x_pts_p[i,:] = pp
+                mean_x += pp_x * Wim
+            self.x_pts_p[i,:] = pp_x
         self.x = mean_x  # predicted state
 
         cov_xx = np.zeros(np.shape(self.Sigma))
@@ -75,6 +77,9 @@ class unscented_kalman_filter:
                 cov_xx += x_temp @ x_temp.T * Wic
         self.Sigma = cov_xx + self.Q # predicted state covariance
 
+        if self.saturation == True:
+            self.state_saturation(self.saturation_range)
+
     def correction(self, z, using_atan2 = False):
         ## UKF correction step
         #  z:  measurement
@@ -83,14 +88,16 @@ class unscented_kalman_filter:
         
         # transform the unscented points using the measurement model
         mean_z = np.zeros(np.shape(z))
-        self.z_pts_p = np.array(np.zeros((2 * self.dim + 1, 3)))
+        self.z_pts_p = np.array(np.zeros((2 * self.dim + 1, np.shape(z)[0])))
+        self.x_pts_p = np.array(np.zeros((2 * self.dim + 1, self.dim)))
         for i in range(2 * self.dim + 1):
-            pp = self.h.evaluate_h_func(self.Psi,pts[i, 0], pts[i, 1], pts[i, 2])[:,0]
+            pp_z = self.h.evaluate_h_func(self.Psi, pts[i, 0], pts[i, 1], pts[i, 2])[:,0]
             if i == 0:
-                mean_z += pp * W0m
+                mean_z += pp_z * W0m
             else:
-                mean_z += pp * Wim
-            self.z_pts_p[i,:] = pp
+                mean_z += pp_z * Wim
+            self.z_pts_p[i,:] = pp_z
+            self.x_pts_p[i,:] = pts[i, :]
         self.z_hat = mean_z  # predicted measurement
         
         if using_atan2:
@@ -120,6 +127,9 @@ class unscented_kalman_filter:
         self.x = self.x + K @ v
         self.x[0] = warpToOne(self.x[0])
         self.Sigma = self.Sigma - K @ self.S @ K.T
+
+        if self.saturation == True:
+            self.state_saturation(self.saturation_range)
 
     def state_saturation(self, saturation_range):
         phase_dots_max = saturation_range[0]
