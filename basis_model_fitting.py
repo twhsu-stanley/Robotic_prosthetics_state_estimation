@@ -348,7 +348,7 @@ if __name__ == '__main__':
     #ramp_model = Berstein_Basis(0, 'ramp')
 
     model_globalThighAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model)#, ramp_model)
-    psi_globalThighAngles = basis_model_fitting(model_globalThighAngles, 'globalThighAngles')
+    #psi_globalThighAngles = basis_model_fitting(model_globalThighAngles, 'globalThighAngles')
     #basis_model_residuals(model_globalThighAngles, 'globalThighAngles', heteroscedastic = False)
 
     model_ankleMoment = Kronecker_Model(phase_model, phase_dot_model, step_length_model)#, ramp_model)
@@ -384,12 +384,12 @@ if __name__ == '__main__':
     #ramp_model = Berstein_Basis(0, 'ramp')
 
     model_atan2 = Kronecker_Model(phase_model, phase_dot_model, step_length_model)#, ramp_model)
-    #psi_atan2 = basis_model_fitting(model_atan2, 'atan2ss')
+    psi_atan2 = basis_model_fitting(model_atan2, 'atan2')
     #basis_model_residuals(model_atan2, 'atan2ss', heteroscedastic = False)
 
     # sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2, 'globalFootAngles':3, 'ankleMoment':4, 'tibiaForce':5}
-    m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities)#, model_atan2)#
-    model_saver(m_model, 'Measurement_model_01_NSL.pickle')
+    #m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities)#, model_atan2)#
+    #model_saver(m_model, 'Measurement_model_01_NSL.pickle')
     #c_model = Measurement_Model(model_kneeAngles, model_ankleAngles)
     #model_saver(c_model, 'Control_model.pickle')
     

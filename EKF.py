@@ -21,7 +21,7 @@ def load_Psi():
         Psi_globalThighAngles = pickle.load(file)
     with open('Psi_3states/Psi_globalThighVelocities', 'rb') as file:
         Psi_globalThighVelocities = pickle.load(file)
-    with open('Psi_3states/Psi_atan2ss', 'rb') as file:
+    with open('Psi_3states/Psi_atan2', 'rb') as file:
         Psi_atan2 = pickle.load(file)
     """
     with open('Psi/Psi_globalThighAngles_NSL_B10_const.pickle', 'rb') as file:
@@ -93,15 +93,15 @@ class extended_kalman_filter:
 
         self.saturation = system.saturation
         self.saturation_range = system.saturation_range
-        
-        self.adapt_Q = system.adapt_Q
+        self.reset = system.reset
+        self.adapt = system.adapt
         fc = 0.2
         self.a = 2 * np.pi * 0.01 * fc / (2 * np.pi * 0.01 * fc + 1) # forgetting factor for averaging
 
         self.x = init.x  # state mean
         self.Sigma = init.Sigma  # state covariance
 
-        self.MD = 0
+        self.MD_square = 0
 
     def prediction(self, dt):
         # EKF propagation (prediction) step
@@ -139,35 +139,23 @@ class extended_kalman_filter:
         # filter gain
         K = self.Sigma @ H.T @ np.linalg.inv(S)
 
+        self.MD_square = self.v.T @ np.linalg.pinv(S) @ self.v
+        if self.adapt == True and self.MD_square > 25:
+            alpha = np.minimum(5, self.MD_square / 25)
+            self.Sigma = np.linalg.inv(H) @ (alpha * H @ self.Sigma @ H.T + (alpha-1) * self.R) @ np.linalg.inv(H.T)
+            K = self.Sigma @ H.T @ np.linalg.inv(alpha*S)
+        
         # correct the predicted state statistics
         self.x = self.x + K @ self.v
         self.x[0] = warpToOne(self.x[0])
         self.Sigma = (np.eye(3) - K @ H) @ self.Sigma
 
-        d = K @ self.v[:,None]
-        self.MD = np.sqrt(d.T @ np.linalg.pinv(self.Q) @ d)[0,0]
-        if self.adapt_Q == True:
-            self.Q = self.a * d @ d.T + (1 - self.a) * self.Q
-            #r =  z - self.h.evaluate_h_func(self.Psi, self.x[0], self.x[1], self.x[2])[:,0]
-            #self.R = self.a * self.R + (1-self.a) * (r[:,None] @ r[:,None].T + H @ self.Sigma @ H.T)        
-        
+        if self.reset == True and self.MD_square > 25:
+            self.x = np.array([0.5, 0.8, 1.1]) # mid-stance
+            self.Sigma = np.diag([1e-2, 1e-1, 1e-1])
+
         if self.saturation == True:
             self.state_saturation(self.saturation_range)
-
-        # Compute MD using residuals
-        """
-        self.z_pred = self.h.evaluate_h_func(Psi, self.x[0,0], self.x[1,0], self.x[2,0], self.x[3,0])
-        #if direct_ramp != False:
-        #    self.z_pred = np.vstack((self.z_pred, np.array([self.x[3,0]])))
-        if using_atan2:
-            self.z_pred[2] += self.x[0,0] * 2 * np.pi
-            self.z_pred[2] = wrapTo2pi(self.z_pred[2])
-        residual = z - self.z_pred
-        if using_atan2:
-            residual[2] = np.arctan2(np.sin(residual[2]), np.cos(residual[2]))
-        #self.MD_residual = 0.2 * np.sqrt(residual.T @ np.linalg.inv(self.R) @ residual) + (1-0.2) * np.copy(self.MD_residual)
-        self.MD_residual = np.sqrt(residual[2] * 1/self.R[2,2] * residual[2])
-        """
 
     def state_saturation(self, saturation_range):
         phase_dots_max = saturation_range[0]

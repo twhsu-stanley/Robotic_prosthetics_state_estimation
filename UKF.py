@@ -45,6 +45,7 @@ class unscented_kalman_filter:
         self.alg = 'chol'
         self.saturation = system.saturation
         self.saturation_range = system.saturation_range
+        self.reset = system.reset
 
         self.x = init.x  # state vector
         self.Sigma = init.Sigma  # state covariance
@@ -127,6 +128,11 @@ class unscented_kalman_filter:
         self.x = self.x + K @ v
         self.x[0] = warpToOne(self.x[0])
         self.Sigma = self.Sigma - K @ self.S @ K.T
+
+        self.MD_square = v.T @ np.linalg.pinv(self.S) @ v
+        if self.reset == True and self.MD_square > 25:
+            self.x = np.array([0.5, 0.8, 1.1]) # mid-stance
+            self.Sigma = np.diag([1e-2, 1e-1, 1e-1])
 
         if self.saturation == True:
             self.state_saturation(self.saturation_range)
