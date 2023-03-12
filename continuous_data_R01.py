@@ -1,7 +1,7 @@
 import numpy as numpy
 import h5py
 import pickle
-from EKF import load_Psi, wrapTo2pi
+from Filters.EKF import load_Psi, wrapTo2pi
 from incline_experiment_utils import *
 from model_framework import *
 from training_data_generators_R01 import get_commanded_velocities

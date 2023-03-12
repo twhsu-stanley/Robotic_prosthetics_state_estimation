@@ -1,7 +1,7 @@
 from model_framework import *
 import matplotlib.pyplot as plt
 import numpy as np
-from EKF import wrapTo2pi
+from Filters.EKF import wrapTo2pi
 from scipy import stats
 
 def virtual_training_data(n, gait_data):

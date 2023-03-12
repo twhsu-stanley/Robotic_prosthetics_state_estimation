@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import StrMethodFormatter
 from mpl_toolkits import mplot3d
 from model_framework import *
-from EKF import wrapTo2pi, load_Psi
+from Filters.EKF import wrapTo2pi, load_Psi
 
 
 # Determine which sensors to be used

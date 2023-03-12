@@ -1,7 +1,7 @@
 import numpy as numpy
 import h5py as hp
 import pickle
-from EKF import load_Psi, wrapTo2pi
+from Filters.EKF import load_Psi, wrapTo2pi
 from incline_experiment_utils import *
 from model_framework import *
 from scipy.signal import butter, lfilter, lfilter_zi
