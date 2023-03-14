@@ -43,7 +43,7 @@ def globalThighAngles_R01():
             globalThighAngles_walking[subject][mode][speed] = dict()
             
             for incline in ['i10', 'i5', 'i0', 'in5', 'in10']:
-                print(" Incline:", incline)
+                print("   Incline:", incline)
                 try:
                     jointAngles = Normalized_data['Normalized'][subject][mode][speed][incline]['jointAngles']
                     globalThighAngles_Sagi = np.zeros((np.shape(jointAngles['PelvisAngles'][:])[0], 150))
@@ -91,7 +91,7 @@ def derivedMeasurements_R01():
             atan2_walking[subject][mode][speed] = dict()
 
             for incline in ['i10', 'i5', 'i0', 'in5', 'in10']:
-                print(" Incline:", incline)
+                print("   Incline:", incline)
                 try:
                     globalThighAngles = globalThighAngles_walking[subject][mode][speed][incline]
                     stride_period = Normalized_data['Normalized'][subject][mode][speed][incline]['events']['StrideDetails'][2,:]/100
@@ -160,50 +160,66 @@ def derivedMeasurements_R01():
     with open('Gait_training_data_R01/atan2_walking.pickle', 'wb') as file:
     	pickle.dump(atan2_walking, file)
 
-def kneeAnkleAngles_R01():
+def kneeAnkleFootAngles_R01():
     """
     # Compute level-ground global thigh angle data from the R01 dataset
     """
     kneeAngles_walking = dict()
     ankleAngles_walking = dict()
+    footAngles_walking = dict()
 
     for subject in get_subject_names():
         print("Subject:", subject)
         kneeAngles_walking[subject] = dict()
         ankleAngles_walking[subject] = dict()
+        footAngles_walking[subject] = dict()
         
         mode = 'Walk'
         kneeAngles_walking[subject][mode] = dict()
         ankleAngles_walking[subject][mode] = dict()
+        footAngles_walking[subject][mode] = dict()
 
         for speed in ['s0x8', 's1', 's1x2']:
             print(" Walk:", speed)
             kneeAngles_walking[subject][mode][speed] = dict()
             ankleAngles_walking[subject][mode][speed] = dict()
+            footAngles_walking[subject][mode][speed] = dict()
 
             for incline in ['i10', 'i5', 'i0', 'in5', 'in10']:
-                print(" Incline:", incline)
+                print("   Incline:", incline)
                 try:
                     jointAngles = Normalized_data['Normalized'][subject][mode][speed][incline]['jointAngles']
                     kneeAngles_Sagi = np.zeros((np.shape(jointAngles['KneeAngles'][:])[0], 150))
-                    ankleAngles_Sagi = np.zeros((np.shape(jointAngles['KneeAngles'][:])[0], 150))
+                    ankleAngles_Sagi = np.zeros((np.shape(jointAngles['AnkleAngles'][:])[0], 150))
+                    footAngles_Sagi = np.zeros((np.shape(jointAngles['FootProgressAngles'][:])[0], 150))
                     for n in range(np.shape(jointAngles['PelvisAngles'][:])[0]):
                         #if subject == 'AB04':
                         kneeAngles = -jointAngles['KneeAngles'][:][n]
                         kneeAngles_Sagi[n,:] = kneeAngles[0,:]
+                        #
                         ankleAngles = -jointAngles['AnkleAngles'][:][n]
                         ankleAngles_Sagi[n,:] = ankleAngles[0,:]
+                        #
+                        footAngles = -jointAngles['FootProgressAngles'][:][n]
+                        footAngles -= 90
+                        footAngles_Sagi[n,:] = footAngles[0,:]
                         
                     kneeAngles_walking[subject][mode][speed][incline] = kneeAngles_Sagi
                     ankleAngles_walking[subject][mode][speed][incline] = ankleAngles_Sagi
+                    footAngles_walking[subject][mode][speed][incline] = footAngles_Sagi
+
                 except:
                     print("Exception: something wrong occured!", subject + '/' + mode  + '/' + speed + '/' + incline)
                     continue
 
     with open('Gait_training_data_R01/kneeAngles_walking.pickle', 'wb') as file:
     	pickle.dump(kneeAngles_walking, file)
+    #    
     with open('Gait_training_data_R01/ankleAngles_walking.pickle', 'wb') as file:
     	pickle.dump(ankleAngles_walking, file)
+    #
+    with open('Gait_training_data_R01/footAngles_walking.pickle', 'wb') as file:
+    	pickle.dump(footAngles_walking, file)
 
 def gait_training_data_generator_R01(gait_data):
     with open('Gait_training_data_R01/' + gait_data + '.pickle', 'rb') as file:
@@ -215,62 +231,62 @@ def gait_training_data_generator_R01(gait_data):
         leg_length_right = Normalized_data[ Normalized_data['Normalized'][subject]['ParticipantDetails'][1,8] ][:][0,0] / 1000
         
         if (gait_data == 'globalThighAngles_walking' or gait_data == 'globalThighVelocities_walking' or gait_data == 'atan2_walking'
-            or gait_data == 'kneeAngles_walking' or gait_data == 'ankleAngles_walking'):
+            or gait_data == 'kneeAngles_walking' or gait_data == 'ankleAngles_walking' or gait_data == 'footAngles_walking'):
             mode = 'Walk'
             for speed in ['s0x8', 's1', 's1x2']:
                 for incline in ['i10', 'i5', 'i0', 'in5', 'in10']:
                     print(subject + '/' + mode  + '/' + speed + '/' + incline)
-                try:
-                    # 1) gait data
-                    data = gait_data_dict[subject][mode][speed][incline]
-                    
-                    # 2) phase dot
-                    stride_period = Normalized_data['Normalized'][subject][mode][speed][incline]['events']['StrideDetails'][2,:]/100
-                    phase_dot = np.zeros(np.shape(data))
-                    for n in range(np.shape(data)[0]):
-                        phase_dot[n,:].fill(1 / stride_period[n])
-                    #if min(stride_period) < 0.4:
-                    #    print("Abnormally large phase rate: ", 1/min(stride_period))
-                    #    print(subject + '/' + mode  + '/' + speed)
-                    
-                    # 3) stride length
-                    if speed == 's0x8':
-                        walking_speed = get_commanded_velocities(subject, 0.8)
-                    elif speed == 's1':
-                        walking_speed = get_commanded_velocities(subject, 1)
-                    elif speed == 's1x2':
-                        walking_speed = get_commanded_velocities(subject, 1.2)
+                    try:
+                        # 1) gait data
+                        data = gait_data_dict[subject][mode][speed][incline]
+                        
+                        # 2) phase dot
+                        stride_period = Normalized_data['Normalized'][subject][mode][speed][incline]['events']['StrideDetails'][2,:]/100
+                        phase_dot = np.zeros(np.shape(data))
+                        for n in range(np.shape(data)[0]):
+                            phase_dot[n,:].fill(1 / stride_period[n])
+                        #if min(stride_period) < 0.4:
+                        #    print("Abnormally large phase rate: ", 1/min(stride_period))
+                        #    print(subject + '/' + mode  + '/' + speed)
+                        
+                        # 3) stride length
+                        if speed == 's0x8':
+                            walking_speed = get_commanded_velocities(subject, 0.8)
+                        elif speed == 's1':
+                            walking_speed = get_commanded_velocities(subject, 1)
+                        elif speed == 's1x2':
+                            walking_speed = get_commanded_velocities(subject, 1.2)
 
-                    step_length = np.zeros(np.shape(data))
-                    for n in range(np.shape(data)[0]):
-                        side = Normalized_data['Normalized'][subject][mode][speed][incline]['events']['StrideDetails'][3,n]
-                        if side == 1: # left
-                            step_length[n,:].fill(walking_speed * stride_period[n] / leg_length_left) # normalization leg_length_left
-                        elif side == 2: # right
-                            step_length[n,:].fill(walking_speed * stride_period[n] / leg_length_right)
+                        step_length = np.zeros(np.shape(data))
+                        for n in range(np.shape(data)[0]):
+                            side = Normalized_data['Normalized'][subject][mode][speed][incline]['events']['StrideDetails'][3,n]
+                            if side == 1: # left
+                                step_length[n,:].fill(walking_speed * stride_period[n] / leg_length_left) # normalization leg_length_left
+                            elif side == 2: # right
+                                step_length[n,:].fill(walking_speed * stride_period[n] / leg_length_right)
+                        
+                        # 4) ramp angle 
+                        ramp = np.zeros(np.shape(data))
+                        for n in range(np.shape(data)[0]):
+                            ramp[n,:].fill(ramp_angle[incline])
+
+                        # Store data
+                        if num_trials == 0:
+                            data_stack = data
+                            phase_dot_stack = phase_dot
+                            step_length_stack = step_length
+                            ramp_stack = ramp
+                        else:
+                            data_stack = np.vstack((data_stack, data))
+                            phase_dot_stack = np.vstack((phase_dot_stack, phase_dot))
+                            step_length_stack = np.vstack((step_length_stack, step_length))
+                            ramp_stack = np.vstack((ramp_stack, ramp))
+
+                        num_trials += 1
                     
-                    # 4) ramp angle 
-                    ramp = np.zeros(np.shape(data))
-                    for n in range(np.shape(data)[0]):
-                        ramp[n,:].fill(ramp_angle[incline])
-
-                    # Store data
-                    if num_trials == 0:
-                        data_stack = data
-                        phase_dot_stack = phase_dot
-                        step_length_stack = step_length
-                        ramp_stack = ramp
-                    else:
-                        data_stack = np.vstack((data_stack, data))
-                        phase_dot_stack = np.vstack((phase_dot_stack, phase_dot))
-                        step_length_stack = np.vstack((step_length_stack, step_length))
-                        ramp_stack = np.vstack((ramp_stack, ramp))
-
-                    num_trials += 1
-                
-                except:
-                    print("Exception: something wrong occured!", subject + '/' + mode  + '/' + speed)
-                    continue
+                    except:
+                        print("Exception: something wrong occured!", subject + '/' + mode  + '/' + speed)
+                        continue
 
         else:
             raise ValueError("The input gait_data is not supported")
@@ -295,18 +311,14 @@ def gait_training_data_generator_R01(gait_data):
     
 if __name__ == '__main__':
     #globalThighAngles_R01()
-    derivedMeasurements_R01()
-    #kneeAnkleAngles_R01()
+    #derivedMeasurements_R01()
+    kneeAnkleFootAngles_R01()
 
     #gait_training_data_generator_R01('globalThighAngles_walking')
     #gait_training_data_generator_R01('globalThighVelocities_walking')
-    gait_training_data_generator_R01('atan2_walking')
-    #gait_training_data_generator_R01('kneeAngles_walking')
-    #gait_training_data_generator_R01('ankleAngles_walking')
+    #gait_training_data_generator_R01('atan2_walking')
+    gait_training_data_generator_R01('kneeAngles_walking')
+    gait_training_data_generator_R01('ankleAngles_walking')
+    gait_training_data_generator_R01('footAngles_walking')
 
-    #gait_training_data_generator_R01('globalThighAngles_running')
-    #gait_training_data_generator_R01('globalThighVelocities_running')
-    #gait_training_data_generator_R01('atan2_running')
-
-    #print(get_commanded_velocities('AB10', 1))
     
