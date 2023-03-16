@@ -111,10 +111,10 @@ def Conti_state_vars(subject, trial, side):
     return phase, phase_dot, step_length, ramp
 
 def load_Conti_measurement_data(subject, trial, side):
-    with open('Continuous_data/Continuous_measurement_data.pickle', 'rb') as file:
+    with open('Continuous_data_incExp/Continuous_measurement_data.pickle', 'rb') as file:
         Continuous_measurement_data = pickle.load(file)
 
-    with open('Continuous_data/globalFootAngle_offset.pickle', 'rb') as file:
+    with open('Continuous_data_incExp/globalFootAngle_offset.pickle', 'rb') as file:
         offset_dict = pickle.load(file)
 
     start_index, end_index = Conti_start_end(subject, trial, side)
@@ -133,7 +133,7 @@ def load_Conti_measurement_data(subject, trial, side):
     return globalThighAngle, globalThighVelocity, atan2, globalFootAngle, ankleMoment, tibiaForce
 
 def Continuous_atan2_scale_shift(subject, trial, side, plot = True):
-    with open('Continuous_data/Continuous_measurement_data.pickle', 'rb') as file:
+    with open('Continuous_data_incExp/Continuous_measurement_data.pickle', 'rb') as file:
         Continuous_measurement_data = pickle.load(file)
     
     dt = 1/100
@@ -236,16 +236,16 @@ def plot_Conti_measurement_data(subject, trial, side):
     
     atan2 = Continuous_atan2_scale_shift(subject, trial, side, plot = False) # use the shifted & scalsed version
     
-    m_model = model_loader('Measurement_model_012_NSL.pickle')
-    Psi = load_Psi('Generic')
+    m_model = model_loader('Measurement_model_ThighAngles_ThighVelocities_atan2_footAngles.pickle')
+    Psi = load_Psi()
 
-    globalThighAngle_pred = model_prediction(m_model.models[0], Psi['globalThighAngles'], phases, phase_dots, step_lengths)
-    globalThighVelocity_pred = model_prediction(m_model.models[1], Psi['globalThighVelocities'], phases, phase_dots, step_lengths)
+    globalThighAngle_pred = model_prediction(m_model.models[0], Psi['globalThighAngles'], phases, phase_dots, step_lengths,ramps)
+    globalThighVelocity_pred = model_prediction(m_model.models[1], Psi['globalThighVelocities'], phases, phase_dots, step_lengths,ramps)
     
     #ankleMoment_pred = model_prediction(m_model.models[4], Psi['ankleMoment'], phases, phase_dots, step_lengths, ramps)
     #tibiaForce_pred = model_prediction(m_model.models[5], Psi['tibiaForce'], phases, phase_dots, step_lengths, ramps)
     
-    atan2_pred = model_prediction(m_model.models[2], Psi['atan2'], phases, phase_dots, step_lengths) + 2*np.pi*phases
+    atan2_pred = model_prediction(m_model.models[2], Psi['atan2'], phases, phase_dots, step_lengths,ramps) + 2*np.pi*phases
     atan2_pred = wrapTo2pi(atan2_pred)
     residuals_atan2 = atan2 - atan2_pred
     residuals_atan2 = np.arctan2(np.sin(residuals_atan2), np.cos(residuals_atan2))
@@ -465,11 +465,11 @@ def detect_nan_in_measurements():
                         nan_dict[subject][trial][side] = False
                         print(subject + "/"+ trial + "/"+ side, ": tibiaForce")
                         break
-    with open('Continuous_data/Measurements_with_Nan.pickle', 'wb') as file:
+    with open('Continuous_data_incExp/Measurements_with_Nan.pickle', 'wb') as file:
     	pickle.dump(nan_dict, file)
 
 def load_Conti_joints_angles(subject, trial, side):
-    with open('Continuous_data/Continuous_joint_data.pickle', 'rb') as file:
+    with open('Continuous_data_incExp/Continuous_joint_data.pickle', 'rb') as file:
         Continuous_joint_data = pickle.load(file)
 
     start_index, end_index = Conti_start_end(subject, trial, side)
@@ -482,15 +482,15 @@ def plot_Conti_joints_angles(subject, trial, side):
     phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
     knee_angle, ankle_angle = load_Conti_joints_angles(subject, trial, side)
     
-    c_model = model_loader('Control_model.pickle')
+    c_model = model_loader('Control_model_kneeAngles_ankleAngles.pickle')
 
-    with open('Psi_3states/Psi_kneeAngles', 'rb') as file:
+    with open('Psi/Psi_kneeAngles', 'rb') as file:
         Psi_knee = pickle.load(file)
-    with open('Psi_3states/Psi_ankleAngles', 'rb') as file:
+    with open('Psi/Psi_ankleAngles', 'rb') as file:
         Psi_ankle = pickle.load(file)
     
-    knee_angle_pred = model_prediction(c_model.models[0], Psi_knee, phases, phase_dots, step_lengths)
-    ankle_angle_pred = model_prediction(c_model.models[1], Psi_ankle, phases, phase_dots, step_lengths)
+    knee_angle_pred = model_prediction(c_model.models[0], Psi_knee, phases, phase_dots, step_lengths, ramps)
+    ankle_angle_pred = model_prediction(c_model.models[1], Psi_ankle, phases, phase_dots, step_lengths, ramps)
     
     plt.figure("Joint Angle Control")
     start = 0
@@ -578,7 +578,7 @@ def detect_nan_in_joints():
     print("Numbers of trials with nan in the ankle angles: ", n_a)
     print("Numbers of trials with nan in both knee and ankle angles: ", n_b)
 
-    with open('Continuous_data/KneeAngles_with_Nan.pickle', 'wb') as file:
+    with open('Continuous_data_incExp/KneeAngles_with_Nan.pickle', 'wb') as file:
     	pickle.dump(nan_dict, file)
 
 def plot_Conti_kinetics_data(subject, trial, side):
@@ -619,7 +619,7 @@ def plot_Conti_kinetics_data(subject, trial, side):
     plt.show()
 
 def globalFootAngle_offset():
-    with open('Continuous_data/Measurements_with_Nan.pickle', 'rb') as file:
+    with open('Continuous_data_incExp/Measurements_with_Nan.pickle', 'rb') as file:
         nan_dict = pickle.load(file)
     
     dt = 1/100
@@ -717,7 +717,7 @@ def globalFootAngle_offset():
         #plt.grid()
         #plt.show()
         
-    with open('Continuous_data/globalFootAngle_offset.pickle', 'wb') as file:
+    with open('Continuous_data_incExp/globalFootAngle_offset.pickle', 'wb') as file:
     	pickle.dump(offset_dict, file)
 
 
@@ -770,7 +770,6 @@ if __name__ == '__main__':
             
                 force_ankle_x, force_ankle_y, force_ankle_z, moment_ankle_x, moment_ankle_y, moment_ankle_z \
                     = Conti_reaction_wrench(subject, trial, side)
-
                 Continuous_measurement_data[subject][trial][side]['force_ankle_x'] = force_ankle_x
                 Continuous_measurement_data[subject][trial][side]['force_ankle_y'] = force_ankle_y
                 Continuous_measurement_data[subject][trial][side]['force_ankle_z'] = force_ankle_z
@@ -786,7 +785,6 @@ if __name__ == '__main__':
     """
     with open('Continuous_measurement_data_unscaled.pickle', 'rb') as file:
     	Continuous_measurement_data = pickle.load(file)
-
     dt = 1/100
     for subject in Conti_subject_names():
         for trial in raw_walking_data['Continuous'][subject].keys():
@@ -799,7 +797,6 @@ if __name__ == '__main__':
                 #global_thigh_angVel_5hz = butter_lowpass_filter(np.insert(v, 0, 0), 5, 1/dt, order = 1)
                 #global_thigh_angVel_2x5hz = butter_lowpass_filter(np.insert(v, 0, 0), 2.5, 1/dt, order = 1)
                 #globalThighVelocity = butter_lowpass_filter(np.insert(v, 0, 0), 2, 1/dt, order = 1)
-
                 # compute atan2 w/ band-passed signals
                 gt_bp = butter_bandpass_filter(gt_Y, 0.5, 2, 1/dt, order = 2)
                 v_bp = np.diff(gt_bp) / dt
@@ -852,139 +849,3 @@ if __name__ == '__main__':
     #plot_Conti_kinetics_data(subject, trial, side)
     plot_Conti_joints_angles(subject, trial, side)
     #plot_Conti_measurement_data(subject, trial, side)
-
-    ######## test real0time filters #############
-    """
-    globalThighAngles, _, _, _, _, _, globalThighVelocity, atan2 = load_Conti_measurement_data(subject, trial, side)
-    
-    # configure low-pass filter (1-order)
-    nyq = 0.5 * 100
-    fc_normal = 2 / nyq
-    b_lp, a_lp = butter(1, fc_normal, btype='low', analog=False)
-    z_lp_1 = lfilter_zi(b_lp,  a_lp)
-    z_lp_2 = lfilter_zi(b_lp,  a_lp)
-    # configure band-pass filter (2-order)
-    nyq = 0.5 * 100
-    normal_lowcut = 0.5 / nyq
-    normal_highcut = 2 / nyq
-    b_bp, a_bp = butter(2, [normal_lowcut, normal_highcut], btype='band', analog=False)
-    z_bp = lfilter_zi(b_bp,  a_bp)
-
-    dt = 1/100
-    global_thigh_angle_vel_lp = np.zeros((len(globalThighAngles), 1))
-    Atan2 = np.zeros((len(globalThighAngles), 1))
-    for i in range(len(globalThighAngles)):
-        if i == 0:
-            global_thigh_angle_vel_lp[i] = 0 
-        else:
-            global_thigh_angle_vel = (globalThighAngles[i] - global_thigh_angle_0) / dt
-            # low-pass filtering
-            vel_lp, z_lp_1 = lfilter(b_lp, a_lp, [global_thigh_angle_vel], zi = z_lp_1)
-            global_thigh_angle_vel_lp[i] = vel_lp[0]
-
-        global_thigh_angle_0 = globalThighAngles[i]
-
-        # Compute atan2
-        ang_bp, z_bp = lfilter(b_bp, a_bp, [globalThighAngles[i]], zi = z_bp) 
-        global_thigh_angle_bp = ang_bp[0]
-        if i == 0:
-            global_thigh_angle_vel_blp = 0
-        else:
-            global_thigh_angle_vel_bp = (global_thigh_angle_bp - global_thigh_angle_bp_0) / dt
-            # low-pass filtering
-            vel_blp, z_lp_2 = lfilter(b_lp, a_lp, [global_thigh_angle_vel_bp], zi = z_lp_2)
-            global_thigh_angle_vel_blp = vel_blp[0]
-
-        global_thigh_angle_bp_0 = global_thigh_angle_bp
-
-        Atan2[i] = np.arctan2(-global_thigh_angle_vel_blp / (2*np.pi*0.8), global_thigh_angle_bp)
-        if Atan2[i] < 0:
-            Atan2[i] = Atan2[i] + 2 * np.pi
-
-    plt.figure()
-    plt.plot(global_thigh_angle_vel_lp, 'r-')
-    plt.plot(globalThighVelocity, 'k--')
-    plt.figure()
-    plt.plot(Atan2, 'r-')
-    plt.plot(atan2, 'k--')
-    plt.show()
-    """
-    #############################################
-
-    """
-    dt = get_time_step(subject)
-    with open('Gait_cycle_data/Global_thigh_angle.npz', 'rb') as file:
-        gt_Y = np.load(file)
-        gt = np.zeros(np.shape(gt_Y[subject][0]))
-        gt_bp = np.zeros(np.shape(gt_Y[subject][0]))
-        gt_bp2 = np.zeros(np.shape(gt_Y[subject][0]))
-        atan2 = np.zeros(np.shape(gt_Y[subject][0]))
-        atan22 = np.zeros(np.shape(gt_Y[subject][0]))
-        atan2v = np.zeros(np.shape(gt_Y[subject][0]))
-        gtv_2hz = np.zeros(np.shape(gt_Y[subject][0]))
-        gtv_2hz2 = np.zeros(np.shape(gt_Y[subject][0]))
-
-        plt.figure('Phase portrait')
-        for i in range(15):
-            gt[i, :] = gt_Y[subject][0][i, :]
-            gt_bp[i, :] = butter_bandpass_filter(gt_Y[subject][0][i, :], 0.5, 2, 1/dt[i, 0], order = 1)
-            
-            gt_rep = np.array([gt_Y[subject][0][i, :], gt_Y[subject][0][i, :], gt_Y[subject][0][i, :],\
-                                   gt_Y[subject][0][i, :], gt_Y[subject][0][i, :]]).reshape(-1)
-            gbp = butter_bandpass_filter(gt_rep, 0.5, 2, 1/dt[i, 0], order = 2)
-            gt_bp2[i, :] = gbp[2*len(gt_Y[subject][0][i, :]): 3*len(gt_Y[subject][0][i, :])]
-            
-            v_bp = np.diff(gt_bp2[i, :]) / dt[i, 0]
-            gtv_bp = np.insert(v_bp, 0, 0)
-            gtv_stack = np.array([gtv_bp, gtv_bp, gtv_bp, gtv_bp, gtv_bp]).reshape(-1)
-            gtv_blp = butter_lowpass_filter(gtv_stack, 2, 1/dt[i, 0], order = 1)[2*len(gt_Y[subject][0][i, :]): 3*len(gt_Y[subject][0][i, :])]
-
-            atan2[i, :] = np.arctan2(-gtv_blp/(2*np.pi*0.8), gt_bp2[i, :])
-            plt.plot(gt_bp2[i, :], -gtv_blp/(2*np.pi*0.8), 'r-')
-
-            for j in range(np.shape(atan2[i, :])[0]):
-                if atan2[i, j] < 0:
-                    atan2[i, j] = atan2[i, j] + 2 * np.pi
-            
-            #######
-            gbp = butter_bandpass_filter(gt_rep, 0.5, 2, 1/dt[i, 0], order = 1)
-            gt_bp2[i, :] = gbp[2*len(gt_Y[subject][0][i, :]): 3*len(gt_Y[subject][0][i, :])]
-            
-            v_bp = np.diff(gt_bp2[i, :]) / dt[i, 0]
-            gtv_bp = np.insert(v_bp, 0, 0)
-            gtv_stack = np.array([gtv_bp, gtv_bp, gtv_bp, gtv_bp, gtv_bp]).reshape(-1)
-            gtv_blp = butter_lowpass_filter(gtv_stack, 2, 1/dt[i, 0], order = 1)[2*len(gt_Y[subject][0][i, :]): 3*len(gt_Y[subject][0][i, :])]
-
-            atan22[i, :] = np.arctan2(-gtv_blp, gt_bp2[i, :])
-            for j in range(np.shape(atan22[i, :])[0]):
-                if atan22[i, j] < 0:
-                    atan22[i, j] = atan22[i, j] + 2 * np.pi
-            
-            
-            v = np.diff(gt_Y[subject][0][i, :]) / dt[i, 0]
-            gtv = np.insert(v, 0, 0)
-            gtv_stack = np.array([gtv, gtv, gtv, gtv, gtv]).reshape(-1)
-            gtv_2hz[i, :] = butter_lowpass_filter(gtv, 2, 1/dt[i, 0], order = 1)
-            gtv2 = butter_lowpass_filter(gtv_stack, 2, 1/dt[i, 0], order = 2)
-            gtv_2hz2[i, :] = gtv2[3 * len(gt_Y[subject][0][i, :]): 4 * len(gt_Y[subject][0][i, :])]
-
-
-    plt.figure()
-    plt.plot(gt[0:10,:].ravel(), 'b-')
-    plt.plot(gt_bp[0:10,:].ravel(), 'k-')
-    plt.plot(gt_bp2[0:10,:].ravel(), 'r-')
-    plt.legend(('original thigh angle', 'band-pass filtered', 'new band-pass filtered'))
-    
-    plt.figure()
-    plt.plot(gtv_2hz[0:15,:].ravel(), 'b-')
-    plt.plot(gtv_2hz2[0:15,:].ravel(), 'r--')
-    
-    plt.figure()
-    plt.plot(atan2[0:15,:].ravel(), 'b-')
-    plt.plot(atan22[0:15,:].ravel(), 'r-')
-
-    #plt.figure()
-    #plt.plot(atan2v[0:15,:].ravel(), 'b-')
-
-    plt.show()
-    """

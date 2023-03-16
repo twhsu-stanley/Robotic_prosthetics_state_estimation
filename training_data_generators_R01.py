@@ -63,7 +63,7 @@ def globalThighAngles_R01():
                     continue
 
     with open('Gait_training_data_R01/globalThighAngles_walking.pickle', 'wb') as file:
-    	pickle.dump(globalThighAngles_walking, file)
+        pickle.dump(globalThighAngles_walking, file)
 
 def derivedMeasurements_R01():
     """ 
@@ -155,10 +155,10 @@ def derivedMeasurements_R01():
                     continue
 
     with open('Gait_training_data_R01/globalThighVelocities_walking.pickle', 'wb') as file:
-    	pickle.dump(globalThighVelocities_walking, file)
+        pickle.dump(globalThighVelocities_walking, file)
 
     with open('Gait_training_data_R01/atan2_walking.pickle', 'wb') as file:
-    	pickle.dump(atan2_walking, file)
+        pickle.dump(atan2_walking, file)
 
 def kneeAnkleFootAngles_R01():
     """
@@ -213,13 +213,13 @@ def kneeAnkleFootAngles_R01():
                     continue
 
     with open('Gait_training_data_R01/kneeAngles_walking.pickle', 'wb') as file:
-    	pickle.dump(kneeAngles_walking, file)
+        pickle.dump(kneeAngles_walking, file)
     #    
     with open('Gait_training_data_R01/ankleAngles_walking.pickle', 'wb') as file:
-    	pickle.dump(ankleAngles_walking, file)
+        pickle.dump(ankleAngles_walking, file)
     #
     with open('Gait_training_data_R01/footAngles_walking.pickle', 'wb') as file:
-    	pickle.dump(footAngles_walking, file)
+        pickle.dump(footAngles_walking, file)
 
 def gait_training_data_generator_R01(gait_data):
     with open('Gait_training_data_R01/' + gait_data + '.pickle', 'rb') as file:
@@ -307,7 +307,7 @@ def gait_training_data_generator_R01(gait_data):
     print("Shape of ramp: ", np.shape(ramp_stack))
 
     with open(('Gait_training_data_R01/' + gait_data + '_training_dataset.pickle'), 'wb') as file:
-    	pickle.dump(gait_training_dataset, file)
+        pickle.dump(gait_training_dataset, file)
     
 if __name__ == '__main__':
     #globalThighAngles_R01()
@@ -320,5 +320,4 @@ if __name__ == '__main__':
     gait_training_data_generator_R01('kneeAngles_walking')
     gait_training_data_generator_R01('ankleAngles_walking')
     gait_training_data_generator_R01('footAngles_walking')
-
     

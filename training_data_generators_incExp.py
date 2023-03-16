@@ -59,7 +59,7 @@ def jointAngles_statistics(joint):
         #plt.grid()
         #plt.show()
     with open(('Gait_data_statistics_incExp/' + joint + 'Angles_mean_std.pickle'), 'wb') as file:
-    	pickle.dump(data_mean_std, file)
+        pickle.dump(data_mean_std, file)
 
 def globalThighAngles_statistics():
     """ 
@@ -127,13 +127,13 @@ def globalThighAngles_statistics():
 
         # Store data iteratively
         #with open('Gait_data_statistics_incExp/globalThighAngles_mean_std.pickle', 'wb') as file:
-    	#    pickle.dump(globalThighAngles_mean_std, file)
+        #    pickle.dump(globalThighAngles_mean_std, file)
     
         #with open('Gait_training_data_incExp/globalThighAngles_original.pickle', 'wb') as file:
-    	#    pickle.dump(globalThighAngles, file)
+        #    pickle.dump(globalThighAngles, file)
 
     with open('Gait_data_statistics_incExp/globalThighAngles_mean_std.pickle', 'wb') as file:
-    	pickle.dump(globalThighAngles_mean_std, file)
+        pickle.dump(globalThighAngles_mean_std, file)
     
     with open('Gait_training_data_incExp/globalThighAngles_original.pickle', 'wb') as file:
         pickle.dump(globalThighAngles, file)
@@ -322,16 +322,16 @@ def derivedMeasurements_statistics():
         #plt.show()
     
     with open('Gait_data_statistics_incExp/globalThighVelocities_mean_std.pickle', 'wb') as file:
-    	pickle.dump(globalThighVelocities_mean_std, file)
+        pickle.dump(globalThighVelocities_mean_std, file)
 
     with open('Gait_data_statistics_incExp/atan2_mean_std.pickle', 'wb') as file:
-    	pickle.dump(atan2_mean_std, file)
+        pickle.dump(atan2_mean_std, file)
 
     with open('Gait_training_data_incExp/globalThighVelocities_original.pickle', 'wb') as file:
-    	pickle.dump(globalThighVelocities, file)
+        pickle.dump(globalThighVelocities, file)
     
     with open('Gait_training_data_incExp/atan2_original.pickle', 'wb') as file:
-    	pickle.dump(atan2, file)
+        pickle.dump(atan2, file)
 
 def ankleMoment_statistics():
     """ Compute mean and standard deviaton of ankle moment (normalized w.r.t. subject's weight) across the phase
@@ -389,7 +389,7 @@ def ankleMoment_statistics():
         #plt.show()
     
     with open('Gait_data_statistics_incExp/ankleMoment_mean_std.pickle', 'wb') as file:
-    	pickle.dump(data_mean_std, file)
+        pickle.dump(data_mean_std, file)
 
 def tibiaForce_statistics():
     """ Compute mean and standard deviaton of tibia axial force (normalized w.r.t. subject's weight) across the phase
@@ -446,7 +446,7 @@ def tibiaForce_statistics():
         plt.show()
     
     with open('Gait_data_statistics_incExp/tibiaForce_mean_std.pickle', 'wb') as file:
-    	pickle.dump(data_mean_std, file)
+        pickle.dump(data_mean_std, file)
 
 def gait_training_data_generator(mode):
 
@@ -709,7 +709,7 @@ def gait_training_data_generator(mode):
 
     # with open(('Gait_training_data_incExp/' + mode + '_NSL_training_dataset.pickle'), 'wb') as file:
     with open(('Gait_training_data_incExp/' + mode + '_training_dataset.pickle'), 'wb') as file:
-    	pickle.dump(gait_training_dataset, file)
+        pickle.dump(gait_training_dataset, file)
     
 def globalFootAngle_offset():
     subject_names = get_subject_names()

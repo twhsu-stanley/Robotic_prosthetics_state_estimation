@@ -9,38 +9,24 @@ def process_model(x, dt):
     return A(dt) @ x.T
 
 ## Load control model & coefficients (for OSL implementation)
-c_model = model_loader('Control_model.pickle')
-with open('Psi_3states/Psi_kneeAngles', 'rb') as file:#_withoutNan
+c_model = model_loader('Control_model_kneeAngles_ankleAngles.pickle')
+with open('Psi/Psi_kneeAngles', 'rb') as file:#_withoutNan
     Psi_knee = pickle.load(file)
-with open('Psi_3states/Psi_ankleAngles', 'rb') as file:
+with open('Psi/Psi_ankleAngles', 'rb') as file:
     Psi_ankle = pickle.load(file)
 
 ## Load model coefficients
 def load_Psi():
-    with open('Psi_3states/Psi_globalThighAngles', 'rb') as file:
+    with open('Psi/Psi_globalThighAngles', 'rb') as file:
         Psi_globalThighAngles = pickle.load(file)
-    with open('Psi_3states/Psi_globalThighVelocities', 'rb') as file:
+    with open('Psi/Psi_globalThighVelocities', 'rb') as file:
         Psi_globalThighVelocities = pickle.load(file)
-    with open('Psi_3states/Psi_atan2', 'rb') as file:
+    with open('Psi/Psi_atan2', 'rb') as file:
         Psi_atan2 = pickle.load(file)
-    """
-    with open('Psi/Psi_globalThighAngles_NSL_B10_const.pickle', 'rb') as file:
-        Psi_globalThighAngles = pickle.load(file)
-        
-    with open('Psi/Psi_globalThighVelocities_NSL_B10_const.pickle', 'rb') as file:
-        Psi_globalThighVelocities = pickle.load(file)
-        
-    #with open('Psi_incExp/Psi_ankleMoment_NSL_B33.pickle', 'rb') as file:
-    #    Psi_ankleMoment = pickle.load(file)
-        
-    #with open('Psi_incExp/Psi_tibiaForce_NSL_B33.pickle', 'rb') as file:
-    #    Psi_tibiaForce = pickle.load(file)
-        
-    with open('Psi/Psi_atan2ss_NSL.pickle', 'rb') as file:
-        Psi_atan2 = pickle.load(file)
-    """
+    with open('Psi/Psi_footAngles', 'rb') as file:
+        Psi_footAngles = pickle.load(file)
     Psi = {'globalThighAngles': Psi_globalThighAngles, 'globalThighVelocities': Psi_globalThighVelocities,
-           'atan2': Psi_atan2}
+           'atan2': Psi_atan2, 'footAngles': Psi_footAngles}
     return Psi
 
 def warpToOne(phase):
