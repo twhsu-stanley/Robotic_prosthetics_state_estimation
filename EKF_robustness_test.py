@@ -72,13 +72,13 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
     if dataset == 'inclineExp':
         trial += 'i0'
         # load ground truth
-        phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
+        phases, phase_dots, step_lengths, ramps = Continuous_state_vars(subject, trial, side)
         # load measurements
-        globalThighAngle, globalThighVelocity, atan2, _, _, _ = load_Conti_measurement_data(subject, trial, side)
-        #atan2 = Continuous_atan2_scale_shift(subject, trial, side, plot = False) # use the shifted & scalsed version
-        kneeAngle, ankleAngle = load_Conti_joints_angles(subject, trial, side)
+        globalThighAngle, globalThighVelocity, atan2, _, _, _ = Continuous_measurement_data(subject, trial, side)
+        #atan2 = Continuous_atan2_scale_shift(subject, trial, side, plot = False) # use the shifted & scaled version
+        kneeAngle, ankleAngle = Continuous_joints_angles(subject, trial, side)
 
-        heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
+        heel_strike_index = Continuous_heel_strikes(subject, trial, side) - Continuous_heel_strikes(subject, trial, side)[0]
         total_step = int(heel_strike_index[total_strides]) + 1
     
     # 2) Use the R01 dataset
@@ -341,13 +341,13 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
     if dataset == 'inclineExp':
         trial += 'i0'
         # load ground truth
-        phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
+        phases, phase_dots, step_lengths, ramps = Continuous_state_vars(subject, trial, side)
         # load measurements
-        globalThighAngle, globalThighVelocity, atan2, _, _, _ = load_Conti_measurement_data(subject, trial, side)
+        globalThighAngle, globalThighVelocity, atan2, _, _, _ = Continuous_measurement_data(subject, trial, side)
         #atan2 = Continuous_atan2_scale_shift(subject, trial, side, plot = False) # use the shifted & scalsed version
-        kneeAngle, ankleAngle = load_Conti_joints_angles(subject, trial, side)
+        kneeAngle, ankleAngle = Continuous_joints_angles(subject, trial, side)
 
-        heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
+        heel_strike_index = Continuous_heel_strikes(subject, trial, side) - Continuous_heel_strikes(subject, trial, side)[0]
         total_step = int(heel_strike_index[total_strides]) + 1
     
     # 2) Use the R01 dataset
@@ -660,8 +660,8 @@ def kf_robustness(kidnap = True, kalman_filter = 'ekf'):
         nan_dict = pickle.load(file)
 
     for dataset in ['Reznick', 'inclineExp']:
-        for subject in Conti_subject_names(): 
-            #for trial in Conti_trial_names(subject):
+        for subject in Continuous_subject_names(): 
+            #for trial in Continuous_trial_names(subject):
             for trial in ['s0x8', 's1', 's1x2']:
                 if trial == 'subjectdetails':
                     continue

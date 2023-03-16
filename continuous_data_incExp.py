@@ -10,22 +10,22 @@ from scipy.signal import butter, lfilter, lfilter_zi
 
 raw_walking_data = hp.File("../InclineExperiment.mat", "r")
 
-def Conti_subject_names():
+def Continuous_subject_names():
     return raw_walking_data['Continuous'].keys()
 
-def Conti_trial_names(subject):
+def Continuous_trial_names(subject):
     return raw_walking_data['Continuous'][subject].keys()
 
-def Conti_heel_strikes(subject, trial, side):
+def Continuous_heel_strikes(subject, trial, side):
     return raw_walking_data['Gaitcycle'][subject][trial]['cycles'][side]['frame'][:][:,0]
 
-def Conti_start_end(subject, trial, side):
-    heel_strike_index = Conti_heel_strikes(subject, trial, side)
+def Continuous_start_end(subject, trial, side):
+    heel_strike_index = Continuous_heel_strikes(subject, trial, side)
     start_index = heel_strike_index[0]
     end_index = heel_strike_index[np.size(heel_strike_index)-1]
     return int(start_index), int(end_index)
 
-def Conti_globalThighAngles(subject, trial, side):
+def Continuous_globalThighAngles(subject, trial, side):
     jointangles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'] #deg
     #plt.figure()
     #plt.plot(jointangles[side]['pelvis'][0,:])
@@ -44,7 +44,25 @@ def Conti_globalThighAngles(subject, trial, side):
         Y_th[0, i], _, _ = YXZ_Euler_angles(R_wt) # deg # only get the Y component
     return Y_th # only return the Y component
 
-def Conti_reaction_wrench(subject, trial, side):
+def store_Continuous_globalThighAngles():
+    Continuous_globalThighAngles_data = dict()
+    for subject in Continuous_subject_names():
+        print("subject: ",  subject)
+        Continuous_globalThighAngles_data[subject] = dict()
+        for trial in raw_walking_data['Continuous'][subject].keys():
+            if trial == 'subjectdetails':
+                continue
+            print("   trial: ",  trial)
+            Continuous_globalThighAngles_data[subject][trial] = dict()
+            for side in ['left', 'right']:
+                print("      side: ", side)
+                Continuous_globalThighAngles_data[subject][trial][side] = dict()
+                Continuous_globalThighAngles_data[subject][trial][side] = Continuous_globalThighAngles(subject, trial, side)
+            
+    with open('Continuous_data_incExp/Continuous_globalThighAngles_data.pickle', 'wb') as file:
+    	pickle.dump(Continuous_globalThighAngles_data, file)
+
+def Continuous_reaction_wrench(subject, trial, side):
     vicon_leftbelt_offset = np.array([-768, 885])*1e-3 #[m]
     vicon_rightbelt_offset = np.array([-255, 885])*1e-3 #[m]
     if side == 'left':
@@ -73,10 +91,10 @@ def Conti_reaction_wrench(subject, trial, side):
     
     return force_ankle_x, force_ankle_y, force_ankle_z, moment_ankle_x, moment_ankle_y, moment_ankle_z
 
-def Conti_state_vars(subject, trial, side):
+def Continuous_state_vars(subject, trial, side):
     heel_strike_index = raw_walking_data['Gaitcycle'][subject][trial]['cycles'][side]['frame'][:]
-    Conti_time = raw_walking_data['Continuous'][subject][trial]['time'][:]
-    dt = Conti_time[0, 1] - Conti_time[0, 0] # 0.01 s/ 100 Hz
+    Continuous_time = raw_walking_data['Continuous'][subject][trial]['time'][:]
+    dt = Continuous_time[0, 1] - Continuous_time[0, 0] # 0.01 s/ 100 Hz
     ptr = raw_walking_data['Continuous'][subject][trial]['description'][1][0]
     walking_speed = raw_walking_data[ptr][:][0, 0]
     ptr = raw_walking_data['Continuous'][subject][trial]['description'][1][1]
@@ -88,10 +106,10 @@ def Conti_state_vars(subject, trial, side):
         ptr_sl = raw_walking_data['Gaitcycle'][subject]['subjectdetails'][1][5]
     leg_length = raw_walking_data[ptr_sl] # mm
 
-    phase = np.zeros((np.size(Conti_time)))
-    phase_dot = np.zeros((np.size(Conti_time)))
-    step_length = np.zeros((np.size(Conti_time)))
-    ramp = incline * np.ones((np.size(Conti_time)))
+    phase = np.zeros((np.size(Continuous_time)))
+    phase_dot = np.zeros((np.size(Continuous_time)))
+    step_length = np.zeros((np.size(Continuous_time)))
+    ramp = incline * np.ones((np.size(Continuous_time)))
 
     for i in range(np.size(heel_strike_index)):
         if i != np.size(heel_strike_index) - 1:
@@ -102,7 +120,7 @@ def Conti_state_vars(subject, trial, side):
                 step_length[int(heel_strike_index[i]) + k] = walking_speed * stride_steps * dt / leg_length * 1000
 
     # truncate the signal s.t. it starts and ends at heel strikes
-    start_index, end_index = Conti_start_end(subject, trial, side)
+    start_index, end_index = Continuous_start_end(subject, trial, side)
     phase = phase[start_index:end_index]
     phase_dot = phase_dot[start_index:end_index]
     step_length = step_length[start_index:end_index]
@@ -110,35 +128,56 @@ def Conti_state_vars(subject, trial, side):
     
     return phase, phase_dot, step_length, ramp
 
-def load_Conti_measurement_data(subject, trial, side):
-    with open('Continuous_data_incExp/Continuous_measurement_data.pickle', 'rb') as file:
-        Continuous_measurement_data = pickle.load(file)
+def Continuous_measurement_data(subject, trial, side):
+    start_index, end_index = Continuous_start_end(subject, trial, side)
 
+    # Global thigh angles
+    with open('Continuous_data_incExp/Continuous_globalThighAngles_data.pickle', 'rb') as file:
+        Continuous_globalThighAngles_data = pickle.load(file)
+    globalThighAngle = Continuous_globalThighAngles_data[subject][trial][side][0, start_index:end_index]
+    #globalThighAngle = Continuous_globalThighAngles(subject, trial, side)[0, start_index:end_index]
+
+    # Global thigh angular velocity
+    dt = 1/100
+    v = np.diff(globalThighAngle) / dt
+    gtv = np.insert(v, 0, 0)
+    globalThighVelocity = butter_lowpass_filter(gtv, 2, 1/dt, order = 1)
+
+    # Atan2
+    gt_bp = butter_bandpass_filter(globalThighAngle, 0.5, 2, 1/dt, order = 2)
+    v_bp = np.diff(gt_bp) / dt
+    gtv_bp = butter_lowpass_filter(np.insert(v_bp, 0, 0), 2, 1/dt, order = 1)
+    atan2 = np.arctan2(-gtv_bp/(2*np.pi*0.8), gt_bp) # scaled
+    for i in range(np.shape(atan2)[0]):
+        if atan2[i] < 0:
+            atan2[i] = atan2[i] + 2 * np.pi
+    
+    # Foot angles
     with open('Continuous_data_incExp/globalFootAngle_offset.pickle', 'rb') as file:
         offset_dict = pickle.load(file)
 
-    start_index, end_index = Conti_start_end(subject, trial, side)
-    globalThighAngle = Continuous_measurement_data[subject][trial][side]['globalThighAngles'][0, start_index:end_index]
-    globalThighVelocity = Continuous_measurement_data[subject][trial][side]['globalThighVelocity'][start_index:end_index]
-    atan2 = Continuous_measurement_data[subject][trial][side]['atan2_s'][start_index:end_index]
     globalFootAngle = -raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]['foot'][0,start_index:end_index] - 90
     try:
         globalFootAngle -= offset_dict[subject][trial][side]
     except:
         pass
+    
+    # Kinetic measurements
     ankleMoment = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointmoment'][side]['ankle'][0, start_index:end_index] / 1000 # N-mm to N-m
     ankleMoment = butter_lowpass_filter(ankleMoment, 7, 100, order = 1)
     tibiaForce = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointforce'][side]['knee'][2, start_index:end_index]
     
     return globalThighAngle, globalThighVelocity, atan2, globalFootAngle, ankleMoment, tibiaForce
 
-def Continuous_atan2_scale_shift(subject, trial, side, plot = True):
-    with open('Continuous_data_incExp/Continuous_measurement_data.pickle', 'rb') as file:
-        Continuous_measurement_data = pickle.load(file)
-    
+def Continuous_atan2_scale_shift(subject, trial, side, plot = True):  
     dt = 1/100
-    start_index, end_index = Conti_start_end(subject, trial, side)
-    globalThighAngle = Continuous_measurement_data[subject][trial][side]['globalThighAngles'][0, start_index:end_index]
+    start_index, end_index = Continuous_start_end(subject, trial, side)
+
+    # Global thigh angles
+    with open('Continuous_data_incExp/Continuous_globalThighAngles_data.pickle', 'rb') as file:
+        Continuous_globalThighAngles_data = pickle.load(file)
+    globalThighAngle = Continuous_globalThighAngles_data[subject][trial][side][0, start_index:end_index]
+    #globalThighAngle = Continuous_globalThighAngles(subject, trial, side)[0, start_index:end_index]
 
     globalThighAngle_lp = butter_lowpass_filter(globalThighAngle, 2, 1/dt, order = 1) # 1st/2nd/3rd order
     globalThighVelocity_lp = np.insert(np.diff(globalThighAngle_lp) / dt, 0, 0)
@@ -228,11 +267,11 @@ def Continuous_atan2_scale_shift(subject, trial, side, plot = True):
         plt.grid()
         plt.show()
 
-def plot_Conti_measurement_data(subject, trial, side):
+def plot_Continuous_measurement_data(subject, trial, side):
     print("subject: ",  subject, "| trial: ",  trial, " | side: ", side)
     
-    phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
-    globalThighAngle, globalThighVelocity, _, globalFootAngle, ankleMoment, tibiaForce = load_Conti_measurement_data(subject, trial, side)
+    phases, phase_dots, step_lengths, ramps = Continuous_state_vars(subject, trial, side)
+    globalThighAngle, globalThighVelocity, _, globalFootAngle, ankleMoment, tibiaForce = Continuous_measurement_data(subject, trial, side)
     
     atan2 = Continuous_atan2_scale_shift(subject, trial, side, plot = False) # use the shifted & scalsed version
     
@@ -294,7 +333,7 @@ def plot_Conti_measurement_data(subject, trial, side):
     plt.plot(a2)
     plt.legend(['atan2-phase*2pi', 'least-squares fitting', 'new'])
     
-    #heel_strike_index = Conti_heel_strikes(subject, trial, side) - Conti_heel_strikes(subject, trial, side)[0]
+    #heel_strike_index = Continuous_heel_strikes(subject, trial, side) - Continuous_heel_strikes(subject, trial, side)[0]
     total_step =  int(np.shape(globalThighAngle)[0] / 1)
     tt = 0.01 * np.arange(total_step)
     plt.figure('Measurements')
@@ -363,8 +402,8 @@ def plot_Conti_measurement_data(subject, trial, side):
 
     plt.show()
 
-def Conti_maxmin(plot = True):
-    #for subject in Conti_subject_names():
+def Continuous_maxmin(plot = True):
+    #for subject in Continuous_subject_names():
     phase_dots_sup = np.zeros((9,1)) # 9 different ramp angles
     phase_dots_inf = np.zeros((9,1))
     phase_dots_mean = np.zeros((9,1))
@@ -379,11 +418,11 @@ def Conti_maxmin(plot = True):
         phase_dots_min = 1000000
         step_lengths_max = -1000000
         step_lengths_min = 1000000
-        for subject in Conti_subject_names():
+        for subject in Continuous_subject_names():
             for trial in raw_walking_data['Continuous'][subject].keys():
                 if str(trial)[-3:] == ramp_code[r] or str(trial)[-4:] == ramp_code[r] or str(trial)[-2:] == ramp_code[r]:
                     for side in ['left', 'right']:
-                        _, phase_dots, step_lengths, _ = Conti_state_vars(subject, trial, side)
+                        _, phase_dots, step_lengths, _ = Continuous_state_vars(subject, trial, side)
 
                         phase_dots_mean[r] += np.mean(phase_dots)
 
@@ -406,7 +445,7 @@ def Conti_maxmin(plot = True):
         step_lengths_sup[r] = step_lengths_max
         step_lengths_inf[r] = step_lengths_min
     
-    saturation_range =np.array([np.max(phase_dots_sup), np.min(phase_dots_inf), np.max(step_lengths_sup), np.min(step_lengths_inf)])
+    saturation_range = np.array([np.max(phase_dots_sup), np.min(phase_dots_inf), np.max(step_lengths_sup), np.min(step_lengths_inf)])
 
     #print("phases_max =", phases_max)
     #print("phases_min =", phases_min)
@@ -439,15 +478,15 @@ def Conti_maxmin(plot = True):
 
 def detect_nan_in_measurements():
     nan_dict = dict()
-    for subject in Conti_subject_names():
+    for subject in Continuous_subject_names():
         nan_dict[subject] = dict()
-        for trial in Conti_trial_names(subject):
+        for trial in Continuous_trial_names(subject):
             if trial == 'subjectdetails':
                 continue
             nan_dict[subject][trial] = dict()
             for side in ['left', 'right']:
                 nan_dict[subject][trial][side] = True
-                globalThighAngle, _, _, globalFootAngle, ankleMoment, tibiaForce= load_Conti_measurement_data(subject, trial, side)
+                globalThighAngle, _, _, globalFootAngle, ankleMoment, tibiaForce= Continuous_measurement_data(subject, trial, side)
                 for i in range(3, len(globalThighAngle)):
                     if globalThighAngle[i] == 0 and globalThighAngle[i-1] == 0 and globalThighAngle[i-2] == 0 and globalThighAngle[i-3] == 0:
                         nan_dict[subject][trial][side] = False
@@ -466,21 +505,41 @@ def detect_nan_in_measurements():
                         print(subject + "/"+ trial + "/"+ side, ": tibiaForce")
                         break
     with open('Continuous_data_incExp/Measurements_with_Nan.pickle', 'wb') as file:
-    	pickle.dump(nan_dict, file)
+        pickle.dump(nan_dict, file)
 
-def load_Conti_joints_angles(subject, trial, side):
-    with open('Continuous_data_incExp/Continuous_joint_data.pickle', 'rb') as file:
+def Continuous_joints_angles(subject, trial, side):
+    jointangles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]
+    start_index, end_index = Continuous_start_end(subject, trial, side)
+    knee_angle = -jointangles['knee'][start_index:end_index]
+    ankle_angle = -jointangles['ankle'][start_index:end_index]
+    """
+    Continuous_joint_data = dict()
+    for subject in Continuous_subject_names():
+        Continuous_joint_data[subject] = dict()
+        for trial in raw_walking_data['Continuous'][subject].keys():
+            if trial == 'subjectdetails':
+                continue
+            Continuous_joint_data[subject][trial] = dict()
+            for side in ['left', 'right']:
+                jointangles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]
+                Continuous_joint_data[subject][trial][side] = dict()
+                Continuous_joint_data[subject][trial][side]['knee'] = -jointangles['knee'][0, :]
+                Continuous_joint_data[subject][trial][side]['ankle'] = -jointangles['ankle'][0, :]
+    with open('Continuous_data_incExp/Continuous_joint_data.pickle', 'wb') as file:
+        pickle.dump(Continuous_joint_data, file)
+
+    with open('Continuous_data_incExp/Contpinuous_joint_data.pickle', 'rb') as file:
         Continuous_joint_data = pickle.load(file)
 
-    start_index, end_index = Conti_start_end(subject, trial, side)
+    start_index, end_index = Continuous_start_end(subject, trial, side)
     knee_angle = Continuous_joint_data[subject][trial][side]['knee'][start_index:end_index]
     ankle_angle = Continuous_joint_data[subject][trial][side]['ankle'][start_index:end_index]
-
+    """
     return knee_angle, ankle_angle
 
-def plot_Conti_joints_angles(subject, trial, side):
-    phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
-    knee_angle, ankle_angle = load_Conti_joints_angles(subject, trial, side)
+def plot_Continuous_joints_angles(subject, trial, side):
+    phases, phase_dots, step_lengths, ramps = Continuous_state_vars(subject, trial, side)
+    knee_angle, ankle_angle = Continuous_joints_angles(subject, trial, side)
     
     c_model = model_loader('Control_model_kneeAngles_ankleAngles.pickle')
 
@@ -513,13 +572,13 @@ def detect_knee_over_extention():
     #with open('Psi/Psi_ankleAngles.pickle', 'rb') as file:
     #    Psi_ankle = pickle.load(file)
     n = 0
-    for subject in Conti_subject_names():
-        for trial in Conti_trial_names(subject):
+    for subject in Continuous_subject_names():
+        for trial in Continuous_trial_names(subject):
             if trial == 'subjectdetails':
                 continue
             for side in ['left', 'right']:
-                knee_angle, ankle_angle = load_Conti_joints_angles(subject, trial, side)
-                phases, phase_dots, step_lengths, ramps = Conti_state_vars(subject, trial, side)
+                knee_angle, ankle_angle = Continuous_joints_angles(subject, trial, side)
+                phases, phase_dots, step_lengths, ramps = Continuous_state_vars(subject, trial, side)
                 knee_angle_pred = model_prediction(c_model.models[0], Psi_knee, phases, phase_dots, step_lengths, ramps)
                 #ankle_angle_pred = model_prediction(c_model.models[1], Psi_ankle, phases, phase_dots, step_lengths, ramps)
                 if np.count_nonzero(knee_angle_pred >= 0) > 0:
@@ -540,9 +599,9 @@ def detect_nan_in_joints():
     n_k = 0
     n_b = 0
 
-    for subject in Conti_subject_names():
+    for subject in Continuous_subject_names():
         nan_dict[subject] = dict()
-        for trial in Conti_trial_names(subject):
+        for trial in Continuous_trial_names(subject):
             if trial == 'subjectdetails':
                 continue
             nan_dict[subject][trial] = dict()
@@ -552,7 +611,7 @@ def detect_nan_in_joints():
                 flag_a = True
 
                 nan_dict[subject][trial][side] = True
-                knee_angle, ankle_angle = load_Conti_joints_angles(subject, trial, side)
+                knee_angle, ankle_angle = Continuous_joints_angles(subject, trial, side)
                 for i in range(3, len(knee_angle)):
                     if knee_angle[i] == 0 and knee_angle[i-1] == 0 and knee_angle[i-2] == 0\
                         and knee_angle[i-3] == 0:
@@ -579,9 +638,9 @@ def detect_nan_in_joints():
     print("Numbers of trials with nan in both knee and ankle angles: ", n_b)
 
     with open('Continuous_data_incExp/KneeAngles_with_Nan.pickle', 'wb') as file:
-    	pickle.dump(nan_dict, file)
+        pickle.dump(nan_dict, file)
 
-def plot_Conti_kinetics_data(subject, trial, side):
+def plot_Continuous_kinetics_data(subject, trial, side):
 
     ptr = raw_walking_data['Gaitcycle'][subject]['subjectdetails'][1][3]
     subject_weight = raw_walking_data[ptr] # kg
@@ -630,7 +689,7 @@ def globalFootAngle_offset():
 
     #offset = np.zeros((3, 9))
     offset_dict = dict()
-    for subject in Conti_subject_names():
+    for subject in Continuous_subject_names():
         offset_dict[subject] = dict()
         for trial in raw_walking_data['Gaitcycle']['AB01'].keys():
             if trial == 'subjectdetails':
@@ -656,7 +715,7 @@ def globalFootAngle_offset():
                 if nan_dict[subject][trial][side] == False:
                     print(subject + "/"+ trial + "/"+ side+ ": Trial skipped!")
                     continue
-                start_index, end_index = Conti_start_end(subject, trial, side)
+                start_index, end_index = Continuous_start_end(subject, trial, side)
                 globalFootAngle = -raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]\
                                     ['foot'][0,start_index:end_index] - 90
                 globalFootAngle_Vel = np.insert(np.diff(globalFootAngle)/dt, 0, 0)
@@ -718,134 +777,26 @@ def globalFootAngle_offset():
         #plt.show()
         
     with open('Continuous_data_incExp/globalFootAngle_offset.pickle', 'wb') as file:
-    	pickle.dump(offset_dict, file)
+        pickle.dump(offset_dict, file)
 
 
 if __name__ == '__main__':
     #detect_nan_in_measurements()
     #globalFootAngle_offset()
-    """
-    with open('Continuous_data/Continuous_measurement_data.pickle', 'rb') as file:
-        Continuous_measurement_data = pickle.load(file)
-    for subject in Conti_subject_names():
-        for trial in raw_walking_data['Continuous'][subject].keys():
-            if trial == 'subjectdetails':
-                continue
-            for side in ['left', 'right']:
-                Continuous_measurement_data[subject][trial][side]['globalThighAngles'] = Continuous_measurement_data[subject][trial][side].pop('global_thigh_angle_Y')
-                Continuous_measurement_data[subject][trial][side]['globalThighVelocity'] = Continuous_measurement_data[subject][trial][side].pop('global_thigh_angVel_2hz')
-    with open('Continuous_data/Continuous_measurement_data.pickle', 'wb') as file:
-    	pickle.dump(Continuous_measurement_data, file)
-    """
+    store_Continuous_globalThighAngles()
 
-    """
-    Continuous_joint_data = dict()
-    for subject in Conti_subject_names():
-        Continuous_joint_data[subject] = dict()
-        for trial in raw_walking_data['Continuous'][subject].keys():
-            if trial == 'subjectdetails':
-                continue
-            Continuous_joint_data[subject][trial] = dict()
-            for side in ['left', 'right']:
-                jointangles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]
-                Continuous_joint_data[subject][trial][side] = dict()
-                Continuous_joint_data[subject][trial][side]['knee'] = -jointangles['knee'][0, :]
-                Continuous_joint_data[subject][trial][side]['ankle'] = -jointangles['ankle'][0, :]
-    with open('Continuous_joint_data.pickle', 'wb') as file:
-    	pickle.dump(Continuous_joint_data, file)
-    """
-    """
-    Continuous_measurement_data = dict()
-    for subject in Conti_subject_names():
-    #for subject in ['AB01']:
-        Continuous_measurement_data[subject] = dict()
-        for trial in raw_walking_data['Continuous'][subject].keys():
-        #for trial in ['s0x8i0']:
-            if trial == 'subjectdetails':
-                continue
-            Continuous_measurement_data[subject][trial] = dict()
-            for side in ['left', 'right']:
-                Continuous_measurement_data[subject][trial][side] = dict()
-                Continuous_measurement_data[subject][trial][side]['globalThighAngles'] = Conti_globalThighAngles(subject, trial, side)
-            
-                force_ankle_x, force_ankle_y, force_ankle_z, moment_ankle_x, moment_ankle_y, moment_ankle_z \
-                    = Conti_reaction_wrench(subject, trial, side)
-                Continuous_measurement_data[subject][trial][side]['force_ankle_x'] = force_ankle_x
-                Continuous_measurement_data[subject][trial][side]['force_ankle_y'] = force_ankle_y
-                Continuous_measurement_data[subject][trial][side]['force_ankle_z'] = force_ankle_z
-                Continuous_measurement_data[subject][trial][side]['moment_ankle_x'] = moment_ankle_x
-                Continuous_measurement_data[subject][trial][side]['moment_ankle_y'] = moment_ankle_y
-                Continuous_measurement_data[subject][trial][side]['moment_ankle_z'] = moment_ankle_z
-    
-    with open('Continuous_measurement_data.pickle', 'wb') as file:
-    	pickle.dump(Continuous_measurement_data, file)
-    """
-    
-    # APPEND NEW DATA
-    """
-    with open('Continuous_measurement_data_unscaled.pickle', 'rb') as file:
-    	Continuous_measurement_data = pickle.load(file)
-    dt = 1/100
-    for subject in Conti_subject_names():
-        for trial in raw_walking_data['Continuous'][subject].keys():
-            if trial == 'subjectdetails':
-                continue
-            for side in ['left', 'right']:
-                # APPEND NEW DATA: Global_thigh_angVel_Y
-                gt_Y = Continuous_measurement_data[subject][trial][side]['globalThighAngles'][0, :]
-                #v = np.diff(gt_Y) / dt
-                #global_thigh_angVel_5hz = butter_lowpass_filter(np.insert(v, 0, 0), 5, 1/dt, order = 1)
-                #global_thigh_angVel_2x5hz = butter_lowpass_filter(np.insert(v, 0, 0), 2.5, 1/dt, order = 1)
-                #globalThighVelocity = butter_lowpass_filter(np.insert(v, 0, 0), 2, 1/dt, order = 1)
-                # compute atan2 w/ band-passed signals
-                gt_bp = butter_bandpass_filter(gt_Y, 0.5, 2, 1/dt, order = 2)
-                v_bp = np.diff(gt_bp) / dt
-                gtv_bp = butter_lowpass_filter(np.insert(v_bp, 0, 0), 2, 1/dt, order = 1)
-                atan2 = np.arctan2(-gtv_bp/(2*np.pi*0.8), gt_bp) # scaled
-                for i in range(np.shape(atan2)[0]):
-                    if atan2[i] < 0:
-                        atan2[i] = atan2[i] + 2 * np.pi
-                
-                #Continuous_measurement_data[subject][trial][side]['global_thigh_angle_bp'] = gt_Y_bp
-                #Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_5hz'] = global_thigh_angVel_5hz
-                #Continuous_measurement_data[subject][trial][side]['global_thigh_angVel_2x5hz'] = global_thigh_angVel_2x5hz
-                #Continuous_measurement_data[subject][trial][side]['globalThighVelocity'] = globalThighVelocity
-                Continuous_measurement_data[subject][trial][side]['atan2_s'] = atan2
-    
-    with open('Continuous_measurement_data.pickle', 'wb') as file:
-    	pickle.dump(Continuous_measurement_data, file)
-    """
-    
-    ##### Find the saturation range for all subjects ###############
-    """
-    phase_dots_max = np.zeros((10,1))
-    phase_dots_min = np.zeros((10,1))
-    step_lengths_max = np.zeros((10,1))
-    step_lengths_min = np.zeros((10,1))
-    s = 0
-    for subject in Conti_subject_names():
-        saturation_range = Conti_maxmin(subject, plot = False)
-        #print(saturation_range)
-        phase_dots_max[s] = saturation_range[0]
-        phase_dots_min[s] = saturation_range[1]
-        step_lengths_max[s] = saturation_range[2]
-        step_lengths_min[s] = saturation_range[3]
-        s += 1
-    print("phase_dots_max = ", np.max(phase_dots_max))
-    print("phase_dots_min = ", np.min(phase_dots_min))
-    print("step_lengths_max = ", np.max(step_lengths_max))
-    print("step_lengths_min = ", np.min(step_lengths_min))
-    """
-    ##################################################################
-    
     subject = 'AB03'
     trial = 's1x2i0'
     side = 'right'
+
+    #Continuous_measurement_data(subject, trial, side)
+    #plot_Continuous_measurement_data(subject, trial, side)
+    
     #Continuous_atan2_scale_shift(subject, trial, side, plot = True)
     #footAngles = raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]['foot'][0,:]
     #plt.figure()
     #plt.plot(-footAngles-90)
     #plt.show()
-    #plot_Conti_kinetics_data(subject, trial, side)
-    plot_Conti_joints_angles(subject, trial, side)
-    #plot_Conti_measurement_data(subject, trial, side)
+    #plot_Continuous_kinetics_data(subject, trial, side)
+    #plot_Continuous_joints_angles(subject, trial, side)
+    #plot_Continuous_measurement_data(subject, trial, side)
