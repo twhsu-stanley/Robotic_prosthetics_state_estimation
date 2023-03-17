@@ -4,6 +4,8 @@ import time
 import matplotlib.pyplot as plt
 from Filters.EKF import *
 from Filters.UKF import *
+from wrapping import *
+from load_Psi import *
 from model_framework import *
 from continuous_data_incExp import *
 from continuous_data_R01 import *
@@ -20,13 +22,14 @@ sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2,
                 'globalFootAngles':3, 'ankleMoment':4, 'tibiaForce':5}
 
 # Determine what sensors to be used
-sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2']#]
+sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2', 'globalFootAngles']#]
 
 sensor_id = [sensors_dict[key] for key in sensors]
 sensor_id_str = ""
 for i in range(len(sensor_id)):
     sensor_id_str += str(sensor_id[i])
-m_model = model_loader('Measurement_model_' + sensor_id_str +'_NSL.pickle')
+#m_model = model_loader('Measurement_model_' + sensor_id_str +'_NSL.pickle')
+m_model = model_loader('Measurement_model_globalThighAngles_globalThighVelocities_atan2_globalFootAngles.pickle')
     
 using_atan2 = np.any(np.array(sensors) == 'atan2')
 
@@ -35,16 +38,16 @@ print("Using sensors:", sensors)
 Psi = np.array([load_Psi()[key] for key in sensors], dtype = object)
 
 dt = 1/100
-initial_x = np.array([0, 0.8, 1.1]) # mid-stance
-initial_Sigma = np.diag([1e-2, 1e-1, 1e-1])
-Q = np.array([[0, 0, 0], [0, 1e-3, 0], [0, 0, 1e-2]]) * dt # 1e-3, 1e-2
+initial_x = np.array([0, 0.8, 1.1, 0]) # mid-stance
+initial_Sigma = np.diag([1e-2, 1e-1, 1e-1, 1e-1])
+Q = np.array([[0, 0, 0, 0], [0, 1e-3, 0, 0], [0, 0, 1e-2, 0], [0, 0, 0, 1e-2]]) * dt # 1e-3, 1e-2
 #if using_atan2:
 #    U = np.diag([1, 1, 1])
 #    R = U @ measurement_noise_covariance(*sensors) @ U.T
 #else:
 R = measurement_noise_covariance(*sensors)
 
-saturation_range = np.array([1.3, 0, 1.9, 0])
+saturation_range = np.array([1.3, 0, 1.9, 10])
 
 # Stride in which kidnapping occurs
 kidnap_stride = 4
@@ -72,13 +75,13 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
     if dataset == 'inclineExp':
         trial += 'i0'
         # load ground truth
-        phases, phase_dots, step_lengths, ramps = Continuous_state_vars(subject, trial, side)
+        phases, phase_dots, step_lengths, ramps = get_Continuous_state_vars(subject, trial, side)
         # load measurements
-        globalThighAngle, globalThighVelocity, atan2, _, _, _ = Continuous_measurement_data(subject, trial, side)
-        #atan2 = Continuous_atan2_scale_shift(subject, trial, side, plot = False) # use the shifted & scaled version
-        kneeAngle, ankleAngle = Continuous_joints_angles(subject, trial, side)
+        globalThighAngle, globalThighVelocity, atan2, globalFootAngle, ankleMoment, tibiaForce = get_Continuous_measurement_data(subject, trial, side)
+        atan2 = get_Continuous_atan2_scale_shift(subject, trial, side, plot = False) # use the shifted & scaled version
+        kneeAngle, ankleAngle = get_Continuous_joints_angles(subject, trial, side)
 
-        heel_strike_index = Continuous_heel_strikes(subject, trial, side) - Continuous_heel_strikes(subject, trial, side)[0]
+        heel_strike_index = get_Continuous_heel_strikes(subject, trial, side) - get_Continuous_heel_strikes(subject, trial, side)[0]
         total_step = int(heel_strike_index[total_strides]) + 1
     
     # 2) Use the R01 dataset
@@ -121,17 +124,19 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
     phases = phases[0 : total_step]
     phase_dots = phase_dots[0 : total_step]
     step_lengths = step_lengths[0 : total_step]
+    ramps = ramps[0 : total_step]
     # initialize the prior with ground truth
-    initial_x = np.array([phases[0], phase_dots[0], step_lengths[0]])
+    initial_x = np.array([phases[0], phase_dots[0], step_lengths[0], ramps[0]])
     
     globalThighAngle = globalThighAngle[0 : total_step]
     globalThighVelocity = globalThighVelocity[0 : total_step]
     atan2 = atan2[0 : total_step]
+    globalFootAngle = globalFootAngle[0 : total_step]
     
     kneeAngle = kneeAngle[0 : total_step]
     ankleAngle = ankleAngle[0 : total_step]
 
-    z_full = np.array([globalThighAngle, globalThighVelocity, atan2])
+    z_full = np.array([globalThighAngle, globalThighVelocity, atan2, globalFootAngle])
     z = z_full[sensor_id, :]
     
     if kalman_filter == 'ekf':
@@ -182,12 +187,12 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
                            kidnap_percent_gait* (heel_strike_index[kidnap_stride+1] - heel_strike_index[kidnap_stride]))
         print("state_kidnap = [%4.2f, %4.2f, %4.2f]" % (state_kidnap[0], state_kidnap[1], state_kidnap[2]))
 
-    x = np.zeros((total_step, 3))  # state estimate
-    std = np.zeros((total_step, 3))  # state estimate
+    x = np.zeros((total_step, 4))  # state estimate
+    std = np.zeros((total_step, 4))  # state estimate
     z_pred = np.zeros((total_step, len(sensors)))
     
     md = np.zeros(total_step)
-    estimate_error = np.zeros((total_step, 3))
+    estimate_error = np.zeros((total_step, 4))
     
     kneeAngle_kmd = np.zeros(total_step)
     ankleAngle_kmd = np.zeros(total_step)
@@ -204,14 +209,14 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
         x[i,:] = filter.x
         std[i, :] = np.sqrt(np.diag(filter.Sigma))
         md[i] = np.sqrt(filter.MD_square)
-        estimate_error[i, :] = (filter.x - np.array([phases[i], phase_dots[i], step_lengths[i]]))
+        estimate_error[i, :] = (filter.x - np.array([phases[i], phase_dots[i], step_lengths[i], ramps[i]]))
         if estimate_error[i, 0] > 0.5:
             estimate_error[i, 0] = estimate_error[i, 0] - 1
         elif estimate_error[i, 0] < -0.5:
             estimate_error[i, 0] = 1 + estimate_error[i, 0]
 
         ## Joints control commands 
-        joint_angles = joints_control(x[i,0], x[i,1], x[i,2])
+        joint_angles = joints_control(x[i,0], x[i,1], x[i,2], x[i,3])
         kneeAngle_kmd[i] = joint_angles[0]
         ankleAngle_kmd[i] = joint_angles[1]
     
@@ -270,7 +275,7 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
         axs_est[2].tick_params(axis='both', labelsize=12)
         axs_est[2].grid(True)
 
-        """
+        
         plt.figure()
         plt.subplot(311)
         plt.title('Estimation Errors')
@@ -292,8 +297,7 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
         plt.grid()
         plt.xlabel('time (s)')
         plt.grid()
-        """
-
+        
         plt.figure()
         plt.title("Mahalanobis Distance")
         plt.plot(tt, md, label = 'MD')
@@ -328,7 +332,7 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
         plt.ylabel('ankle angle (deg)')
         plt.xlabel('time (s)')
         """
-        #plt.show()
+        plt.show()
     
     if kidnap == False:
         return result
@@ -341,13 +345,13 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
     if dataset == 'inclineExp':
         trial += 'i0'
         # load ground truth
-        phases, phase_dots, step_lengths, ramps = Continuous_state_vars(subject, trial, side)
+        phases, phase_dots, step_lengths, ramps = get_Continuous_state_vars(subject, trial, side)
         # load measurements
-        globalThighAngle, globalThighVelocity, atan2, _, _, _ = Continuous_measurement_data(subject, trial, side)
-        #atan2 = Continuous_atan2_scale_shift(subject, trial, side, plot = False) # use the shifted & scalsed version
-        kneeAngle, ankleAngle = Continuous_joints_angles(subject, trial, side)
+        globalThighAngle, globalThighVelocity, atan2, _, _, _ = get_Continuous_measurement_data(subject, trial, side)
+        #atan2 = get_Continuous_atan2_scale_shift(subject, trial, side, plot = False) # use the shifted & scalsed version
+        kneeAngle, ankleAngle = get_Continuous_joints_angles(subject, trial, side)
 
-        heel_strike_index = Continuous_heel_strikes(subject, trial, side) - Continuous_heel_strikes(subject, trial, side)[0]
+        heel_strike_index = get_Continuous_heel_strikes(subject, trial, side) - get_Continuous_heel_strikes(subject, trial, side)[0]
         total_step = int(heel_strike_index[total_strides]) + 1
     
     # 2) Use the R01 dataset
@@ -656,7 +660,7 @@ def kf_robustness(kidnap = True, kalman_filter = 'ekf'):
     T_total = 0
 
     # Skip trials with problematic measurements
-    with open('Continuous_data/Measurements_with_Nan.pickle', 'rb') as file:
+    with open('Continuous_data_incExp/Measurements_with_Nan.pickle', 'rb') as file:
         nan_dict = pickle.load(file)
 
     for dataset in ['Reznick', 'inclineExp']:
@@ -733,17 +737,17 @@ if __name__ == '__main__':
     #trial = 's0x8'
     #side = 'left'
 
-    #kf_bank_test(dataset, subject, trial, side, N = 25, kalman_filter = 'ekf', kidnap = [0, 1, 2], plot = True)
+    #kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', kidnap = [0, 1, 2], plot = True)
     #kf_bank_test(dataset, subject, trial, side, N = 5, kalman_filter = 'ukf', kidnap = [0, 1, 2], plot = True)
 
-    #kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False, plot = True)
+    kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False, plot = True)
     #kf_test(dataset, subject, trial, side, kalman_filter = 'ukf', kidnap = False, plot = True)
 
     #plt.show()
 
     #kf_robustness(kidnap = True, kalman_filter = 'ukf')
     #print(" ==================== ")
-    kf_robustness(kidnap = True, kalman_filter = 'ekf')
+    #kf_robustness(kidnap = True, kalman_filter = 'ekf')
 
     # Q=[0, 1e-3, 1e-3]
     #Total RMSE phase = 0.029

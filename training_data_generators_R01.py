@@ -166,24 +166,24 @@ def kneeAnkleFootAngles_R01():
     """
     kneeAngles_walking = dict()
     ankleAngles_walking = dict()
-    footAngles_walking = dict()
+    globalFootAngles_walking = dict()
 
     for subject in get_subject_names():
         print("Subject:", subject)
         kneeAngles_walking[subject] = dict()
         ankleAngles_walking[subject] = dict()
-        footAngles_walking[subject] = dict()
+        globalFootAngles_walking[subject] = dict()
         
         mode = 'Walk'
         kneeAngles_walking[subject][mode] = dict()
         ankleAngles_walking[subject][mode] = dict()
-        footAngles_walking[subject][mode] = dict()
+        globalFootAngles_walking[subject][mode] = dict()
 
         for speed in ['s0x8', 's1', 's1x2']:
             print(" Walk:", speed)
             kneeAngles_walking[subject][mode][speed] = dict()
             ankleAngles_walking[subject][mode][speed] = dict()
-            footAngles_walking[subject][mode][speed] = dict()
+            globalFootAngles_walking[subject][mode][speed] = dict()
 
             for incline in ['i10', 'i5', 'i0', 'in5', 'in10']:
                 print("   Incline:", incline)
@@ -206,7 +206,7 @@ def kneeAnkleFootAngles_R01():
                         
                     kneeAngles_walking[subject][mode][speed][incline] = kneeAngles_Sagi
                     ankleAngles_walking[subject][mode][speed][incline] = ankleAngles_Sagi
-                    footAngles_walking[subject][mode][speed][incline] = footAngles_Sagi
+                    globalFootAngles_walking[subject][mode][speed][incline] = footAngles_Sagi
 
                 except:
                     print("Exception: something wrong occured!", subject + '/' + mode  + '/' + speed + '/' + incline)
@@ -218,8 +218,8 @@ def kneeAnkleFootAngles_R01():
     with open('Gait_training_data_R01/ankleAngles_walking.pickle', 'wb') as file:
         pickle.dump(ankleAngles_walking, file)
     #
-    with open('Gait_training_data_R01/footAngles_walking.pickle', 'wb') as file:
-        pickle.dump(footAngles_walking, file)
+    with open('Gait_training_data_R01/globalFootAngles_walking.pickle', 'wb') as file:
+        pickle.dump(globalFootAngles_walking, file)
 
 def gait_training_data_generator_R01(gait_data):
     with open('Gait_training_data_R01/' + gait_data + '.pickle', 'rb') as file:
@@ -231,7 +231,7 @@ def gait_training_data_generator_R01(gait_data):
         leg_length_right = Normalized_data[ Normalized_data['Normalized'][subject]['ParticipantDetails'][1,8] ][:][0,0] / 1000
         
         if (gait_data == 'globalThighAngles_walking' or gait_data == 'globalThighVelocities_walking' or gait_data == 'atan2_walking'
-            or gait_data == 'kneeAngles_walking' or gait_data == 'ankleAngles_walking' or gait_data == 'footAngles_walking'):
+            or gait_data == 'kneeAngles_walking' or gait_data == 'ankleAngles_walking' or gait_data == 'globalFootAngles_walking'):
             mode = 'Walk'
             for speed in ['s0x8', 's1', 's1x2']:
                 for incline in ['i10', 'i5', 'i0', 'in5', 'in10']:
@@ -317,7 +317,7 @@ if __name__ == '__main__':
     #gait_training_data_generator_R01('globalThighAngles_walking')
     #gait_training_data_generator_R01('globalThighVelocities_walking')
     #gait_training_data_generator_R01('atan2_walking')
-    gait_training_data_generator_R01('kneeAngles_walking')
-    gait_training_data_generator_R01('ankleAngles_walking')
-    gait_training_data_generator_R01('footAngles_walking')
+    #gait_training_data_generator_R01('kneeAngles_walking')
+    #gait_training_data_generator_R01('ankleAngles_walking')
+    gait_training_data_generator_R01('globalFootAngles_walking')
     

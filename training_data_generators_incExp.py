@@ -21,6 +21,9 @@ def jointAngles_statistics(joint):
     
     subject_names = get_subject_names()
     data_mean_std = dict()
+
+    if joint == 'globalFoot':
+        joint = 'foot'
     
     for trial in raw_walking_data['Gaitcycle']['AB01'].keys():
         if trial == 'subjectdetails':
@@ -58,6 +61,10 @@ def jointAngles_statistics(joint):
         #plt.plot(range(150), data_mean_std[trial]['mean'] - 3 * data_mean_std[trial]['std'])
         #plt.grid()
         #plt.show()
+
+    if joint == 'foot':
+            joint = 'globalFoot'
+
     with open(('Gait_data_statistics_incExp/' + joint + 'Angles_mean_std.pickle'), 'wb') as file:
         pickle.dump(data_mean_std, file)
 
@@ -493,7 +500,7 @@ def gait_training_data_generator(mode):
             elif mode == 'ankleAngles':
                 data_left = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['left']['ankle']['x'][:]
                 data_right = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['right']['ankle']['x'][:]
-            elif mode == 'footAngles':
+            elif mode == 'globalFootAngles':
                 data_left = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['left']['foot']['x'][:]-90
                 data_right = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['right']['foot']['x'][:]-90
             elif mode == 'globalThighAngles' or mode == 'globalThighVelocities' or mode == 'atan2':
@@ -613,7 +620,7 @@ def gait_training_data_generator(mode):
             #===================================================================================================================
                 
             # Step 2: Remove strides with NaN values
-            if mode == 'footAngles':
+            if mode == 'globalFootAngles':
                 nan_val = -90
             else:
                 nan_val = 0
@@ -743,19 +750,19 @@ def globalFootAngle_offset():
 
 if __name__ == '__main__':
 
-    globalThighAngles_statistics()
-    derivedMeasurements_statistics()
-    jointAngles_statistics('knee')
-    jointAngles_statistics('ankle')
-    jointAngles_statistics('foot')
+    #globalThighAngles_statistics()
+    #derivedMeasurements_statistics()
+    #jointAngles_statistics('knee')
+    #jointAngles_statistics('ankle')
+    jointAngles_statistics('globalFoot')
     #ankleMoment_statistics()
     #tibiaForce_statistics()
 
-    gait_training_data_generator('kneeAngles')
-    gait_training_data_generator('ankleAngles')
-    gait_training_data_generator('footAngles')
-    gait_training_data_generator('globalThighAngles')
-    gait_training_data_generator('globalThighVelocities')
-    gait_training_data_generator('atan2')
+    #gait_training_data_generator('kneeAngles')
+    #gait_training_data_generator('ankleAngles')
+    gait_training_data_generator('globalFootAngles')
+    #gait_training_data_generator('globalThighAngles')
+    #gait_training_data_generator('globalThighVelocities')
+    #gait_training_data_generator('atan2')
     #gait_training_data_generator('ankleMoment')
     #gait_training_data_generator('tibiaForce')

@@ -1,9 +1,10 @@
 import numpy as np
 from model_framework import *
+from wrapping import *
 
 # Process model for the EKF
 def A(dt):
-    return np.array([[1, dt, 0], [0, 1, 0], [0, 0, 1]])
+    return np.array([[1, dt, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
 
 def process_model(x, dt):
     return A(dt) @ x.T
@@ -14,30 +15,6 @@ with open('Psi/Psi_kneeAngles', 'rb') as file:#_withoutNan
     Psi_knee = pickle.load(file)
 with open('Psi/Psi_ankleAngles', 'rb') as file:
     Psi_ankle = pickle.load(file)
-
-## Load model coefficients
-def load_Psi():
-    with open('Psi/Psi_globalThighAngles', 'rb') as file:
-        Psi_globalThighAngles = pickle.load(file)
-    with open('Psi/Psi_globalThighVelocities', 'rb') as file:
-        Psi_globalThighVelocities = pickle.load(file)
-    with open('Psi/Psi_atan2', 'rb') as file:
-        Psi_atan2 = pickle.load(file)
-    with open('Psi/Psi_footAngles', 'rb') as file:
-        Psi_footAngles = pickle.load(file)
-    Psi = {'globalThighAngles': Psi_globalThighAngles, 'globalThighVelocities': Psi_globalThighVelocities,
-           'atan2': Psi_atan2, 'footAngles': Psi_footAngles}
-    return Psi
-
-def warpToOne(phase):
-    phase_wrap = np.remainder(phase, 1)
-    while np.abs(phase_wrap) > 1:
-        phase_wrap = phase_wrap - np.sign(phase_wrap)
-    return phase_wrap
-
-def wrapTo2pi(ang):
-    ang = ang % (2*np.pi)
-    return ang
 
 def phase_error(phase_est, phase_truth):
     if len(phase_est) == len(phase_truth):
@@ -55,8 +32,8 @@ def phase_error(phase_est, phase_truth):
             phase_error[i] = 1 - abs(phase_est[i] - phase_truth[i])
     return phase_error
 
-def joints_control(phases, phase_dots, step_lengths):
-    joint_angles = c_model.evaluate_h_func([Psi_knee, Psi_ankle], phases, phase_dots, step_lengths)
+def joints_control(phases, phase_dots, step_lengths, ramps):
+    joint_angles = c_model.evaluate_h_func([Psi_knee, Psi_ankle], phases, phase_dots, step_lengths, ramps)
     return joint_angles
     
 class myStruct:
@@ -103,10 +80,10 @@ class extended_kalman_filter:
         #   z:  measurement
 
         # evaluate measurement Jacobian at current operating point
-        H = self.h.evaluate_dh_func(self.Psi, self.x[0], self.x[1], self.x[2])
+        H = self.h.evaluate_dh_func(self.Psi, self.x[0], self.x[1], self.x[2], self.x[3])
         
         # predicted measurements
-        self.z_hat = self.h.evaluate_h_func(self.Psi, self.x[0], self.x[1], self.x[2])[:,0]
+        self.z_hat = self.h.evaluate_h_func(self.Psi, self.x[0], self.x[1], self.x[2], self.x[3])[:,0]
 
         if using_atan2:
             H[2, 0] += 2*np.pi
@@ -134,11 +111,11 @@ class extended_kalman_filter:
         # correct the predicted state statistics
         self.x = self.x + K @ self.v
         self.x[0] = warpToOne(self.x[0])
-        self.Sigma = (np.eye(3) - K @ H) @ self.Sigma
+        self.Sigma = (np.eye(np.size(self.x)) - K @ H) @ self.Sigma
 
         if self.reset == True and self.MD_square > 25:
-            self.x = np.array([0.5, 0.8, 1.1]) # mid-stance
-            self.Sigma = np.diag([1e-2, 1e-1, 1e-1])
+            self.x = np.array([0.5, 0.8, 1.1, 0]) # mid-stance
+            self.Sigma = np.diag([1e-2, 1e-1, 1e-1, 1e-1])
 
         if self.saturation == True:
             self.state_saturation(self.saturation_range)
