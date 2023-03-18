@@ -125,6 +125,8 @@ class extended_kalman_filter:
         phase_dots_min = saturation_range[1]
         step_lengths_max = saturation_range[2]
         step_lengths_min = saturation_range[3]
+        ramps_max = saturation_range[4]
+        ramps_min = saturation_range[5]
         
         if self.x[1] > phase_dots_max:
             self.x[1] = phase_dots_max
@@ -135,4 +137,9 @@ class extended_kalman_filter:
             self.x[2] = step_lengths_max
         elif self.x[2] < step_lengths_min:
             self.x[2] = step_lengths_min
+
+        if self.x[3] > ramps_max:
+            self.x[3] = ramps_max
+        elif self.x[3] < ramps_min:
+            self.x[3] = ramps_min
     
