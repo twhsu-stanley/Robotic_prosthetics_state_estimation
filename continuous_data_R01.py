@@ -7,6 +7,8 @@ from incline_experiment_utils import *
 from model_framework import *
 from training_data_generators_R01 import get_commanded_velocities
 
+## Process, store, and generate continuous (streaming) data for the R01 dataset
+
 dataset_location = '../Reznick_Dataset/'
 Streaming_data = h5py.File(dataset_location + 'Streaming.mat', 'r')
 
@@ -17,7 +19,7 @@ leg_length = {'AB01': 0.860, 'AB02': 0.790, 'AB03': 0.770, 'AB04': 0.810, 'AB05'
 def get_subject_names():
     return Streaming_data['Streaming'].keys()
 
-def Streaming_globalThighAngles():
+def store_Streaming_globalThighAngles():
     # ONLY CONSIDER THE LEFT SIDE
     mode = 'Tread'
     incline = 'i0'
@@ -38,13 +40,13 @@ def Streaming_globalThighAngles():
 
     
     with open('Streaming_data_R01/streaming_globalThighAngles_tread.pickle', 'wb') as file:
-    	pickle.dump(streaming_globalThighAngles_tread, file)
+        pickle.dump(streaming_globalThighAngles_tread, file)
 
-def Streaming_derivedMeasurements():
+def store_Streaming_derivedMeasurements():
     # ONLY CONSIDER THE LEFT SIDE
     # global thigh velocities and atan2
     with open('Streaming_data_R01/streaming_globalThighAngles_tread.pickle', 'rb') as file:
-    	streaming_globalThighAngles_tread =  pickle.load(file)
+        streaming_globalThighAngles_tread =  pickle.load(file)
     
     # mode = 'Tread'
     # incline = 'i0'
@@ -76,9 +78,9 @@ def Streaming_derivedMeasurements():
         streaming_atan2_tread[subject] = atan2
     
     with open('Streaming_data_R01/streaming_globalThighVelocities_tread.pickle', 'wb') as file:
-    	pickle.dump(streaming_globalThighVelocities_tread, file)
+        pickle.dump(streaming_globalThighVelocities_tread, file)
     with open('Streaming_data_R01/streaming_atan2_tread.pickle', 'wb') as file:
-    	pickle.dump(streaming_atan2_tread, file)
+        pickle.dump(streaming_atan2_tread, file)
 
 def load_Streaming_data(subject, speed):
     mode = 'Tread'
@@ -86,16 +88,16 @@ def load_Streaming_data(subject, speed):
     # ONLY CONSIDER THE LEFT SIDE
     # Load measurements
     with open('Streaming_data_R01/streaming_globalThighAngles_tread.pickle', 'rb') as file:
-    	streaming_globalThighAngles_tread =  pickle.load(file)
+        streaming_globalThighAngles_tread =  pickle.load(file)
     with open('Streaming_data_R01/streaming_globalThighVelocities_tread.pickle', 'rb') as file:
-    	streaming_globalThighVelocities_tread =  pickle.load(file)
+        streaming_globalThighVelocities_tread =  pickle.load(file)
     with open('Streaming_data_R01/streaming_atan2_tread.pickle', 'rb') as file:
-    	streaming_atan2_tread =  pickle.load(file)
+        streaming_atan2_tread =  pickle.load(file)
 
     # Load state variables 
-    heel_strike_index = Streaming_data['Streaming'][subject][mode]['i0']['events']['LHS'][:]
+    heel_strike_index = Streaming_data['Streaming'][subject][mode][incline]['events']['LHS'][:]
     leg_length_left = Streaming_data[ Streaming_data['Streaming'][subject]['ParticipantDetails'][1,5] ][:][0,0] / 1000
-    cvel = Streaming_data['Streaming'][subject][mode]['i0']['events']['VelProf']['cvel'][:][:,0]
+    cvel = Streaming_data['Streaming'][subject][mode][incline]['events']['VelProf']['cvel'][:][:,0]
     if speed == 'all' or speed == 'a0x2' or speed == 'a0x5':
         walking_speed = get_commanded_velocities(subject, cvel)
     elif speed == 's0x8':
@@ -293,9 +295,9 @@ def plot_Streaming_data(subject, speed):
 
     plt.show()
 
-def Streaming_atan2_scale_shift(subject, speed, plot = True):
+def get_Streaming_atan2_scale_shift(subject, speed, plot = True):
     with open('Streaming_data_R01/streaming_globalThighAngles_tread.pickle', 'rb') as file:
-    	streaming_globalThighAngles_tread = pickle.load(file)
+        streaming_globalThighAngles_tread = pickle.load(file)
     
     # Extract a particular section
     cutPoints = Streaming_data['Streaming'][subject]['Tread']['i0']['events']['cutPoints'][:]
@@ -496,8 +498,8 @@ if __name__ == '__main__':
     #plt.plot(streaming_globalThighAngles_tread['AB01'])
     #plt.show()
 
-    #Streaming_globalThighAngles()
-    #Streaming_derivedMeasurements()
+    #store_Streaming_globalThighAngles()
+    #store_Streaming_derivedMeasurements()
     
 
     #with open('Streaming_data_R01/streaming_globalThighAngles_tread.pickle', 'rb') as file:

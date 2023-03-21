@@ -113,7 +113,7 @@ class extended_kalman_filter:
         self.x[0] = warpToOne(self.x[0])
         self.Sigma = (np.eye(np.size(self.x)) - K @ H) @ self.Sigma
 
-        if self.reset == True and self.MD_square > 25:
+        if self.reset == True and self.MD_square > 20:
             self.x = np.array([0.5, 0.8, 1.1, 0]) # mid-stance
             self.Sigma = np.diag([1e-2, 1e-1, 1e-1, 1e-1])
 

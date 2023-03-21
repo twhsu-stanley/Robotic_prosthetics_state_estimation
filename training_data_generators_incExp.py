@@ -63,7 +63,7 @@ def jointAngles_statistics(joint):
         #plt.show()
 
     if joint == 'foot':
-            joint = 'globalFoot'
+        joint = 'globalFoot'
 
     with open(('Gait_data_statistics_incExp/' + joint + 'Angles_mean_std.pickle'), 'wb') as file:
         pickle.dump(data_mean_std, file)
@@ -265,13 +265,13 @@ def derivedMeasurements_statistics():
                 gta_bp_stack = butter_bandpass_filter(gta_stack, 0.5, 2, 1/dt_right[i, 0], order = 2)
                 gta_bp = gta_bp_stack[2 * len(data_right[i, :]): 3 * len(data_right[i, :])]
 
-                v_bp = np.diff(gt_bp) / dt_right[i, 0]
+                v_bp = np.diff(gta_bp) / dt_right[i, 0]
                 gtv_bp = np.insert(v_bp, 0, 0)
                 gtv_bp_stack = np.array([gtv_bp, gtv_bp, gtv_bp, gtv_bp, gtv_bp]).reshape(-1)
                 gtv_blp_stack = butter_lowpass_filter(gtv_bp_stack, 2, 1/dt_right[i, 0], order = 1)
                 gtv_blp = gtv_blp_stack[2 * len(data_right[i, :]): 3 * len(data_right[i, :])]
                 
-                atan2_right[i, :] = np.arctan2(-gtv_blp/(2*np.pi*0.8), gt_bp)  # arctan2 and scaling
+                atan2_right[i, :] = np.arctan2(-gtv_blp/(2*np.pi*0.8), gta_bp)  # arctan2 and scaling
                 """
                 # 2.2. compute shifted & scaled atan2 w/ a low-pass filter
                 gta_lp_stack = butter_lowpass_filter(gta_stack, 2, 1 / dt_right[i, 0], order = 1) # 1st, 2nd or 3rd order? 
@@ -290,6 +290,7 @@ def derivedMeasurements_statistics():
                 phase_x = gta_scale * (gta_lp - gta_shift)
                     
                 atan2_right[i, :] = np.arctan2(phase_y, phase_x)
+                
                 for j in range(np.shape(atan2_right[i, :])[0]):
                     if atan2_right[i, j] < 0:
                         atan2_right[i, j] = atan2_right[i, j] + 2 * np.pi
@@ -719,6 +720,7 @@ def gait_training_data_generator(mode):
         pickle.dump(gait_training_dataset, file)
     
 def globalFootAngle_offset():
+    # TODO: This is not complete yet
     subject_names = get_subject_names()
     offset = dict()
     

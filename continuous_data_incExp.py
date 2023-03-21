@@ -7,7 +7,7 @@ from model_framework import *
 from scipy.signal import butter, lfilter, lfilter_zi
 from load_Psi import load_Psi 
 
-# Generate measurement data from the "Continuous" data structure
+## Process, store, and generate continuous (streaming) data for the incExp dataset
 
 raw_walking_data = hp.File("../InclineExperiment.mat", "r")
 
@@ -154,15 +154,17 @@ def get_Continuous_measurement_data(subject, trial, side):
             atan2[i] = atan2[i] + 2 * np.pi
     
     # Foot angles
-    with open('Continuous_data_incExp/globalFootAngle_offset.pickle', 'rb') as file:
-        offset_dict = pickle.load(file)
+    #with open('Continuous_data_incExp/globalFootAngle_offset.pickle', 'rb') as file:
+        #offset_dict = pickle.load(file)
 
     globalFootAngle = -raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]['foot'][0,start_index:end_index] - 90
+    """
     try:
         globalFootAngle -= offset_dict[subject][trial][side]
     except:
         pass
-    
+    """
+
     # Kinetic measurements
     ankleMoment = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointmoment'][side]['ankle'][0, start_index:end_index] / 1000 # N-mm to N-m
     ankleMoment = butter_lowpass_filter(ankleMoment, 7, 100, order = 1)
@@ -191,49 +193,25 @@ def get_Continuous_atan2_scale_shift(subject, trial, side, plot = True):
     phase_y = np.ones(np.shape(globalThighVelocity_lp)[0])
     phase_x = np.ones(np.shape(globalThighVelocity_lp)[0])
     
-    t_min_prev = np.ones(np.shape(globalThighVelocity_lp)[0])
-    t_min = np.ones(np.shape(globalThighVelocity_lp)[0])
-    t_max_prev = np.ones(np.shape(globalThighVelocity_lp)[0])
-    t_max = np.ones(np.shape(globalThighVelocity_lp)[0])
-
-    idx_min_prev = 0
-    idx_min = 0
-    idx_max_prev = 0
-    idx_max = 0
+    ####
+    heel_strike_index = get_Continuous_heel_strikes(subject, trial, side)
+    heel_strike_index  = heel_strike_index - start_index
 
     for i in range(np.shape(globalThighAngle)[0]):
-        if i > 0:
-            globalThighAngle_max[i] = np.max(globalThighAngle_lp[idx_min_prev:i])
-            globalThighAngle_min[i] = np.min(globalThighAngle_lp[idx_max_prev:i])
-            globalThighVelocity_max[i] = np.max(globalThighVelocity_lp[idx_min_prev:i])
-            globalThighVelocity_min[i] = np.min(globalThighVelocity_lp[idx_max_prev:i])
-        
-        if i > idx_max + 1:
-            idx_min_temp = np.argmin(globalThighAngle_lp[idx_max:i]) + idx_max
-            if i > idx_min_temp + 1 and globalThighAngle_lp[idx_min_temp] < -5:
-                idx_min = idx_min_temp
-                idx_max_temp = np.argmax(globalThighAngle_lp[idx_min_temp:i]) + idx_min_temp
-                if i > idx_max_temp + 1 and globalThighAngle_lp[idx_max_temp] > 10: # new stride
-                    idx_max_prev = idx_max
-                    idx_max = idx_max_temp
-                    idx_min_prev = idx_min
-        
-        t_min_prev[i] = idx_min_prev
-        t_min[i] = idx_min
-        t_max_prev[i] = idx_max_prev
-        t_max[i] = idx_max
+        h1 = int(heel_strike_index[np.where(heel_strike_index <= i)[0][-1]])
+        h2 = int(heel_strike_index[np.where(heel_strike_index > i)[0][0]])
+        globalThighAngle_max[i] = max(globalThighAngle_lp[h1:h2])
+        globalThighAngle_min[i] = min(globalThighAngle_lp[h1:h2])
+        globalThighVelocity_max[i] = max(globalThighVelocity_lp[h1:h2])
+        globalThighVelocity_min[i] = min(globalThighVelocity_lp[h1:h2])
 
-        if idx_max_prev > 0 and idx_min_prev > 0:
-            globalThighAngle_shift = (globalThighAngle_max[i] + globalThighAngle_min[i]) / 2
-            globalThighAngle_scale = abs(globalThighVelocity_max[i] - globalThighVelocity_min[i]) / abs(globalThighAngle_max[i] - globalThighAngle_min[i])
-            globalThighVelocity_shift = (globalThighVelocity_max[i] + globalThighVelocity_min[i]) / 2
+        gta_shift = (globalThighAngle_max[i] + globalThighAngle_min[i]) / 2
+        gta_scale = abs(globalThighVelocity_max[i] - globalThighVelocity_min[i]) / abs(globalThighAngle_max[i]- globalThighAngle_min[i])
+        gtv_shift = (globalThighVelocity_max[i] + globalThighVelocity_min[i]) / 2
 
-            phase_y[i] = - (globalThighVelocity_lp[i] - globalThighVelocity_shift)
-            phase_x[i] = globalThighAngle_scale * (globalThighAngle_lp[i] - globalThighAngle_shift)
-        else:
-            phase_y[i] = - globalThighVelocity_lp[i] / (2*np.pi*0.8)
-            phase_x[i] = globalThighAngle_lp[i] 
-        
+        phase_y[i] = - (globalThighVelocity_lp[i] - gtv_shift)
+        phase_x[i] = gta_scale * (globalThighAngle_lp[i] - gta_shift)
+
         atan2[i] = np.arctan2(phase_y[i], phase_x[i])
         if atan2[i] < 0:
             atan2[i] = atan2[i] + 2 * np.pi
@@ -247,10 +225,6 @@ def get_Continuous_atan2_scale_shift(subject, trial, side, plot = True):
         plt.plot(globalThighAngle_lp, 'k-', linewidth = 2)
         plt.plot(globalThighAngle_max)
         plt.plot(globalThighAngle_min)
-        plt.plot(t_min, np.zeros(np.shape(t_min)[0]), 'bx', label = 'min')
-        plt.plot(t_min_prev, np.zeros(np.shape(t_min_prev)[0]), 'g.', label = 'min_prev')
-        plt.plot(t_max, np.zeros(np.shape(t_max)[0]), 'rx', label = 'max')
-        plt.plot(t_max_prev, np.zeros(np.shape(t_max_prev)[0]), 'm.', label = 'max_prev')
         plt.grid()
         plt.subplot(312)
         plt.plot(globalThighVelocity_lp, 'k-', linewidth = 2)
@@ -750,9 +724,9 @@ if __name__ == '__main__':
     #get_globalFootAngle_offset()
     #store_Continuous_globalThighAngles()
 
-    subject = 'AB03'
-    trial = 's1x2i0'
-    side = 'right'
+    subject = 'AB05'
+    trial = 's0x8d10'
+    side = 'left'
 
     #get_Continuous_measurement_data(subject, trial, side)
     plot_Continuous_measurement_data(subject, trial, side)
