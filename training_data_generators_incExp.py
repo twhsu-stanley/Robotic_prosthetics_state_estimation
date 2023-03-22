@@ -480,6 +480,10 @@ def gait_training_data_generator(mode):
         with open('Gait_training_data_incExp/atan2_original.pickle', 'rb') as file:
             atan2 = pickle.load(file)
 
+    if mode == 'globalFootAngles':
+        with open('Gait_training_data_incExp/globalFootAngles_offsetted.pickle', 'rb') as file:
+            globalFootAngles = pickle.load(file)
+
     subject_names = get_subject_names()
 
     num_trials = 0
@@ -502,8 +506,8 @@ def gait_training_data_generator(mode):
                 data_left = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['left']['ankle']['x'][:]
                 data_right = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['right']['ankle']['x'][:]
             elif mode == 'globalFootAngles':
-                data_left = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['left']['foot']['x'][:]-90
-                data_right = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['right']['foot']['x'][:]-90
+                data_left = globalFootAngles[trial][subject]['left']
+                data_right = globalFootAngles[trial][subject]['right']
             elif mode == 'globalThighAngles' or mode == 'globalThighVelocities' or mode == 'atan2':
                 data_left = globalThighAngles[trial][subject]['left']
                 data_right = globalThighAngles[trial][subject]['right']
@@ -719,50 +723,125 @@ def gait_training_data_generator(mode):
     with open(('Gait_training_data_incExp/' + mode + '_training_dataset.pickle'), 'wb') as file:
         pickle.dump(gait_training_dataset, file)
     
-def globalFootAngle_offset():
-    # TODO: This is not complete yet
+def globalFootAngle_statistics():
+    ###
     subject_names = get_subject_names()
-    offset = dict()
+
+    globalFootAngles_mean_std = dict()
+    globalFootAngles = dict()
+    globalFootAngles_offset = dict()
     
-    for subject in subject_names:
-        offset[subject] = dict()
-        for trial in raw_walking_data['Gaitcycle']['AB01'].keys():
-            if trial == 'subjectdetails':
-                continue
+    for trial in raw_walking_data['Gaitcycle']['AB01'].keys():
+        if trial == 'subjectdetails':
+            continue
+        print("trial: ", trial)
+
+        globalFootAngles_mean_std[trial] = dict()
+        globalFootAngles[trial] = dict()
+        globalFootAngles_offset[trial] = dict()
+
+        for subject in subject_names:
+            print("subject: ", subject)
+            globalFootAngles[trial][subject] = dict()
+            globalFootAngles_offset[trial][subject] = dict()
+
+            ptr = raw_walking_data['Gaitcycle'][subject][trial]['description'][1][1]
+            ramp = raw_walking_data[ptr][:][0][0]
+
+            time_info_left = raw_walking_data['Gaitcycle'][subject][trial]['cycles']['left']['time']
+            dt_left = []
+            for step_left in time_info_left:
+                delta_time_left = step_left[1] - step_left[0]
+                dt_left.append(np.full((1,150), delta_time_left))
+            dt_left = np.squeeze(np.array(dt_left))
+
+            time_info_right = raw_walking_data['Gaitcycle'][subject][trial]['cycles']['right']['time']
+            dt_right = []
+            for step_right in time_info_right:
+                delta_time_right = step_right[1] - step_right[0]
+                dt_right.append(np.full((1,150), delta_time_right))
+            dt_right = np.squeeze(np.array(dt_right))
+
+            # left
+            globalFootAngles_left = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['left']['foot']['x'][:] - 90
+            phase_left = np.linspace(0, 1, np.shape(globalFootAngles_left)[1]).reshape(1, np.shape(globalFootAngles_left)[1])
+            contactAngle_left = []
+            #plt.figure()
+            #plt.title('globalFootAngles left')
+            for i in range(np.shape(globalFootAngles_left)[0]):
+                globalFootAngleVel_left = np.insert(np.diff(globalFootAngles_left[i,:])/dt_left[i,0], 0, 0)
+                globalFootAngleVel_left = butter_lowpass_filter(globalFootAngleVel_left, 2, 1/dt_left[i,0], order = 1)
+
+                stance_start_idx = np.where(phase_left[0,:] > 0.1)[0][0]
+                stance_end_idx = np.where(phase_left[0,:] > 0.6)[0][0]
+                idx = np.argmin(abs(globalFootAngleVel_left[stance_start_idx:stance_end_idx]))
+                contactAngle_left.append(globalFootAngles_left[i,idx])
+
+                #plt.plot(phase_left[0,:], globalFootAngles_left[i,:])
+                #plt.plot(phase_left[0,idx], globalFootAngles_left[i,idx], 'x')
+                #plt.grid()
+            #plt.show()
+            offset_left = np.mean(contactAngle_left) - ramp
+            globalFootAngles_offset[trial][subject]['left'] = offset_left
+            globalFootAngles[trial][subject]['left'] = globalFootAngles_left - offset_left
             
-            footAngle_left = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['left']['foot']['x'][:] - 90
-            footAngle_right = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['right']['foot']['x'][:] - 90
-            
+            # right
+            globalFootAngles_right = -raw_walking_data['Gaitcycle'][subject][trial]['kinematics']['jointangles']['right']['foot']['x'][:] - 90
+            phase_right = np.linspace(0, 1, np.shape(globalFootAngles_right)[1]).reshape(1, np.shape(globalFootAngles_right)[1])
+            contactAngle_right = []
+            #plt.figure()
+            #plt.title('globalFootAngles right')
+            for i in range(np.shape(globalFootAngles_right)[0]):
+                globalFootAngleVel_right = np.insert(np.diff(globalFootAngles_right[i,:])/dt_right[i,0], 0, 0)
+                globalFootAngleVel_right = butter_lowpass_filter(globalFootAngleVel_right, 2, 1/dt_right[i,0], order = 1)
+
+                stance_start_idx = np.where(phase_right[0,:] > 0.1)[0][0]
+                stance_end_idx = np.where(phase_right[0,:] > 0.6)[0][0]
+                idx = np.argmin(abs(globalFootAngleVel_right[stance_start_idx:stance_end_idx]))
+                contactAngle_right.append(globalFootAngles_right[i,idx])
+
+                #plt.plot(phase_right[0,:], globalFootAngles_right[i,:])
+                #plt.plot(phase_right[0,idx], globalFootAngles_right[i,idx], 'x')
+                #plt.grid()
+            #plt.show()
+            offset_right = np.mean(contactAngle_right) - ramp
+            globalFootAngles_offset[trial][subject]['right'] = offset_right
+            globalFootAngles[trial][subject]['right'] = globalFootAngles_right - offset_right
+
             if subject == 'AB01':
-                data = footAngle_left
-                data = np.vstack((data, footAngle_right))
+                data = globalFootAngles_left - offset_left
+                data = np.vstack((data, globalFootAngles_right - offset_right))
             else:
-                data = np.vstack((data, footAngle_left))
-                data = np.vstack((data, footAngle_right))
-        
-            offset[subject][trial] = 0
+                data = np.vstack((data, globalFootAngles_left - offset_left))
+                data = np.vstack((data, globalFootAngles_right - offset_right))
+
+        globalFootAngles_mean_std[trial]['mean'] = np.mean(data, axis = 0)
+        globalFootAngles_mean_std[trial]['std'] = np.std(data, axis = 0)
+
+    with open('Gait_data_statistics_incExp/globalFootAngles_mean_std.pickle', 'wb') as file:
+        pickle.dump(globalFootAngles_mean_std, file)
     
-        #plt.figure(trial)
-        #plt.plot(range(150), data.T, 'k-', alpha = 0.2)
-        #plt.plot(range(150), data_mean_std[trial]['mean'])
-        #plt.plot(range(150), data_mean_std[trial]['mean'] + 3 * data_mean_std[trial]['std'])
-        #plt.plot(range(150), data_mean_std[trial]['mean'] - 3 * data_mean_std[trial]['std'])
-        #plt.grid()
-        #plt.show()
+    with open('Gait_training_data_incExp/globalFootAngles_offsetted.pickle', 'wb') as file:
+        pickle.dump(globalFootAngles, file)
+    
+    with open('Gait_training_data_incExp/globalFootAngles_offset.pickle', 'wb') as file:
+        pickle.dump(globalFootAngles_offset, file)
 
 if __name__ == '__main__':
+
+    globalFootAngle_statistics()
 
     #globalThighAngles_statistics()
     #derivedMeasurements_statistics()
     #jointAngles_statistics('knee')
     #jointAngles_statistics('ankle')
-    jointAngles_statistics('globalFoot')
+    #jointAngles_statistics('globalFoot')
     #ankleMoment_statistics()
     #tibiaForce_statistics()
 
     #gait_training_data_generator('kneeAngles')
     #gait_training_data_generator('ankleAngles')
-    gait_training_data_generator('globalFootAngles')
+    #gait_training_data_generator('globalFootAngles')
     #gait_training_data_generator('globalThighAngles')
     #gait_training_data_generator('globalThighVelocities')
     #gait_training_data_generator('atan2')

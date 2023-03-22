@@ -341,7 +341,7 @@ if __name__ == '__main__':
     
     phase_model = Fourier_Basis(11, 'phase')
     phase_dot_model = Polynomial_Basis(0, 'phase_dot')
-    step_length_model = Berstein_Basis(1,'step_length')
+    step_length_model = Berstein_Basis(2,'step_length')
     ramp_model = Berstein_Basis(2, 'ramp')
     model_globalThighAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_globalThighAngles = basis_model_fitting(model_globalThighAngles, 'globalThighAngles')
@@ -364,20 +364,20 @@ if __name__ == '__main__':
     ## 
     phase_model = Fourier_Basis(11, 'phase')
     phase_dot_model = Polynomial_Basis(1, 'phase_dot')
-    step_length_model = Berstein_Basis(1,'step_length')
+    step_length_model = Berstein_Basis(2,'step_length')
     ramp_model = Berstein_Basis(2, 'ramp')
     model_globalThighVelocities = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     #psi_globalThighVelocities = basis_model_fitting(model_globalThighVelocities, 'globalThighVelocities')
-    basis_model_residuals(model_globalThighVelocities, 'globalThighVelocities', heteroscedastic = False)
+    #basis_model_residuals(model_globalThighVelocities, 'globalThighVelocities', heteroscedastic = False)
     
     ##
     phase_model = Fourier_Basis(11, 'phase')
     phase_dot_model = Polynomial_Basis(0, 'phase_dot')
-    step_length_model = Berstein_Basis(1,'step_length')
-    ramp_model = Berstein_Basis(1, 'ramp')
+    step_length_model = Berstein_Basis(0,'step_length')
+    ramp_model = Berstein_Basis(2, 'ramp')
     model_globalFootAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
-    #psi_globalFootAngles = basis_model_fitting(model_globalFootAngles, 'globalFootAngles')
-    #basis_model_residuals(model_globalFootAngles, 'globalFootAngles', heteroscedastic = False)
+    psi_globalFootAngles = basis_model_fitting(model_globalFootAngles, 'globalFootAngles')
+    basis_model_residuals(model_globalFootAngles, 'globalFootAngles', heteroscedastic = False)
 
     # Atan2 fitting
     phase_model = Fourier_Basis(11, 'phase')
@@ -388,7 +388,7 @@ if __name__ == '__main__':
     #psi_atan2 = basis_model_fitting(model_atan2, 'atan2')
     #basis_model_residuals(model_atan2, 'atan2', heteroscedastic = False)
 
-    # sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2, 'globalFootAngles':3, 'ankleMoment':4, 'tibiaForce':5}
+    ## Store measurement models
     m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities, model_atan2, model_globalFootAngles)
     model_saver(m_model, 'Measurement_model_globalThighAngles_globalThighVelocities_atan2_globalFootAngles.pickle')
 

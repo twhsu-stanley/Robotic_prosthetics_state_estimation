@@ -1,5 +1,6 @@
 from pickle import FALSE
 import numpy as np
+import seaborn as sns
 import time
 import matplotlib.pyplot as plt
 from Filters.EKF import *
@@ -43,15 +44,15 @@ Psi = np.array([load_Psi()[key] for key in sensors], dtype = object)
 dt = 1/100
 initial_x = np.array([0, 0.8, 1.1, 0]) # mid-stance
 initial_Sigma = np.diag([1e-2, 1e-1, 1e-1, 1e-1])
-Q = np.array([[0, 0, 0, 0], [0, 5e-3, 0, 0], [0, 0, 6e-2, 0], [0, 0, 0, 1]]) * dt # 0, 1e-3, 1e-2, 1e-2
+Q = np.array([[0, 0, 0, 0], [0, 1e-3, 0, 0], [0, 0, 5e-2, 0], [0, 0, 0, 5]]) * dt # 0, 1e-3, 1e-2, 1e-2
 if using_atan2:
-    U = np.diag([2, 2, 2, 2])
+    U = np.diag([2, 1.5, 1, 1])
     R = U @ measurement_noise_covariance(*sensors) @ U.T
 else:
     R = measurement_noise_covariance(*sensors)
 
 # saturation_range = [phase_dots_max, phase_dots_min, step_lengths_max, step_lengths_min, ramp_max, ramp_min]
-saturation_range = np.array([1.5, 0.5, 2, 0.6, 11, -11])
+saturation_range = np.array([1.17, 0.59, 1.81, 0.82, 11, -11]) #[1.5, 0.5, 2, 0.6, 11, -11]
 
 # Stride in which kidnapping occurs
 kidnap_stride = 5
@@ -65,9 +66,9 @@ ramp_kidnap = np.random.uniform(-10, 10)
 state_kidnap = np.array([phase_kidnap, phase_dot_kidnap, step_length_kidnap, ramp_kidnap])
 
 # Roecover Criteria
-phase_recover_thr = 0.05
-step_length_recover_thr = 0.1
-ramp_recover_thr = 1
+phase_recover_thr = 0.08
+step_length_recover_thr = 0.2
+ramp_recover_thr = 2.5
 
 # for multi-filter plotting
 num_plots = 0
@@ -205,8 +206,8 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
     md = np.zeros(total_step)
     estimate_error = np.zeros((total_step, 4))
     
-    kneeAngle_kmd = np.zeros(total_step)
-    ankleAngle_kmd = np.zeros(total_step)
+    #kneeAngle_kmd = np.zeros(total_step)
+    #ankleAngle_kmd = np.zeros(total_step)
     
     time_0 = time.time()
     for i in range(total_step):
@@ -227,9 +228,9 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
             estimate_error[i, 0] = 1 + estimate_error[i, 0]
 
         ## Joints control commands 
-        joint_angles = joints_control(x[i,0], x[i,1], x[i,2], x[i,3])
-        kneeAngle_kmd[i] = joint_angles[0]
-        ankleAngle_kmd[i] = joint_angles[1]
+        #joint_angles = joints_control(x[i,0], x[i,1], x[i,2], x[i,3])
+        #kneeAngle_kmd[i] = joint_angles[0]
+        #ankleAngle_kmd[i] = joint_angles[1]
     
     time_per = (time.time() - time_0)/total_step * 1000
     print("Time per step (ms) =", time_per)
@@ -275,7 +276,7 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
         axs_est[1].fill_between(tt, x[:, 1]-3*std[:, 1], x[:, 1]+3*std[:, 1], color = clr, alpha=0.2)
         axs_est[1].set_ylabel('$\dot{\phi}~(1/s)$', fontsize = 14)
         axs_est[1].set_xlim([0, tt[-1]+0.1])
-        axs_est[1].set_ylim([-0.01, 1.5])
+        #axs_est[1].set_ylim([-0.01, 1.5])
         axs_est[1].tick_params(axis='both', labelsize=12)
         axs_est[1].grid(True)
         #plt.subplot(313)
@@ -628,7 +629,7 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
         axs_est[2].set_ylabel('$l$', fontsize = 14)
         axs_est[2].set_xlabel('time (s)', fontsize = 14)
         axs_est[2].set_xlim([0, tt[-1]+0.1])
-        axs_est[2].set_ylim([0, 2.01])
+        axs_est[2].set_ylim([0, 2.1])
         axs_est[2].tick_params(axis='both', labelsize=12)
         axs_est[2].grid(True)
         #
@@ -638,7 +639,7 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
         axs_est[3].set_ylabel('ramp (deg)', fontsize = 14)
         axs_est[3].set_xlabel('time (s)', fontsize = 14)
         axs_est[3].set_xlim([0, tt[-1]+0.1])
-        #axs_est[3].set_ylim([-15, 15])
+        axs_est[3].set_ylim([-12, 12])
         axs_est[3].tick_params(axis='both', labelsize=12)
         axs_est[3].grid(True)
         
@@ -730,24 +731,32 @@ def kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'
     SE_ramp_total = 0
     T_total = 0
 
+    # Store trials with large RMSEs
+    R_dict = dict()
+
     # Skip trials with problematic measurements
     with open('Continuous_data_incExp/Measurements_with_Nan.pickle', 'rb') as file:
         nan_dict = pickle.load(file)
     
     for dataset in datasets: # datasets = ['inclineExp', 'Reznick']
+        R_dict[dataset] = dict()
         for subject in get_Continuous_subject_names(): 
+            R_dict[dataset][subject] = dict()
             for trial in get_Continuous_trial_names(subject):
                 if trial == 'subjectdetails':
                     continue
-                for side in ['left']:
+                R_dict[dataset][subject][trial] = dict()
+                for side in ['left']: #, 'right'
                     if dataset == 'inclineExp' and nan_dict[subject][trial][side] == False:
-                        print('inclineExp/' + subject + "/"+ trial + "/"+ side + ": Trial skipped!")
+                        print('inclineExp/' + subject + "/"+ trial + "/"+ side + ": trial skipped because of nans in measurements")
                         skipped_trials += 1
                         continue
-                    if dataset == 'inclineExp' and subject == 'AB05' and trial == 's0x8':
+                    if dataset == 'inclineExp' and subject == 'AB05' and ('s0x8' in trial):
+                        print('inclineExp/' + subject + "/"+ trial + "/"+ side + ": AB05 s0x8 trial skipped because of abnormal measurements")
                         skipped_trials += 1
                         continue
-                    if dataset == 'Reznick' and (((subject == 'AB08' or subject == 'AB04' or subject == 'AB07' or subject == 'AB09') and trial == 's0x8') or subject == 'AB10'):
+                    if dataset == 'Reznick' and (((subject == 'AB08' or subject == 'AB04' or subject == 'AB07' or subject == 'AB09') and 's0x8' in trial) or subject == 'AB10'):
+                        print('Reznick/' + subject + "/"+ trial + "/"+ side + ": trial skipped because of abnormal measurements")
                         skipped_trials += 1
                         continue
                     
@@ -772,8 +781,13 @@ def kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'
                                 "|| R_33 = %4.1f %%" % (robustness_33 / total_trials),
                                 "|| R_35 = %4.1f %%" % (robustness_35 / total_trials),
                                 "|| R_55 = %4.1f %%" % (robustness_55 / total_trials))
+                            R_dict[dataset][subject][trial][side] = np.array([R_11, R_13, R_15, R_33, R_35, R_55])
+                    
                     else:
                         (SE_phase, SE_phase_dot, SE_step_length, SE_ramp, T) = kf_test(dataset, subject, trial, side, kalman_filter)
+
+                        R_dict[dataset][subject][trial][side] = np.array([np.sqrt(SE_phase/T), np.sqrt(SE_phase_dot/T),np.sqrt(SE_step_length/T), np.sqrt(SE_ramp/T)])
+
                         if np.sqrt(SE_phase/T) < 0.1:
                             SE_phase_total += SE_phase
                             SE_phase_dot_total += SE_phase_dot
@@ -781,11 +795,11 @@ def kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'
                             SE_ramp_total += SE_ramp
                             T_total += T
 
-                        #print("Current RMSE phase = %5.3f" % np.sqrt(SE_phase_total/T_total))
-                        #print("Current RMSE phase_dot= %5.3f" % np.sqrt(SE_phase_dot_total/T_total))
-                        #print("Current RMSE step_length = %5.3f" % np.sqrt(SE_step_length_total/T_total))
-                        #print("Current RMSE ramp = %5.3f" % np.sqrt(SE_ramp_total/T_total))
-                        #print("----------------------------------------------------------------")
+                        print("Current RMSE phase = %5.3f" % np.sqrt(SE_phase_total/T_total))
+                        print("Current RMSE phase_dot= %5.3f" % np.sqrt(SE_phase_dot_total/T_total))
+                        print("Current RMSE step_length = %5.3f" % np.sqrt(SE_step_length_total/T_total))
+                        print("Current RMSE ramp = %5.3f" % np.sqrt(SE_ramp_total/T_total))
+                        print("----------------------------------------------------------------")
 
     if kidnap != False:
         robustness_11 = robustness_11 / total_trials
@@ -805,17 +819,111 @@ def kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'
         print("Total trials = %d" % total_trials)
         print("Skipped trials = %d" % skipped_trials)
 
+        R_dict[dataset]['R11'] = robustness_11
+        R_dict[dataset]['R13'] = robustness_13
+        R_dict[dataset]['R15'] = robustness_15
+        R_dict[dataset]['R33'] = robustness_33
+        R_dict[dataset]['R35'] = robustness_35
+        R_dict[dataset]['R55'] = robustness_55
+
+        # TODO: move this to some other folder
+        with open('Filters/'+kalman_filter+'_Robustness_data.pickle', 'wb') as file:
+            pickle.dump(R_dict, file)
+
     else:
         print("Total RMSE phase = %5.3f" % np.sqrt(SE_phase_total/T_total))
         print("Total RMSE phase_dot = %5.3f" % np.sqrt(SE_phase_dot_total/T_total))
         print("Total RMSE step_length = %5.3f" % np.sqrt(SE_step_length_total/T_total))
         print("Total RMSE ramp = %5.3f" % np.sqrt(SE_ramp_total/T_total))
 
+        R_dict[dataset]['RMSE_phase'] = np.sqrt(SE_phase_total/T_total)
+        R_dict[dataset]['RMSE_phase_dot'] = np.sqrt(SE_phase_dot_total/T_total)
+        R_dict[dataset]['RMSE_step_length'] = np.sqrt(SE_step_length_total/T_total)
+        R_dict[dataset]['RMSE_ramp'] = np.sqrt(SE_ramp_total/T_total)
+        
+        # TODO: move this to some other folder
+        with open('Filters/'+kalman_filter+'_RMSE_data.pickle', 'wb') as file:
+            pickle.dump(R_dict, file)
+
+def plot_kf_robustness_heatmap(kalman_filter = 'ekf'):
+    
+    with open('Filters/'+kalman_filter+'_RMSE_data.pickle', 'rb') as file:
+        RMSE_data = pickle.load(file)
+
+    with open('Filters/'+kalman_filter+'_Robustness_data.pickle',  'rb') as file:
+        Robustness_data = pickle.load(file)  
+
+    subjects = list(RMSE_data['inclineExp'].keys())[0:10]
+    trials = list(RMSE_data['inclineExp']['AB01'].keys())
+    RMSE_phase_map = np.zeros((len(subjects), len(trials)))
+    RMSE_phase_dot_map = np.zeros((len(subjects), len(trials)))
+    RMSE_step_length_map = np.zeros((len(subjects), len(trials)))
+    RMSE_ramp_map = np.zeros((len(subjects), len(trials)))
+    R11_map = np.zeros((len(subjects), len(trials)))
+    R13_map = np.zeros((len(subjects), len(trials)))
+    R33_map = np.zeros((len(subjects), len(trials)))
+    for ks in range(len(subjects)):
+        for kt in range(len(trials)):
+            try:
+                RMSE_phase_map[ks, kt] = RMSE_data['inclineExp'][subjects[ks]][trials[kt]]['left'][0]
+            except:
+                RMSE_phase_map[ks, kt] = np.NAN
+            try:
+                RMSE_phase_dot_map[ks, kt] = RMSE_data['inclineExp'][subjects[ks]][trials[kt]]['left'][1]
+            except:
+                RMSE_phase_dot_map[ks, kt] = np.NAN
+            try:
+                RMSE_step_length_map[ks, kt] = RMSE_data['inclineExp'][subjects[ks]][trials[kt]]['left'][2]
+            except:
+                RMSE_step_length_map[ks, kt] = np.NAN
+            try:
+                RMSE_ramp_map[ks, kt] = RMSE_data['inclineExp'][subjects[ks]][trials[kt]]['left'][3]
+            except:
+                RMSE_ramp_map[ks, kt] = np.NAN
+            #
+            try:
+                R11_map[ks, kt] = Robustness_data['inclineExp'][subjects[ks]][trials[kt]]['left'][0]
+            except:
+                R11_map[ks, kt] = np.NAN
+            try:
+                R13_map[ks, kt] = Robustness_data['inclineExp'][subjects[ks]][trials[kt]]['left'][1]
+            except:
+                R13_map[ks, kt] = np.NAN
+            try:
+                R33_map[ks, kt] = Robustness_data['inclineExp'][subjects[ks]][trials[kt]]['left'][3]
+            except:
+                R33_map[ks, kt] = np.NAN
+    
+    plt.figure()
+    sns.heatmap(RMSE_phase_map, annot = True, fmt=".2f", xticklabels = trials, yticklabels = subjects[0:9])
+    plt.title('RMSE_phase_map; RMSE = %1.2f' % RMSE_data['inclineExp']['RMSE_phase'])
+    plt.figure()
+    sns.heatmap(RMSE_phase_dot_map, annot = True, fmt=".2f", xticklabels = trials, yticklabels = subjects[0:9])
+    plt.title('RMSE_phase_dot_map; RMSE = %1.2f' % RMSE_data['inclineExp']['RMSE_phase_dot'])
+    plt.figure()
+    sns.heatmap(RMSE_step_length_map, annot = True, fmt=".2f", xticklabels = trials, yticklabels = subjects[0:9])
+    plt.title('RMSE_step_length_map; RMSE = %1.2f' % RMSE_data['inclineExp']['RMSE_step_length'])
+    plt.figure()
+    sns.heatmap(RMSE_ramp_map, annot = True, fmt=".2f", xticklabels = trials, yticklabels = subjects[0:9])
+    plt.title('RMSE_ramp_map; RMSE = %1.2f' % RMSE_data['inclineExp']['RMSE_ramp'])
+    plt.figure()
+    sns.heatmap(R11_map, annot = True, xticklabels = trials, yticklabels = subjects[0:9])
+    plt.title('R11_map; average = %2.2f' % Robustness_data['inclineExp']['R11'])
+    plt.figure()
+    sns.heatmap(R13_map, annot = True, xticklabels = trials, yticklabels = subjects[0:9])
+    plt.title('R13_map; average = %2.2f' % Robustness_data['inclineExp']['R13'])
+    plt.figure()
+    sns.heatmap(R33_map, annot = True, xticklabels = trials, yticklabels = subjects[0:9])
+    plt.title('R33_map; average = %2.2f' % Robustness_data['inclineExp']['R33'])
+    plt.show()
+
 if __name__ == '__main__':
+    #plot_kf_robustness_heatmap()
+
     dataset = 'inclineExp'
 
-    subject = 'AB01'
-    trial = 's0x8d10'
+    subject = 'AB03'
+    trial = 's1d7x5'
     side = 'left'
 
     #if nan_dict[subject][trial][side] == False:
@@ -836,6 +944,7 @@ if __name__ == '__main__':
 
     #kf_robustness(kidnap = True, kalman_filter = 'ukf', datasets = 'inclineExp')
     #print(" ==================== ")
+    #kf_robustness(kidnap = False, kalman_filter = 'ekf', datasets = ['inclineExp'])
     #kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'])
 
     # Q=[0, 1e-3, 1e-3]

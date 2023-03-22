@@ -32,9 +32,9 @@ def phase_error(phase_est, phase_truth):
             phase_error[i] = 1 - abs(phase_est[i] - phase_truth[i])
     return phase_error
 
-def joints_control(phases, phase_dots, step_lengths, ramps):
-    joint_angles = c_model.evaluate_h_func([Psi_knee, Psi_ankle], phases, phase_dots, step_lengths, ramps)
-    return joint_angles
+#def joints_control(phases, phase_dots, step_lengths, ramps):
+#    joint_angles = c_model.evaluate_h_func([Psi_knee, Psi_ankle], phases, phase_dots, step_lengths, ramps)
+#    return joint_angles
     
 class myStruct:
     pass
@@ -58,11 +58,12 @@ class extended_kalman_filter:
         self.saturation_range = system.saturation_range
         self.reset = system.reset
         self.adapt = system.adapt
-        fc = 0.2
-        self.a = 2 * np.pi * 0.01 * fc / (2 * np.pi * 0.01 * fc + 1) # forgetting factor for averaging
+        #fc = 0.2
+        #self.a = 2 * np.pi * 0.01 * fc / (2 * np.pi * 0.01 * fc + 1) # forgetting factor for averaging
 
         self.x = init.x  # state mean
         self.Sigma = init.Sigma  # state covariance
+        self.x_init = init.x
 
         self.MD_square = 0
 
@@ -113,12 +114,16 @@ class extended_kalman_filter:
         self.x[0] = warpToOne(self.x[0])
         self.Sigma = (np.eye(np.size(self.x)) - K @ H) @ self.Sigma
 
-        if self.reset == True and self.MD_square > 20:
-            self.x = np.array([0.5, 0.8, 1.1, 0]) # mid-stance
+        if self.reset == True and self.MD_square > 16: #20:
+            #self.x = np.array([0.5, 0.8, 1.1, 0]) # previous state or mid-stance
+            self.x = np.array([0.3, 0.8, 1.1, self.x_init[3]])
             self.Sigma = np.diag([1e-2, 1e-1, 1e-1, 1e-1])
 
         if self.saturation == True:
             self.state_saturation(self.saturation_range)
+
+        # force ramp to be ground truth
+        #self.x[3] = self.x_init[3]
 
     def state_saturation(self, saturation_range):
         phase_dots_max = saturation_range[0]
