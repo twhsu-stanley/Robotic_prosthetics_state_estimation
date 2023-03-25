@@ -231,10 +231,29 @@ def get_Continuous_atan2_scale_shift(subject, trial, side, plot = True):
         plt.grid()
 
         plt.figure("Atan2 phase plane")
-        plt.plot(phase_x, phase_y, 'k-', linewidth = 2)
+        plt.plot(phase_x[2000:3000], phase_y[2000:3000], linewidth = 2)
         plt.xlabel('X')
         plt.ylabel('Y')
         plt.grid()
+
+        phases, _, _, _ = get_Continuous_state_vars(subject, trial, side)
+        idx_start = int(heel_strike_index[5])
+        idx_end = int(heel_strike_index[10]) + 1
+        tt = 0.01 * np.arange(idx_end - idx_start)
+        fig, ax1 = plt.subplots()
+        color = 'tab:blue'
+        ax1.set_xlabel('time (s)')
+        ax1.set_ylabel('atan2')
+        ax1.plot(tt, atan2[idx_start:idx_end], color=color)
+        ax1.tick_params(axis='y', labelcolor=color)
+        ax1.grid(True)
+        ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+        color = 'k'
+        ax2.set_ylabel('phase', color=color)  # we already handled the x-label with ax1
+        ax2.plot(tt, phases[idx_start:idx_end], '--', color=color)
+        ax2.tick_params(axis='y', labelcolor=color)
+        
+        fig.tight_layout()  # otherwise the right y-label is slightly clipped
         plt.show()
 
 def plot_Continuous_measurement_data(subject, trial, side):
@@ -621,13 +640,13 @@ if __name__ == '__main__':
     #get_globalFootAngle_offset()
     #store_Continuous_globalThighAngles()
 
-    subject = 'AB03'
-    trial = 's1d7x5'
+    subject = 'AB10'
+    trial = 's1x2i0'
     side = 'left'
 
     #get_Continuous_measurement_data(subject, trial, side)
-    plot_Continuous_measurement_data(subject, trial, side)
+    #plot_Continuous_measurement_data(subject, trial, side)
 
-    #get_Continuous_atan2_scale_shift(subject, trial, side, plot = True)
+    get_Continuous_atan2_scale_shift(subject, trial, side, plot = True)
     #plot_Continuous_kinetics_data(subject, trial, side)
     #plot_Continuous_joints_angles(subject, trial, side)
