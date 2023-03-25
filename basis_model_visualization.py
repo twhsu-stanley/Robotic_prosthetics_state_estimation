@@ -42,7 +42,7 @@ ramp_training = np.vstack((ramp_training, gait_training_dataset['ramp']))
 
 ## A. Visualize Measurement Model w.r.t. phase_dot ===========================================================================
 phases = np.linspace(0, 1, num = 50)
-phase_dots = np.linspace(0.5, 1.2, num = 50)
+phase_dots = np.linspace(0.55, 1.2, num = 50)
 step_lengths = 1.3
 ramps = 0
 
@@ -61,8 +61,11 @@ fig = plt.figure()
 X, Y = np.meshgrid(phases, phase_dots)
 ax = plt.axes(projection='3d')
 for p in range(np.shape(data_training)[0]):
-    if p % 10 == 0:
-        ax.plot(phase_training[p,:], phase_dot_training[p,:], data_training[p,:], 'r')
+    if p % 40 == 0:
+        if sensors[sensor_id] == 'globalThighVelocities' and np.any(data_training[p,50:80] > 0):
+            continue
+        else:
+            ax.plot(phase_training[p,:], phase_dot_training[p,:], data_training[p,:], 'r', alpha = 0.4)
 ax.plot_surface(X, Y, measurement.T, alpha = 0.7)
 ax.set_xlabel('$\phi$', fontsize = 14)
 ax.set_ylabel('$\dot{\phi}$ (1/s)', fontsize = 14)
@@ -89,8 +92,11 @@ fig = plt.figure()
 X, Y = np.meshgrid(phases, step_lengths)
 ax2 = plt.axes(projection='3d')
 for p in range(np.shape(data_training)[0]):
-    if p % 10 == 0:
-        ax2.plot(phase_training[p,:], step_length_training[p,:], data_training[p,:], 'r')
+    if p % 40 == 0:
+        if sensors[sensor_id] == 'globalThighVelocities' and np.any(data_training[p,50:80] > 0):
+            continue
+        else:
+            ax2.plot(phase_training[p,:], step_length_training[p,:], data_training[p,:], 'r', alpha = 0.4)
 ax2.plot_surface(X, Y, measurement.T, alpha = 0.7)
 ax2.set_xlabel('$\phi$', fontsize = 14)
 ax2.set_ylabel('$l$', fontsize = 14)
@@ -115,12 +121,15 @@ for i in range(len(phases)):
 
 fig = plt.figure()
 X, Y = np.meshgrid(phases, ramps)
-ax2 = plt.axes(projection='3d')
+ax3 = plt.axes(projection='3d')
 for p in range(np.shape(data_training)[0]):
-    if p % 10 == 0:
-        ax2.plot(phase_training[p,:], ramp_training[p,:], data_training[p,:], 'r')
-ax2.plot_surface(X, Y, measurement.T, alpha = 0.7)
-ax2.set_xlabel('$\phi$', fontsize = 14)
-ax2.set_ylabel('$r$  (deg)', fontsize = 14)
-ax2.set_zlabel(sensors[sensor_id], fontsize = 14)
+    if p % 40 == 0:
+        if sensors[sensor_id] == 'globalThighVelocities' and np.any(data_training[p,50:80] > 0):
+            continue
+        else:
+            ax3.plot(phase_training[p,:], ramp_training[p,:], data_training[p,:], 'r', alpha = 0.4)
+ax3.plot_surface(X, Y, measurement.T, alpha = 0.7)
+ax3.set_xlabel('$\phi$', fontsize = 14)
+ax3.set_ylabel('$r$  (deg)', fontsize = 14)
+ax3.set_zlabel(sensors[sensor_id], fontsize = 14)
 plt.show()
