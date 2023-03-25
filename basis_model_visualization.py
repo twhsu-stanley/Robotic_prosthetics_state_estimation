@@ -4,19 +4,25 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import StrMethodFormatter
 from mpl_toolkits import mplot3d
 from model_framework import *
-from Filters.EKF import wrapTo2pi, load_Psi
+from wrapping import *
+from load_Psi import *
 
+# Determine what sensors to be used
+sensors = ['globalThighAngles', 'globalThighVelocities' ,'atan2', 'globalFootAngles']
 
-# Determine which sensors to be used
-sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2']#,'globalFootAngles','ankleMoment', 'tibiaForce']
+sensor_id = 3
 
-sensor_id = 1
+# Load model
+model_name = "Measurement_model"
+for s in sensors:
+    model_name += ('_' + s)
+model_name += ".pickle"
+m_model = model_loader(model_name)
 
-m_model = model_loader('Measurement_model_012_NSL.pickle')
 Psi = np.array([load_Psi()[key] for key in sensors], dtype = object)
 
-# load training data
-with open(('Gait_training_data/' + sensors[sensor_id] + '_NSL_training_dataset.pickle'), 'rb') as file:
+# Load training data
+with open(('Gait_training_data_incExp/' + sensors[sensor_id] + '_training_dataset.pickle'), 'rb') as file:
     gait_training_dataset = pickle.load(file)
 data_training = gait_training_dataset['training_data']
 phase_training = gait_training_dataset['phase']
@@ -24,25 +30,27 @@ phase_dot_training = gait_training_dataset['phase_dot']
 step_length_training = gait_training_dataset['step_length']
 ramp_training = gait_training_dataset['ramp']
 
-with open(('Gait_training_R01data/' + sensors[sensor_id] + '_walking_NSL_training_dataset.pickle'), 'rb') as file:
+"""
+with open(('Gait_training_data_R01/' + sensors[sensor_id] + '_walking_training_dataset.pickle'), 'rb') as file:
     gait_training_dataset = pickle.load(file)
 data_training = np.vstack((data_training, gait_training_dataset['training_data']))
 phase_training = np.vstack((phase_training, gait_training_dataset['phase']))
 phase_dot_training = np.vstack((phase_dot_training, gait_training_dataset['phase_dot']))
 step_length_training = np.vstack((step_length_training, gait_training_dataset['step_length']))
 ramp_training = np.vstack((ramp_training, gait_training_dataset['ramp']))
+"""
 
 ## A. Visualize Measurement Model w.r.t. phase_dot ===========================================================================
 phases = np.linspace(0, 1, num = 50)
-phase_dots = np.linspace(0, 1.1, num = 50)
-step_lengths = 1.5
+phase_dots = np.linspace(0.5, 1.2, num = 50)
+step_lengths = 1.3
 ramps = 0
 
 measurement = np.zeros((len(phases), len(phase_dots)))
 
 for i in range(len(phases)):
     for j in range(len(phase_dots)):
-        z = m_model.evaluate_h_func(Psi, phases[i], phase_dots[j], step_lengths)
+        z = m_model.evaluate_h_func(Psi, phases[i], phase_dots[j], step_lengths, ramps)
         if sensors[sensor_id] == 'atan2':
             measurement[i,j] = z[sensor_id] + 2*np.pi*phases[i]
             measurement[i,j] = wrapTo2pi(measurement[i,j])
@@ -57,24 +65,20 @@ for p in range(np.shape(data_training)[0]):
         ax.plot(phase_training[p,:], phase_dot_training[p,:], data_training[p,:], 'r')
 ax.plot_surface(X, Y, measurement.T, alpha = 0.7)
 ax.set_xlabel('$\phi$', fontsize = 14)
-ax.set_ylabel('$\dot{\phi}$', fontsize = 14)
-if sensor_id == 0:
-    ax.set_zlabel('$\\theta_{th}$', fontsize = 14)
-elif sensor_id == 1:
-    ax.set_zlabel('$\dot{\\theta}_{th}$', fontsize = 14)
-# ==========================================================================================================================
+ax.set_ylabel('$\dot{\phi}$ (1/s)', fontsize = 14)
+ax.set_zlabel(sensors[sensor_id], fontsize = 14)
 
 ## B. Visualize Measurement Model w.r.t. stpe_length ===========================================================================
 phases = np.linspace(0, 1, num = 50)
-phase_dots = 1
-step_lengths = np.linspace(0, 2, num = 50)
+phase_dots = 0.85
+step_lengths = np.linspace(0.8, 2, num = 50)
 ramps = 0
 
 measurement = np.zeros((len(phases), len(step_lengths)))
 
 for i in range(len(phases)):
     for j in range(len(step_lengths)):
-        z = m_model.evaluate_h_func(Psi, phases[i], phase_dots, step_lengths[j])#, ramps
+        z = m_model.evaluate_h_func(Psi, phases[i], phase_dots, step_lengths[j], ramps)
         if sensors[sensor_id] == 'atan2':
             measurement[i,j] = z[sensor_id] + 2*np.pi*phases[i]
             measurement[i,j] = wrapTo2pi(measurement[i,j])
@@ -83,119 +87,40 @@ for i in range(len(phases)):
 
 fig = plt.figure()
 X, Y = np.meshgrid(phases, step_lengths)
-ax = plt.axes(projection='3d')
+ax2 = plt.axes(projection='3d')
 for p in range(np.shape(data_training)[0]):
     if p % 10 == 0:
-        ax.plot(phase_training[p,:], step_length_training[p,:], data_training[p,:], 'r')
-ax.plot_surface(X, Y, measurement.T, alpha = 0.7)
-ax.set_xlabel('$\phi$', fontsize = 14)
-ax.set_ylabel('$l$', fontsize = 14)
-if sensor_id == 0:
-    ax.set_zlabel('$\\theta_{th}$', fontsize = 14)
-elif sensor_id == 1:
-    ax.set_zlabel('$\dot{\\theta}_{th}$', fontsize = 14)
+        ax2.plot(phase_training[p,:], step_length_training[p,:], data_training[p,:], 'r')
+ax2.plot_surface(X, Y, measurement.T, alpha = 0.7)
+ax2.set_xlabel('$\phi$', fontsize = 14)
+ax2.set_ylabel('$l$', fontsize = 14)
+ax2.set_zlabel(sensors[sensor_id], fontsize = 14)
 
-## C. Visualize Measurement Model w.r.t. phase_dot & stpe_length ===========================================================================
-if sensors[sensor_id] != 'atan2':
-    phases = 0.3
-    phase_dots = np.linspace(0, 1.5, num = 50)
-    step_lengths = np.linspace(0, 2, num = 50)
-    ramps = 0
-
-    measurement = np.zeros((len(phase_dots), len(step_lengths)))
-
-    for i in range(len(phase_dots)):
-        for j in range(len(step_lengths)):
-            z = m_model.evaluate_h_func(Psi, phases, phase_dots[i], step_lengths[j], ramps)
-            measurement[i,j] = z[sensor_id]
-
-    fig = plt.figure()
-    X, Y = np.meshgrid(phase_dots, step_lengths)
-    ax = plt.axes(projection='3d')
-    ax.plot_surface(X, Y, measurement.T)
-    #for p in range(np.shape(data_training)[0]):
-    #    ax.plot(phase_dot_training[p,:], step_length_training[p,:], data_training[p,:], 'r')
-    ax.set_xlabel('phase_dot')
-    ax.set_ylabel('step_length')
-# ==========================================================================================================================
-
-# Visualization of joint models
-
-c_model = model_loader('Control_model_NSL_B20.pickle')
-with open('Psi/Psi_kneeAngles_NSL_B20_const.pickle', 'rb') as file:#_withoutNan
-    Psi_knee = pickle.load(file)
-with open('Psi/Psi_ankleAngles_NSL_B20_const.pickle', 'rb') as file:
-    Psi_ankle = pickle.load(file)
-## C. Visualize Joint Model w.r.t. step_length ===============================================================================================
+## C. Visualize Measurement Model w.r.t. ramp angle ===========================================================================
 phases = np.linspace(0, 1, num = 50)
-phase_dots = 0.8
-step_lengths = np.linspace(0, 1.8, num = 50)
-ramps = 0
+phase_dots = 0.85
+step_lengths = 1.3 
+ramps = np.linspace(-10, 10, num = 50)
 
-knee_angle_model = np.zeros((len(phases), len(step_lengths)))
-ankle_angle_model = np.zeros((len(phases), len(step_lengths)))
+measurement = np.zeros((len(phases), len(ramps)))
 
 for i in range(len(phases)):
-    for j in range(len(step_lengths)):
-        joint_angles = c_model.evaluate_h_func([Psi_knee, Psi_ankle], phases[i], phase_dots, step_lengths[j], ramps)
-        knee_angle_model[i,j] = joint_angles[0]
-        ankle_angle_model[i,j] = joint_angles[1]
-        
-with open(('Gait_training_data/ankleAngles_NSL_training_dataset.pickle'), 'rb') as file:
-    gait_training_dataset = pickle.load(file)
-data_training = gait_training_dataset['training_data']
-phase_training = gait_training_dataset['phase']
-phase_dot_training = gait_training_dataset['phase_dot']
-step_length_training = gait_training_dataset['step_length']
-ramp_training = gait_training_dataset['ramp']
-
-with open(('Gait_training_R01data/ankleAngles_walking_NSL_training_dataset.pickle'), 'rb') as file:
-    gait_training_dataset = pickle.load(file)
-data_training = np.vstack((data_training, gait_training_dataset['training_data']))
-phase_training = np.vstack((phase_training, gait_training_dataset['phase']))
-phase_dot_training = np.vstack((phase_dot_training, gait_training_dataset['phase_dot']))
-step_length_training = np.vstack((step_length_training, gait_training_dataset['step_length']))
-ramp_training = np.vstack((ramp_training, gait_training_dataset['ramp']))
+    for j in range(len(ramps)):
+        z = m_model.evaluate_h_func(Psi, phases[i], phase_dots, step_lengths, ramps[j])
+        if sensors[sensor_id] == 'atan2':
+            measurement[i,j] = z[sensor_id] + 2*np.pi*phases[i]
+            measurement[i,j] = wrapTo2pi(measurement[i,j])
+        else:
+            measurement[i,j] = z[sensor_id]
 
 fig = plt.figure()
-X, Y = np.meshgrid(phases, step_lengths)
-ax = plt.axes(projection='3d')
+X, Y = np.meshgrid(phases, ramps)
+ax2 = plt.axes(projection='3d')
 for p in range(np.shape(data_training)[0]):
     if p % 10 == 0:
-        ax.plot(phase_training[p,:], step_length_training[p,:], data_training[p,:], 'r')
-ax.plot_surface(X, Y, ankle_angle_model.T, alpha = 0.7)
-ax.set_xlabel('$\phi$', fontsize = 14)
-ax.set_ylabel('$l$', fontsize = 14)
-ax.set_zlabel('$\\theta_{a}$', fontsize = 14)
-ax.set_zlim(-20,40)
-
-
-with open(('Gait_training_data/kneeAngles_NSL_training_dataset.pickle'), 'rb') as file:
-    gait_training_dataset = pickle.load(file)
-data_training = gait_training_dataset['training_data']
-phase_training = gait_training_dataset['phase']
-phase_dot_training = gait_training_dataset['phase_dot']
-step_length_training = gait_training_dataset['step_length']
-ramp_training = gait_training_dataset['ramp']
-
-with open(('Gait_training_R01data/kneeAngles_walking_NSL_training_dataset.pickle'), 'rb') as file:
-    gait_training_dataset = pickle.load(file)
-data_training = np.vstack((data_training, gait_training_dataset['training_data']))
-phase_training = np.vstack((phase_training, gait_training_dataset['phase']))
-phase_dot_training = np.vstack((phase_dot_training, gait_training_dataset['phase_dot']))
-step_length_training = np.vstack((step_length_training, gait_training_dataset['step_length']))
-ramp_training = np.vstack((ramp_training, gait_training_dataset['ramp']))
-
-fig = plt.figure()
-X, Y = np.meshgrid(phases, step_lengths)
-ax = plt.axes(projection='3d')
-for p in range(np.shape(data_training)[0]):
-    if p % 10 == 0:
-        ax.plot(phase_training[p,:], step_length_training[p,:], data_training[p,:], 'r')
-ax.plot_surface(X, Y, knee_angle_model.T, alpha = 0.7)
-ax.set_xlabel('$\phi$', fontsize = 14)
-ax.set_ylabel('$l$', fontsize = 14)
-ax.set_zlabel('$\\theta_{k}$', fontsize = 14)
-#==============================================================================================================================
-
+        ax2.plot(phase_training[p,:], ramp_training[p,:], data_training[p,:], 'r')
+ax2.plot_surface(X, Y, measurement.T, alpha = 0.7)
+ax2.set_xlabel('$\phi$', fontsize = 14)
+ax2.set_ylabel('$r$  (deg)', fontsize = 14)
+ax2.set_zlabel(sensors[sensor_id], fontsize = 14)
 plt.show()

@@ -2,14 +2,14 @@ from matplotlib import interactive
 import numpy as np
 import matplotlib.pyplot as plt
 from model_framework import *
-from Filters.EKF import load_Psi
+from load_Psi import load_Psi 
 import time
 
 
 def phase_lookup_table(plot = False):
     ## Create a lookup table that mpas global thigh angles to phases
     #  at normalized_stride_length = 1.5
-    m_model = model_loader('Measurement_model_012_NSL.pickle')
+    m_model = model_loader('Measurement_model_globalThighAngles_globalThighVelocities_atan2_globalFootAngles.pickle')
     Psi = load_Psi()
 
     res = 1000

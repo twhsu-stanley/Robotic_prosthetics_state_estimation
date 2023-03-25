@@ -346,7 +346,7 @@ if __name__ == '__main__':
     ramp_model = Berstein_Basis(2, 'ramp')
     model_globalThighAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     psi_globalThighAngles = basis_model_fitting(model_globalThighAngles, 'globalThighAngles')
-    basis_model_residuals(model_globalThighAngles, 'globalThighAngles', heteroscedastic = False)
+    #basis_model_residuals(model_globalThighAngles, 'globalThighAngles', heteroscedastic = False)
 
     #model_ankleMoment = Kronecker_Model(phase_model, phase_dot_model, step_length_model)#, ramp_model)
     #psi_ankleMoment = basis_model_fitting(model_ankleMoment, 'ankleMoment')
@@ -369,7 +369,7 @@ if __name__ == '__main__':
     ramp_model = Berstein_Basis(2, 'ramp')
     model_globalThighVelocities = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     psi_globalThighVelocities = basis_model_fitting(model_globalThighVelocities, 'globalThighVelocities')
-    basis_model_residuals(model_globalThighVelocities, 'globalThighVelocities', heteroscedastic = False)
+    #basis_model_residuals(model_globalThighVelocities, 'globalThighVelocities', heteroscedastic = False)
     
     ##
     phase_model = Fourier_Basis(11, 'phase')
@@ -378,7 +378,7 @@ if __name__ == '__main__':
     ramp_model = Berstein_Basis(2, 'ramp')
     model_globalFootAngles = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     psi_globalFootAngles = basis_model_fitting(model_globalFootAngles, 'globalFootAngles')
-    basis_model_residuals(model_globalFootAngles, 'globalFootAngles', heteroscedastic = False)
+    #basis_model_residuals(model_globalFootAngles, 'globalFootAngles', heteroscedastic = False)
 
     # Atan2 fitting
     phase_model = Fourier_Basis(11, 'phase')
@@ -387,7 +387,7 @@ if __name__ == '__main__':
     ramp_model = Berstein_Basis(0, 'ramp')
     model_atan2 = Kronecker_Model(phase_model, phase_dot_model, step_length_model, ramp_model)
     psi_atan2 = basis_model_fitting(model_atan2, 'atan2')
-    basis_model_residuals(model_atan2, 'atan2', heteroscedastic = False)
+    #basis_model_residuals(model_atan2, 'atan2', heteroscedastic = False)
 
     ## Store measurement models
     m_model = Measurement_Model(model_globalThighAngles, model_globalThighVelocities, model_atan2, model_globalFootAngles)
