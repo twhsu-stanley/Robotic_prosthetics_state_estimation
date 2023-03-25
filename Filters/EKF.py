@@ -58,8 +58,6 @@ class extended_kalman_filter:
         self.saturation_range = system.saturation_range
         self.reset = system.reset
         self.adapt = system.adapt
-        #fc = 0.2
-        #self.a = 2 * np.pi * 0.01 * fc / (2 * np.pi * 0.01 * fc + 1) # forgetting factor for averaging
 
         self.x = init.x  # state mean
         self.Sigma = init.Sigma  # state covariance
@@ -121,9 +119,6 @@ class extended_kalman_filter:
 
         if self.saturation == True:
             self.state_saturation(self.saturation_range)
-
-        # force ramp to be ground truth
-        #self.x[3] = self.x_init[3]
 
     def state_saturation(self, saturation_range):
         phase_dots_max = saturation_range[0]

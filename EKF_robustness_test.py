@@ -16,13 +16,13 @@ import csv
 # Robustification mechanisms
 state_saturation = True
 adaptive_cov = False
-reset = True
+reset = False
 
 # Dictionary of all sensors
 sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2, 'globalFootAngles':3}
 
 # Determine what sensors to be used
-sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2', 'globalFootAngles']
+sensors = ['globalThighAngles', 'globalThighVelocities' ,'atan2', 'globalFootAngles'] #
 
 sensor_id = [sensors_dict[key] for key in sensors]
 
@@ -31,8 +31,6 @@ for s in sensors:
     model_name += ('_' + s)
 model_name += ".pickle"
 m_model = model_loader(model_name)
-#m_model = model_loader('Measurement_model_globalThighAngles_globalThighVelocities.pickle')
-#m_model = model_loader('Measurement_model_globalThighAngles_globalThighVelocities_globalFootAngles.pickle')
 #m_model = model_loader('Measurement_model_globalThighAngles_globalThighVelocities_atan2_globalFootAngles.pickle')
     
 using_atan2 = np.any(np.array(sensors) == 'atan2')
@@ -42,33 +40,35 @@ print("Using sensors:", sensors)
 Psi = np.array([load_Psi()[key] for key in sensors], dtype = object)
 
 dt = 1/100
-initial_x = np.array([0, 0.8, 1.1, 0]) # mid-stance
-initial_Sigma = np.diag([1e-2, 1e-1, 1e-1, 1e-1])
-Q = np.array([[0, 0, 0, 0], [0, 1e-3, 0, 0], [0, 0, 5e-2, 0], [0, 0, 0, 5]]) * dt # 0, 1e-3, 1e-2, 1e-2
+
+# Filter settings
+initial_Sigma = np.diag([0.5, 2, 1, 5]) * 0.1 #np.diag([1e-2, 1e-1, 1e-1, 1e-1]) #
+Q_ekf = np.diag([0, 1e-3, 5e-2, 5]) * dt # np.diag[0, 1e-3, 5e-2, 5]
+Q_ukf = np.diag([1e-20, 1e-1, 5e-1, 5]) * dt  #np.diag([0, 1e-1, 5e-1, 5e-1]) * dt #
+
 if using_atan2:
-    U = np.diag([2, 1.5, 1, 1])
-    R = U @ measurement_noise_covariance(*sensors) @ U.T
+    U_ekf = np.diag([2, 1.5, 1, 1])
 else:
-    R = measurement_noise_covariance(*sensors)
+    U_ekf = np.diag([2, 1.5, 1])
+R_ekf = U_ekf @ measurement_noise_covariance(*sensors) @ U_ekf.T
+
+if using_atan2:
+    U_ukf = np.diag([2, 1.5, 1, 1])
+else:
+    U_ukf = np.diag([2, 1.5, 1])
+R_ukf = U_ukf @ measurement_noise_covariance(*sensors) @ U_ukf.T
 
 # saturation_range = [phase_dots_max, phase_dots_min, step_lengths_max, step_lengths_min, ramp_max, ramp_min]
-saturation_range = np.array([1.17, 0.59, 1.81, 0.82, 11, -11]) #[1.5, 0.5, 2, 0.6, 11, -11]
+saturation_range = np.array([1.17, 0.59, 1.81, 0.82, 11, -11])
 
 # Stride in which kidnapping occurs
-kidnap_stride = 5
-total_strides = 15
-
-kidnap_percent_gait = np.random.uniform(0, 1)
-phase_kidnap =  np.random.uniform(0, 1)
-phase_dot_kidnap = np.random.uniform(0, 5)
-step_length_kidnap = np.random.uniform(0, 2)
-ramp_kidnap = np.random.uniform(-10, 10)
-state_kidnap = np.array([phase_kidnap, phase_dot_kidnap, step_length_kidnap, ramp_kidnap])
+kidnap_stride = 2 # 5
+total_strides = 5 # 11
 
 # Roecover Criteria
-phase_recover_thr = 0.08
-step_length_recover_thr = 0.2
-ramp_recover_thr = 2.5
+phase_recover_thr = 0.08 #0.05 # 
+step_length_recover_thr = 0.15 #0.2 #
+ramp_recover_thr = 2.5 #2 #
 
 # for multi-filter plotting
 num_plots = 0
@@ -147,7 +147,7 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
     
     kneeAngle = kneeAngle[0 : total_step]
     ankleAngle = ankleAngle[0 : total_step]
-
+    
     z_full = np.array([globalThighAngle, globalThighVelocity, atan2, globalFootAngle])
     z = z_full[sensor_id, :]
     
@@ -158,8 +158,8 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
         sys.A = A
         sys.h = m_model
         sys.Psi = Psi
-        sys.Q = Q
-        sys.R = R
+        sys.Q = Q_ekf
+        sys.R = R_ekf
         sys.saturation = state_saturation
         sys.saturation_range = saturation_range
         sys.reset = reset
@@ -177,8 +177,8 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
         sys.f = process_model
         sys.h = m_model
         sys.Psi = Psi
-        sys.Q = Q
-        sys.R = R
+        sys.Q = Q_ukf
+        sys.R = R_ukf
         sys.alpha = 1
         sys.beta = 0
         sys.kappa = 0
@@ -195,6 +195,13 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
         exit("Select a filter to be used: EKF or UKF")
     
     if kidnap != False:
+        kidnap_percent_gait = np.random.uniform(0.05, 0.95)
+        phase_kidnap =  np.random.uniform(0, 1)
+        phase_dot_kidnap = np.random.uniform(0, 5)
+        step_length_kidnap = np.random.uniform(0, 2)
+        ramp_kidnap = np.random.uniform(-10, 10)
+        state_kidnap = np.array([phase_kidnap, phase_dot_kidnap, step_length_kidnap, ramp_kidnap])
+
         kidnap_index = int(heel_strike_index[kidnap_stride] +
                            kidnap_percent_gait* (heel_strike_index[kidnap_stride+1] - heel_strike_index[kidnap_stride]))
         print("state_kidnap = [%4.2f, %4.2f, %4.2f, %4.2f]" % (state_kidnap[0], state_kidnap[1], state_kidnap[2], state_kidnap[3]))
@@ -264,11 +271,11 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
             axs_est[0].plot(tt, phases, 'k-')
         axs_est[0].plot(tt, x[:, 0], color = clr, linestyle = 'dashed')
         axs_est[0].fill_between(tt, x[:, 0]-3*std[:, 0], x[:, 0]+3*std[:, 0], color = clr, alpha=0.2)
-        axs_est[0].legend(('ground truth', 'EKF estimates', 'UKF estimates'), fontsize = 14)
+        #axs_est[0].legend(('ground truth', 'estimates'), fontsize = 14)
         axs_est[0].set_ylabel('$\phi$', fontsize = 14)
-        axs_est[0].set_ylim([0, 2])
+        #axs_est[0].set_ylim([0, 1.2])
         axs_est[0].set_xlim([0, tt[-1]+0.1])
-        axs_est[0].tick_params(axis='both', labelsize=12)
+        axs_est[0].tick_params(axis='both', bottom=False, top=False,labelbottom=False)
         axs_est[0].grid(True)
         #plt.subplot(312)
         axs_est[1].plot(tt, phase_dots, 'k-')
@@ -277,23 +284,22 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
         axs_est[1].set_ylabel('$\dot{\phi}~(1/s)$', fontsize = 14)
         axs_est[1].set_xlim([0, tt[-1]+0.1])
         #axs_est[1].set_ylim([-0.01, 1.5])
-        axs_est[1].tick_params(axis='both', labelsize=12)
+        axs_est[1].tick_params(axis='both', bottom=False, top=False,labelbottom=False)
         axs_est[1].grid(True)
         #plt.subplot(313)
         axs_est[2].plot(tt, step_lengths, 'k-')
         axs_est[2].plot(tt, x[:, 2], color = clr, linestyle = 'dashed')
         axs_est[2].fill_between(tt, x[:, 2]-3*std[:, 2], x[:, 2]+3*std[:, 2], color = clr, alpha=0.2)
         axs_est[2].set_ylabel('$l$', fontsize = 14)
-        axs_est[2].set_xlabel('time (s)', fontsize = 14)
         axs_est[2].set_xlim([0, tt[-1]+0.1])
         #axs_est[2].set_ylim([-0.01, 2])
-        axs_est[2].tick_params(axis='both', labelsize=12)
+        axs_est[2].tick_params(axis='both', bottom=False, top=False,labelbottom=False)
         axs_est[2].grid(True)
 
         axs_est[3].plot(tt, ramps, 'k-')
         axs_est[3].plot(tt, x[:, 3], color = clr, linestyle = 'dashed')
         axs_est[3].fill_between(tt, x[:, 3]-3*std[:, 3], x[:, 3]+3*std[:, 3], color = clr, alpha=0.2)
-        axs_est[3].set_ylabel('$ramp$', fontsize = 14)
+        axs_est[3].set_ylabel('$r$ (deg)', fontsize = 14)
         axs_est[3].set_xlabel('time (s)', fontsize = 14)
         axs_est[3].set_xlim([0, tt[-1]+0.1])
         axs_est[3].set_ylim([-15, 15])
@@ -337,14 +343,16 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
         for i in range(len(sensors)):
             plt.subplot(int(str(len(sensors)) + "1" + str(i+1)))
             plt.plot(tt, z[i, :], 'k-')
-            plt.plot(tt, z_pred[:, i], 'r--')
+            plt.plot(tt, z_pred[:, i], '--', color = clr)
             plt.xlim([0, tt[-1]+0.1])
             plt.grid()
             if i == 0:
                 plt.title("Measurements")
-                plt.legend(('actual', 'predicted'))
+                #plt.legend(('actual', 'predicted'))
             elif i == len(sensors)-1:
                 plt.xlabel("time (s)")
+            if i < len(sensors)-1:
+                plt.tick_params(axis='x', which='both', bottom=False, top=False,labelbottom=False)
         """
         plt.figure()
         plt.title("Control Commands: Joint Angles")
@@ -446,8 +454,8 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
         sys.A = A
         sys.h = m_model
         sys.Psi = Psi
-        sys.Q = Q
-        sys.R = R
+        sys.Q = Q_ekf
+        sys.R = R_ekf
         sys.saturation = state_saturation
         sys.saturation_range = saturation_range
         sys.reset = reset
@@ -459,8 +467,8 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
         sys.f = process_model
         sys.h = m_model
         sys.Psi = Psi
-        sys.Q = Q
-        sys.R = R
+        sys.Q = Q_ukf
+        sys.R = R_ukf
         sys.alpha = 1
         sys.beta = 0
         sys.kappa = 0
@@ -468,8 +476,6 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
         sys.saturation_range = saturation_range
         sys.reset = reset
     
-    kidnap_index = int(heel_strike_index[kidnap_stride] +
-                        kidnap_percent_gait* (heel_strike_index[kidnap_stride+1] - heel_strike_index[kidnap_stride]))
     x = np.zeros((N+1, total_step, 4))  # state estimate
     #std = np.zeros((N+1, total_step, 3))  # state estimate std
     estimate_error = np.zeros((N+1, total_step, 4))
@@ -493,11 +499,15 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
             filter = unscented_kalman_filter(sys, init)
             clr = 'b'
         
+        kidnap_percent_gait = np.random.uniform(0.05, 0.95)
         phase_kidnap =  np.random.uniform(0, 1)
         phase_dot_kidnap = np.random.uniform(0, 5)
         step_length_kidnap = np.random.uniform(0, 2)
         ramp_kidnap = np.random.uniform(-10, 10)
         state_kidnap = np.array([phase_kidnap, phase_dot_kidnap, step_length_kidnap, ramp_kidnap])
+
+        kidnap_index = int(heel_strike_index[kidnap_stride] +
+                        kidnap_percent_gait* (heel_strike_index[kidnap_stride+1] - heel_strike_index[kidnap_stride]))
 
         for i in range(total_step):
             # kidnap
@@ -520,7 +530,10 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
             RMSE_phase = np.sqrt(SE_phase/T)
             if RMSE_phase > 0.1:
                 print("The filter gets lost in nominal case.")
-                return (np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN)
+                print("R_11(%) = ", 0, "|| R_13(%) = ", 0, "|| R_15(%) = ", 0, "|| R_33(%) = ", 0 , "|| R_35(%) = ", 0, "|| R_55(%) = ", 0)
+                print("---------------------------------------------------------------------------")
+                #return (np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN)
+                return (0, 0, 0, 0, 0, 0)
 
         if n > 0:
             idx_1 = int(heel_strike_index[kidnap_stride + 2])
@@ -607,11 +620,11 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
         elif kalman_filter == 'ukf': 
             axs_est[0].plot(tt,  x[0, :, 0].T, color = clr, linestyle = 'dashed', linewidth=2, label='UKF')
         axs_est[0].set_ylabel('$\phi$', fontsize = 14)
-        axs_est[0].legend( fontsize = 14)
+        #axs_est[0].legend( fontsize = 14)
         #plt.legend(('ground truth', 'estimate'), bbox_to_anchor=(1, 1.05))
-        axs_est[0].set_ylim([0, 2])
+        #axs_est[0].set_ylim([0, 2])
         axs_est[0].set_xlim([0, tt[-1]+0.1])
-        axs_est[0].tick_params(axis='both', labelsize=12)
+        axs_est[0].tick_params(axis='both', bottom=False, top=False,labelbottom=False)
         axs_est[0].grid(True)
         #plt.subplot(312)
         axs_est[1].plot(tt, phase_dots, 'k-', linewidth=2)
@@ -619,24 +632,23 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
         axs_est[1].plot(tt, x[0, :, 1].T, color = clr, linestyle = 'dashed', linewidth=2)
         axs_est[1].set_ylabel('$\dot{\phi}~(1/s)$', fontsize = 14)
         axs_est[1].set_xlim([0, tt[-1]+0.1])
-        axs_est[1].set_ylim([0, 2])
-        axs_est[1].tick_params(axis='both', labelsize=12)
+        #axs_est[1].set_ylim([0, 2])
+        axs_est[1].tick_params(axis='both', bottom=False, top=False,labelbottom=False)
         axs_est[1].grid(True)
         #plt.subplot(313)
         axs_est[2].plot(tt, step_lengths, 'k-', linewidth=2)
         axs_est[2].plot(tt, x[1:, :, 2].T, color = clr, linestyle = 'dashed', alpha = 0.3)
         axs_est[2].plot(tt, x[0, :, 2].T, color = clr, linestyle = 'dashed', linewidth=2)
         axs_est[2].set_ylabel('$l$', fontsize = 14)
-        axs_est[2].set_xlabel('time (s)', fontsize = 14)
         axs_est[2].set_xlim([0, tt[-1]+0.1])
-        axs_est[2].set_ylim([0, 2.1])
-        axs_est[2].tick_params(axis='both', labelsize=12)
+        #axs_est[2].set_ylim([0, 2.05])
+        axs_est[2].tick_params(axis='both', bottom=False, top=False,labelbottom=False)
         axs_est[2].grid(True)
         #
         axs_est[3].plot(tt, ramps, 'k-', linewidth=2)
         axs_est[3].plot(tt, x[1:, :, 3].T, color = clr, linestyle = 'dashed', alpha = 0.3)
         axs_est[3].plot(tt, x[0, :, 3].T, color = clr, linestyle = 'dashed', linewidth=2)
-        axs_est[3].set_ylabel('ramp (deg)', fontsize = 14)
+        axs_est[3].set_ylabel('r (deg)', fontsize = 14)
         axs_est[3].set_xlabel('time (s)', fontsize = 14)
         axs_est[3].set_xlim([0, tt[-1]+0.1])
         axs_est[3].set_ylim([-12, 12])
@@ -691,7 +703,7 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
         plt.plot(idx_1*dt*np.ones(5), np.linspace(0,2,5), 'k-', alpha = 0.4, linewidth=2)
         plt.plot(idx_3*dt*np.ones(5), np.linspace(0,2,5), 'b-', alpha = 0.4, linewidth=2)
         plt.plot(idx_5*dt*np.ones(5), np.linspace(0,2,5), 'r-', alpha = 0.4, linewidth=2)
-        plt.ylabel('$\Delta l$ (m)')
+        plt.ylabel('$\Delta l$')
         plt.xlim([0, tt[-1]+0.1])
         plt.grid()
         plt.subplot(414)
@@ -700,7 +712,7 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
         plt.plot(idx_1*dt*np.ones(5), np.linspace(0,2,5), 'k-', alpha = 0.4, linewidth=2)
         plt.plot(idx_3*dt*np.ones(5), np.linspace(0,2,5), 'b-', alpha = 0.4, linewidth=2)
         plt.plot(idx_5*dt*np.ones(5), np.linspace(0,2,5), 'r-', alpha = 0.4, linewidth=2)
-        plt.ylabel('$\Delta$  ramp (deg)')
+        plt.ylabel('$\Delta$  r(deg)')
         plt.xlim([0, tt[-1]+0.1])
         plt.grid()
 
@@ -761,7 +773,7 @@ def kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'
                         continue
                     
                     if kidnap != False:
-                        N = 10
+                        N = 5
                         (R_11, R_13, R_15, R_33, R_35, R_55) = kf_bank_test(dataset, subject, trial, side, N, kalman_filter = kalman_filter, kidnap = [0, 1, 2, 3])
                         if math.isnan(R_11) or math.isnan(R_13) or math.isnan(R_15) or math.isnan(R_33) or math.isnan(R_35) or math.isnan(R_55):
                             skipped_trials += 1
@@ -795,11 +807,11 @@ def kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'
                             SE_ramp_total += SE_ramp
                             T_total += T
 
-                        print("Current RMSE phase = %5.3f" % np.sqrt(SE_phase_total/T_total))
-                        print("Current RMSE phase_dot= %5.3f" % np.sqrt(SE_phase_dot_total/T_total))
-                        print("Current RMSE step_length = %5.3f" % np.sqrt(SE_step_length_total/T_total))
-                        print("Current RMSE ramp = %5.3f" % np.sqrt(SE_ramp_total/T_total))
-                        print("----------------------------------------------------------------")
+                            print("Current RMSE phase = %5.3f" % np.sqrt(SE_phase_total/T_total))
+                            print("Current RMSE phase_dot= %5.3f" % np.sqrt(SE_phase_dot_total/T_total))
+                            print("Current RMSE step_length = %5.3f" % np.sqrt(SE_step_length_total/T_total))
+                            print("Current RMSE ramp = %5.3f" % np.sqrt(SE_ramp_total/T_total))
+                            print("----------------------------------------------------------------")
 
     if kidnap != False:
         robustness_11 = robustness_11 / total_trials
@@ -922,27 +934,18 @@ if __name__ == '__main__':
 
     dataset = 'inclineExp'
 
-    subject = 'AB03'
-    trial = 's1d7x5'
+    subject = 'AB09'
+    trial = 's1i2x5'
     side = 'left'
 
-    #if nan_dict[subject][trial][side] == False:
-    #    print(subject + "/"+ trial + "/"+ side+ ": This trial should be skipped!")
-    
-    #dataset = 'Reznick'
-    #subject = 'AB05'
-    #trial = 's0x8'
-    #side = 'left'
+    kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', kidnap = [0, 1, 2, 3], plot = True)
+    #kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ukf', kidnap = [0, 1, 2, 3], plot = True)
 
-    #kf_bank_test(dataset, subject, trial, side, N = 3, kalman_filter = 'ekf', kidnap = [0, 1, 2, 3], plot = True)
-    #kf_bank_test(dataset, subject, trial, side, N = 5, kalman_filter = 'ukf', kidnap = [0, 1, 2], plot = True)
-
-    kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = True, plot = True)
+    #kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = True, plot = True)
     #kf_test(dataset, subject, trial, side, kalman_filter = 'ukf', kidnap = False, plot = True)
 
-    #plt.show()
-
-    #kf_robustness(kidnap = True, kalman_filter = 'ukf', datasets = 'inclineExp')
+    #kf_robustness(kidnap = False, kalman_filter = 'ukf', datasets = ['inclineExp'])
+    #kf_robustness(kidnap = True, kalman_filter = 'ukf', datasets = ['inclineExp'])
     #print(" ==================== ")
     #kf_robustness(kidnap = False, kalman_filter = 'ekf', datasets = ['inclineExp'])
     #kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'])

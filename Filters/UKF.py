@@ -1,4 +1,5 @@
 import numpy as np
+from wrapping import *
 
 def unscented_points(mean, cov, alpha = 1, beta = 0, kappa = 0, alg = 'chol'):
     ## Generate unscented points
@@ -23,12 +24,6 @@ def unscented_points(mean, cov, alpha = 1, beta = 0, kappa = 0, alg = 'chol'):
     Wic = 1/ 2 / (dim + lam)
     return pts, (W0m, Wim, W0c, Wic)
 
-def warpToOne(phase):
-    phase_wrap = np.remainder(phase, 1)
-    while np.abs(phase_wrap) > 1:
-        phase_wrap = phase_wrap - np.sign(phase_wrap)
-    return phase_wrap
-
 class myStruct:
     pass
 
@@ -49,6 +44,7 @@ class unscented_kalman_filter:
 
         self.x = init.x  # state vector
         self.Sigma = init.Sigma  # state covariance
+        self.x_init = init.x
         self.dim = self.Sigma.shape[0]
 
     def prediction(self, dt):
@@ -92,7 +88,7 @@ class unscented_kalman_filter:
         self.z_pts_p = np.array(np.zeros((2 * self.dim + 1, np.shape(z)[0])))
         self.x_pts_p = np.array(np.zeros((2 * self.dim + 1, self.dim)))
         for i in range(2 * self.dim + 1):
-            pp_z = self.h.evaluate_h_func(self.Psi, pts[i, 0], pts[i, 1], pts[i, 2])[:,0]
+            pp_z = self.h.evaluate_h_func(self.Psi, pts[i, 0], pts[i, 1], pts[i, 2], pts[i, 3])[:,0]
             if i == 0:
                 mean_z += pp_z * W0m
             else:
@@ -130,18 +126,25 @@ class unscented_kalman_filter:
         self.Sigma = self.Sigma - K @ self.S @ K.T
 
         self.MD_square = v.T @ np.linalg.pinv(self.S) @ v
-        if self.reset == True and self.MD_square > 25:
-            self.x = np.array([0.5, 0.8, 1.1]) # mid-stance
-            self.Sigma = np.diag([1e-2, 1e-1, 1e-1])
+        if self.reset == True and self.MD_square > 16:
+            self.x = np.array([0.3, 0.8, 1.1, 0]) # previous state or mid-stance
+            #self.x = np.array([0.3, 0.8, 1.1, self.x_init[3]])
+            self.Sigma = np.diag([1e-2, 1e-1, 1e-1, 1e-1])
 
         if self.saturation == True:
             self.state_saturation(self.saturation_range)
+        else:   
+            self.state_saturation([8, 0, 2, 0, 10, -10])
+
+        #self.x[3] = self.x_init[3]
 
     def state_saturation(self, saturation_range):
         phase_dots_max = saturation_range[0]
         phase_dots_min = saturation_range[1]
         step_lengths_max = saturation_range[2]
         step_lengths_min = saturation_range[3]
+        ramps_max = saturation_range[4]
+        ramps_min = saturation_range[5]
         
         if self.x[1] > phase_dots_max:
             self.x[1] = phase_dots_max
@@ -152,3 +155,8 @@ class unscented_kalman_filter:
             self.x[2] = step_lengths_max
         elif self.x[2] < step_lengths_min:
             self.x[2] = step_lengths_min
+
+        if self.x[3] > ramps_max:
+            self.x[3] = ramps_max
+        elif self.x[3] < ramps_min:
+            self.x[3] = ramps_min

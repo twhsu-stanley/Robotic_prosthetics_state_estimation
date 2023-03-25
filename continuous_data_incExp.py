@@ -153,15 +153,12 @@ def get_Continuous_measurement_data(subject, trial, side):
         if atan2[i] < 0:
             atan2[i] = atan2[i] + 2 * np.pi
     
-    # Foot angles
+    # Global foot angles
     with open('Gait_training_data_incExp/globalFootAngles_offset.pickle', 'rb') as file:
         globalFootAngles_offset = pickle.load(file)
 
     globalFootAngle = -raw_walking_data['Continuous'][subject][trial]['kinematics']['jointangles'][side]['foot'][0,start_index:end_index] - 90
-    try:
-        globalFootAngle -= globalFootAngles_offset[trial][subject][side]
-    except:
-        pass
+    globalFootAngle -= globalFootAngles_offset[trial][subject][side]
     
     # Kinetic measurements
     ankleMoment = raw_walking_data['Continuous'][subject][trial]['kinetics']['jointmoment'][side]['ankle'][0, start_index:end_index] / 1000 # N-mm to N-m
