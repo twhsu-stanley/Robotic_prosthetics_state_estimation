@@ -215,6 +215,12 @@ def get_Continuous_atan2_scale_shift(subject, trial, side, plot = True):
         return atan2
 
     else:
+        phases, phase_dots, step_lengths, ramps = get_Continuous_state_vars(subject, trial, side)
+        m_model = model_loader('Measurement_model_globalThighAngles_globalThighVelocities_atan2_globalFootAngles.pickle')
+        Psi = load_Psi()
+        atan2_pred = model_prediction(m_model.models[2], Psi['atan2'], phases, phase_dots, step_lengths,ramps) + 2*np.pi*phases
+        atan2_pred = wrapTo2pi(atan2_pred)
+
         plt.figure()
         plt.subplot(311)
         plt.plot(globalThighAngle_lp, 'k-', linewidth = 2)
@@ -245,12 +251,13 @@ def get_Continuous_atan2_scale_shift(subject, trial, side, plot = True):
         ax1.set_xlabel('time (s)')
         ax1.set_ylabel('atan2')
         ax1.plot(tt, atan2[idx_start:idx_end], color=color)
+        ax1.plot(tt, atan2_pred[idx_start:idx_end], 'g--', alpha = 0.5)
         ax1.tick_params(axis='y', labelcolor=color)
         ax1.grid(True)
         ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
         color = 'k'
         ax2.set_ylabel('phase', color=color)  # we already handled the x-label with ax1
-        ax2.plot(tt, phases[idx_start:idx_end], '--', color=color)
+        ax2.plot(tt, phases[idx_start:idx_end], color=color)
         ax2.tick_params(axis='y', labelcolor=color)
         
         fig.tight_layout()  # otherwise the right y-label is slightly clipped

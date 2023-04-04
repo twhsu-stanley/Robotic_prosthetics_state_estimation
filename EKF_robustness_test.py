@@ -22,7 +22,7 @@ reset = False
 sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2, 'globalFootAngles':3}
 
 # Determine what sensors to be used
-sensors = ['globalThighAngles', 'globalThighVelocities' ,'atan2', 'globalFootAngles'] #
+sensors = ['globalThighAngles', 'globalThighVelocities', 'globalFootAngles'] #,'atan2'
 
 sensor_id = [sensors_dict[key] for key in sensors]
 
@@ -68,7 +68,7 @@ total_strides = 5 # 11
 # Roecover Criteria
 phase_recover_thr = 0.08 #0.05 # 
 step_length_recover_thr = 0.15 #0.2 #
-ramp_recover_thr = 2.5 #2 #
+ramp_recover_thr = 2.2 #2.5 #
 
 # for multi-filter plotting
 num_plots = 0
@@ -179,8 +179,8 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
         sys.Psi = Psi
         sys.Q = Q_ukf
         sys.R = R_ukf
-        sys.alpha = 1
-        sys.beta = 0
+        sys.alpha = 1e-3
+        sys.beta = 2
         sys.kappa = 0
         sys.saturation = state_saturation
         sys.saturation_range = saturation_range
@@ -469,8 +469,8 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
         sys.Psi = Psi
         sys.Q = Q_ukf
         sys.R = R_ukf
-        sys.alpha = 1
-        sys.beta = 0
+        sys.alpha = 1e-3
+        sys.beta = 2
         sys.kappa = 0
         sys.saturation = state_saturation
         sys.saturation_range = saturation_range
@@ -938,7 +938,7 @@ if __name__ == '__main__':
     trial = 's1i2x5'
     side = 'left'
 
-    kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', kidnap = [0, 1, 2, 3], plot = True)
+    #kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', kidnap = [0, 1, 2, 3], plot = True)
     #kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ukf', kidnap = [0, 1, 2, 3], plot = True)
 
     #kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = True, plot = True)
@@ -948,7 +948,7 @@ if __name__ == '__main__':
     #kf_robustness(kidnap = True, kalman_filter = 'ukf', datasets = ['inclineExp'])
     #print(" ==================== ")
     #kf_robustness(kidnap = False, kalman_filter = 'ekf', datasets = ['inclineExp'])
-    #kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'])
+    kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'])
 
     # Q=[0, 1e-3, 1e-3]
     #Total RMSE phase = 0.029
