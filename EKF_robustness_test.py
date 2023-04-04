@@ -16,13 +16,13 @@ import csv
 # Robustification mechanisms
 state_saturation = True
 adaptive_cov = False
-reset = False
+reset = True
 
 # Dictionary of all sensors
 sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2, 'globalFootAngles':3}
 
 # Determine what sensors to be used
-sensors = ['globalThighAngles', 'globalThighVelocities', 'globalFootAngles'] #,'atan2'
+sensors = ['globalThighAngles', 'globalThighVelocities','atan2', 'globalFootAngles'] #
 
 sensor_id = [sensors_dict[key] for key in sensors]
 
@@ -945,10 +945,10 @@ if __name__ == '__main__':
     #kf_test(dataset, subject, trial, side, kalman_filter = 'ukf', kidnap = False, plot = True)
 
     #kf_robustness(kidnap = False, kalman_filter = 'ukf', datasets = ['inclineExp'])
-    #kf_robustness(kidnap = True, kalman_filter = 'ukf', datasets = ['inclineExp'])
+    kf_robustness(kidnap = True, kalman_filter = 'ukf', datasets = ['inclineExp'])
     #print(" ==================== ")
     #kf_robustness(kidnap = False, kalman_filter = 'ekf', datasets = ['inclineExp'])
-    kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'])
+    #kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'])
 
     # Q=[0, 1e-3, 1e-3]
     #Total RMSE phase = 0.029

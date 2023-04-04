@@ -1,7 +1,7 @@
 import numpy as np
 from wrapping import *
 
-def unscented_points(mean, cov, alpha = 1, beta = 0, kappa = 0, alg = 'chol'):
+def unscented_points(mean, cov, alpha = 1e-3, beta = 2, kappa = 0, alg = 'chol'):
     ## Generate unscented points
     dim = cov.shape[0]
     lam = alpha * alpha * (dim + kappa) - dim
