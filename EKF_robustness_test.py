@@ -22,7 +22,7 @@ reset = True
 sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2, 'globalFootAngles':3}
 
 # Determine what sensors to be used
-sensors = ['globalThighAngles', 'globalThighVelocities','atan2', 'globalFootAngles'] #
+sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2','globalFootAngles'] #
 
 sensor_id = [sensors_dict[key] for key in sensors]
 
@@ -43,32 +43,29 @@ dt = 1/100
 
 # Filter settings
 initial_Sigma = np.diag([0.5, 2, 1, 5]) * 0.1 #np.diag([1e-2, 1e-1, 1e-1, 1e-1]) #
-Q_ekf = np.diag([0, 1e-3, 5e-2, 5]) * dt # np.diag[0, 1e-3, 5e-2, 5]
-Q_ukf = np.diag([1e-20, 1e-1, 5e-1, 5]) * dt  #np.diag([0, 1e-1, 5e-1, 5e-1]) * dt #
+Q_ekf = np.diag([0, 1e-3, 5e-2, 5]) * dt # np.diag([0, 1e-3, 5e-2, 5]) * dt #
+Q_ukf = np.diag([1e-20, 1e-3, 5e-2, 5]) * dt  #np.diag([1e-20, 1e-1, 5e-1, 5]) * dt #
 
 if using_atan2:
     U_ekf = np.diag([2, 1.5, 1, 1])
-else:
-    U_ekf = np.diag([2, 1.5, 1])
-R_ekf = U_ekf @ measurement_noise_covariance(*sensors) @ U_ekf.T
-
-if using_atan2:
     U_ukf = np.diag([2, 1.5, 1, 1])
 else:
+    U_ekf = np.diag([2, 1.5, 1])
     U_ukf = np.diag([2, 1.5, 1])
+R_ekf = U_ekf @ measurement_noise_covariance(*sensors) @ U_ekf.T
 R_ukf = U_ukf @ measurement_noise_covariance(*sensors) @ U_ukf.T
 
 # saturation_range = [phase_dots_max, phase_dots_min, step_lengths_max, step_lengths_min, ramp_max, ramp_min]
-saturation_range = np.array([1.17, 0.59, 1.81, 0.82, 11, -11])
+saturation_range = np.array([1.17, 0.59, 1.81, 0.82, 10, -10]) # 11, -11
 
 # Stride in which kidnapping occurs
-kidnap_stride = 2 # 5
-total_strides = 5 # 11
+kidnap_stride = 3 # 2
+total_strides = 7 # 6
 
 # Roecover Criteria
-phase_recover_thr = 0.08 #0.05 # 
-step_length_recover_thr = 0.15 #0.2 #
-ramp_recover_thr = 2.2 #2.5 #
+phase_recover_thr = 0.0254 #0.075 # 
+step_length_recover_thr = 0.154 #0.2 #
+ramp_recover_thr = 2.54 #2.5 #
 
 # for multi-filter plotting
 num_plots = 0
@@ -182,6 +179,7 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
         sys.alpha = 1e-3
         sys.beta = 2
         sys.kappa = 0
+        sys.alg = 'svd'
         sys.saturation = state_saturation
         sys.saturation_range = saturation_range
         sys.reset = reset
@@ -195,7 +193,7 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
         exit("Select a filter to be used: EKF or UKF")
     
     if kidnap != False:
-        kidnap_percent_gait = np.random.uniform(0.05, 0.95)
+        kidnap_percent_gait = np.random.uniform(0.01, 0.95)
         phase_kidnap =  np.random.uniform(0, 1)
         phase_dot_kidnap = np.random.uniform(0, 5)
         step_length_kidnap = np.random.uniform(0, 2)
@@ -257,7 +255,7 @@ def kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False
         print("RMSE phase_dot = %5.3f" % RMSE_phase_dot)
         print("RMSE step_length = %5.3f" % RMSE_step_length)
         print("RMSE ramp = %5.3f" % RMSE_ramp)
-        result = (SE_phase, SE_phase_dot, SE_step_length, SE_ramp, T)
+        result = (SE_phase, SE_phase_dot, SE_step_length, SE_ramp, T, std)
     
     if plot == True:
         global num_plots
@@ -472,6 +470,7 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
         sys.alpha = 1e-3
         sys.beta = 2
         sys.kappa = 0
+        sys.alg = 'svd'
         sys.saturation = state_saturation
         sys.saturation_range = saturation_range
         sys.reset = reset
@@ -499,7 +498,7 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
             filter = unscented_kalman_filter(sys, init)
             clr = 'b'
         
-        kidnap_percent_gait = np.random.uniform(0.05, 0.95)
+        kidnap_percent_gait = np.random.uniform(0.01, 0.8) # (0.01, 0.95)
         phase_kidnap =  np.random.uniform(0, 1)
         phase_dot_kidnap = np.random.uniform(0, 5)
         step_length_kidnap = np.random.uniform(0, 2)
@@ -529,16 +528,16 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
             T = len(estimate_error[0, start_check_idx:, 0])
             RMSE_phase = np.sqrt(SE_phase/T)
             if RMSE_phase > 0.1:
-                print("The filter gets lost in nominal case.")
-                print("R_11(%) = ", 0, "|| R_13(%) = ", 0, "|| R_15(%) = ", 0, "|| R_33(%) = ", 0 , "|| R_35(%) = ", 0, "|| R_55(%) = ", 0)
+                print("The filter gets lost in the nominal case.")
+                print("R_11(%) = Nan || R_13(%) = Nan || R_15(%) = Nan || R_33(%) = Nan || R_35(%) = Nan || R_55(%) = Nan")
                 print("---------------------------------------------------------------------------")
-                #return (np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN)
-                return (0, 0, 0, 0, 0, 0)
+                return (np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN)
+                #return (0, 0, 0, 0, 0, 0)
 
         if n > 0:
-            idx_1 = int(heel_strike_index[kidnap_stride + 2])
-            idx_3 = int(heel_strike_index[kidnap_stride + 4])
-            idx_5 = int(heel_strike_index[kidnap_stride + 6])
+            idx_1 = int(heel_strike_index[kidnap_stride + 2]) + 1
+            idx_3 = int(heel_strike_index[kidnap_stride + 4]) + 1
+            idx_5 = int(heel_strike_index[kidnap_stride + 6]) + 1
             
             # 1) Absolute estimate error approach
             """
@@ -651,7 +650,7 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
         axs_est[3].set_ylabel('r (deg)', fontsize = 14)
         axs_est[3].set_xlabel('time (s)', fontsize = 14)
         axs_est[3].set_xlim([0, tt[-1]+0.1])
-        axs_est[3].set_ylim([-12, 12])
+        #axs_est[3].set_ylim([-12, 12])
         axs_est[3].tick_params(axis='both', labelsize=12)
         axs_est[3].grid(True)
         
@@ -742,6 +741,12 @@ def kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'
     SE_step_length_total = 0
     SE_ramp_total = 0
     T_total = 0
+    ##TESTING
+    STD_phase = 0
+    STD_phase_dot = 0
+    STD_step_length = 0
+    STD_ramp = 0
+    NN = 0
 
     # Store trials with large RMSEs
     R_dict = dict()
@@ -761,21 +766,22 @@ def kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'
                 for side in ['left']: #, 'right'
                     if dataset == 'inclineExp' and nan_dict[subject][trial][side] == False:
                         print('inclineExp/' + subject + "/"+ trial + "/"+ side + ": trial skipped because of nans in measurements")
-                        skipped_trials += 1
-                        continue
+                        #skipped_trials += 1
+                        #continue
                     if dataset == 'inclineExp' and subject == 'AB05' and ('s0x8' in trial):
                         print('inclineExp/' + subject + "/"+ trial + "/"+ side + ": AB05 s0x8 trial skipped because of abnormal measurements")
-                        skipped_trials += 1
-                        continue
+                        #skipped_trials += 1
+                        #continue
                     if dataset == 'Reznick' and (((subject == 'AB08' or subject == 'AB04' or subject == 'AB07' or subject == 'AB09') and 's0x8' in trial) or subject == 'AB10'):
                         print('Reznick/' + subject + "/"+ trial + "/"+ side + ": trial skipped because of abnormal measurements")
                         skipped_trials += 1
                         continue
                     
                     if kidnap != False:
-                        N = 5
+                        N = 8
                         (R_11, R_13, R_15, R_33, R_35, R_55) = kf_bank_test(dataset, subject, trial, side, N, kalman_filter = kalman_filter, kidnap = [0, 1, 2, 3])
                         if math.isnan(R_11) or math.isnan(R_13) or math.isnan(R_15) or math.isnan(R_33) or math.isnan(R_35) or math.isnan(R_55):
+                            print("Skipped becuase the filter got lost in the nominal case")
                             skipped_trials += 1
                             continue
                         else:
@@ -796,7 +802,7 @@ def kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'
                             R_dict[dataset][subject][trial][side] = np.array([R_11, R_13, R_15, R_33, R_35, R_55])
                     
                     else:
-                        (SE_phase, SE_phase_dot, SE_step_length, SE_ramp, T) = kf_test(dataset, subject, trial, side, kalman_filter)
+                        (SE_phase, SE_phase_dot, SE_step_length, SE_ramp, T, STD) = kf_test(dataset, subject, trial, side, kalman_filter)
 
                         R_dict[dataset][subject][trial][side] = np.array([np.sqrt(SE_phase/T), np.sqrt(SE_phase_dot/T),np.sqrt(SE_step_length/T), np.sqrt(SE_ramp/T)])
 
@@ -812,6 +818,18 @@ def kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'
                             print("Current RMSE step_length = %5.3f" % np.sqrt(SE_step_length_total/T_total))
                             print("Current RMSE ramp = %5.3f" % np.sqrt(SE_ramp_total/T_total))
                             print("----------------------------------------------------------------")
+
+                        ##TESTING
+                        STD_phase += np.mean(STD[:,0])
+                        STD_phase_dot += np.mean(STD[:,1])
+                        STD_step_length += np.mean(STD[:,2])
+                        STD_ramp += np.mean(STD[:,3])
+                        NN += 1
+                        print("Current Average STD phase = %f" % (STD_phase/NN))
+                        print("Current Average STD phase_dot = %f" % (STD_phase_dot/NN))
+                        print("Current Average STD step_length = %f" % (STD_step_length/NN))
+                        print("Current Average STD ramp = %f" % (STD_ramp/NN))
+
 
     if kidnap != False:
         robustness_11 = robustness_11 / total_trials
@@ -856,6 +874,12 @@ def kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'
         # TODO: move this to some other folder
         with open('Filters/'+kalman_filter+'_RMSE_data.pickle', 'wb') as file:
             pickle.dump(R_dict, file)
+
+        ##TESTING
+        print("Average STD phase = %f" % (STD_phase/NN))
+        print("Average STD phase_dot = %f" % (STD_phase_dot/NN))
+        print("Average STD step_length = %f" % (STD_step_length/NN))
+        print("Average STD ramp = %f" % (STD_ramp/NN))
 
 def plot_kf_robustness_heatmap(kalman_filter = 'ekf'):
     
@@ -934,23 +958,29 @@ if __name__ == '__main__':
 
     dataset = 'inclineExp'
 
-    subject = 'AB09'
-    trial = 's1i2x5'
+    subject = 'AB05'
+    trial = 's0x8d10'
     side = 'left'
 
-    #kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', kidnap = [0, 1, 2, 3], plot = True)
-    #kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ukf', kidnap = [0, 1, 2, 3], plot = True)
+    #kf_bank_test(dataset, subject, trial, side, N = 3, kalman_filter = 'ekf', kidnap = [0, 1, 2, 3], plot = True)
+    #kf_bank_test(dataset, subject, trial, side, N = 3, kalman_filter = 'ukf', kidnap = [0, 1, 2, 3], plot = True)
 
-    #kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = True, plot = True)
+    #kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False, plot = True)
     #kf_test(dataset, subject, trial, side, kalman_filter = 'ukf', kidnap = False, plot = True)
 
     #kf_robustness(kidnap = False, kalman_filter = 'ukf', datasets = ['inclineExp'])
-    kf_robustness(kidnap = True, kalman_filter = 'ukf', datasets = ['inclineExp'])
+    #kf_robustness(kidnap = True, kalman_filter = 'ukf', datasets = ['inclineExp'])
     #print(" ==================== ")
     #kf_robustness(kidnap = False, kalman_filter = 'ekf', datasets = ['inclineExp'])
-    #kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'])
+    kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'])
 
     # Q=[0, 1e-3, 1e-3]
     #Total RMSE phase = 0.029
     #Total RMSE phase_dot = 0.041
     #Total RMSE step_length = 0.142
+
+    #inclineExp/AB03/s1x2i0/left: trial skipped because of nans in measurements
+    #inclineExp/AB03/s1x2i10/left: trial skipped because of nans in measurements
+    #inclineExp/AB03/s1x2i2x5/left: trial skipped because of nans in measurements
+    #inclineExp/AB03/s1x2i5/left: trial skipped because of nans in measurements
+    #inclineExp/AB03/s1x2i7x5/left: trial skipped because of nans in measurements

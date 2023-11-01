@@ -37,7 +37,7 @@ class unscented_kalman_filter:
         self.alpha = system.alpha
         self.beta = system.beta
         self.kappa = system.kappa
-        self.alg = 'chol'
+        self.alg = system.alg
         self.saturation = system.saturation
         self.saturation_range = system.saturation_range
         self.reset = system.reset
@@ -127,14 +127,14 @@ class unscented_kalman_filter:
 
         self.MD_square = v.T @ np.linalg.pinv(self.S) @ v
         if self.reset == True and self.MD_square > 16:
-            self.x = np.array([0.3, 0.8, 1.1, 0]) # previous state or mid-stance
-            #self.x = np.array([0.3, 0.8, 1.1, self.x_init[3]])
+            #self.x = np.array([0.3, 0.8, 1.1, 0]) # previous state or mid-stance
+            self.x = np.array([0.3, 0.8, 1.1, self.x_init[3]])
             self.Sigma = np.diag([1e-2, 1e-1, 1e-1, 1e-1])
 
         if self.saturation == True:
             self.state_saturation(self.saturation_range)
-        else:   
-            self.state_saturation([8, 0, 2, 0, 10, -10])
+        #else:
+            #self.state_saturation([8, 0, 2, 0, 10, -10])
 
         #self.x[3] = self.x_init[3]
 
