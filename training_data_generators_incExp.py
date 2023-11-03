@@ -829,7 +829,7 @@ def globalFootAngle_statistics():
 
 if __name__ == '__main__':
 
-    globalFootAngle_statistics()
+    #globalFootAngle_statistics()
 
     #globalThighAngles_statistics()
     #derivedMeasurements_statistics()
@@ -839,7 +839,7 @@ if __name__ == '__main__':
     #ankleMoment_statistics()
     #tibiaForce_statistics()
 
-    #gait_training_data_generator('kneeAngles')
+    gait_training_data_generator('kneeAngles')
     #gait_training_data_generator('ankleAngles')
     #gait_training_data_generator('globalFootAngles')
     #gait_training_data_generator('globalThighAngles')

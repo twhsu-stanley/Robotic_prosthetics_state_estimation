@@ -126,9 +126,9 @@ class unscented_kalman_filter:
         self.Sigma = self.Sigma - K @ self.S @ K.T
 
         self.MD_square = v.T @ np.linalg.pinv(self.S) @ v
-        if self.reset == True and self.MD_square > 16:
-            #self.x = np.array([0.3, 0.8, 1.1, 0]) # previous state or mid-stance
-            self.x = np.array([0.3, 0.8, 1.1, self.x_init[3]])
+        if self.reset == True and self.MD_square > 20: #16 used in the paper
+            self.x = np.array([0.5, 0.8, 1.1, 0]) # previous state or mid-stance
+            #self.x = np.array([0.3, 0.8, 1.1, self.x_init[3]])
             self.Sigma = np.diag([1e-2, 1e-1, 1e-1, 1e-1])
 
         if self.saturation == True:

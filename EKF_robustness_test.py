@@ -16,13 +16,13 @@ import csv
 # Robustification mechanisms
 state_saturation = True
 adaptive_cov = False
-reset = True
+reset = False
 
 # Dictionary of all sensors
 sensors_dict = {'globalThighAngles':0, 'globalThighVelocities':1, 'atan2':2, 'globalFootAngles':3}
 
 # Determine what sensors to be used
-sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2','globalFootAngles'] #
+sensors = ['globalThighAngles', 'globalThighVelocities', 'atan2', 'globalFootAngles'] # 
 
 sensor_id = [sensors_dict[key] for key in sensors]
 
@@ -60,7 +60,7 @@ saturation_range = np.array([1.17, 0.59, 1.81, 0.82, 10, -10]) # 11, -11
 
 # Stride in which kidnapping occurs
 kidnap_stride = 3 # 2
-total_strides = 7 # 6
+total_strides = 10 # 6
 
 # Roecover Criteria
 phase_recover_thr = 0.0254 #0.075 # 
@@ -498,7 +498,7 @@ def kf_bank_test(dataset, subject, trial, side, N = 10, kalman_filter = 'ekf', k
             filter = unscented_kalman_filter(sys, init)
             clr = 'b'
         
-        kidnap_percent_gait = np.random.uniform(0.01, 0.8) # (0.01, 0.95)
+        kidnap_percent_gait = np.random.uniform(0.01, 0.75) # 0.8 # (0.01, 0.95)
         phase_kidnap =  np.random.uniform(0, 1)
         phase_dot_kidnap = np.random.uniform(0, 5)
         step_length_kidnap = np.random.uniform(0, 2)
@@ -958,21 +958,21 @@ if __name__ == '__main__':
 
     dataset = 'inclineExp'
 
-    subject = 'AB05'
-    trial = 's0x8d10'
+    subject = 'AB08'
+    trial = 's0x8i10'
     side = 'left'
 
-    #kf_bank_test(dataset, subject, trial, side, N = 3, kalman_filter = 'ekf', kidnap = [0, 1, 2, 3], plot = True)
-    #kf_bank_test(dataset, subject, trial, side, N = 3, kalman_filter = 'ukf', kidnap = [0, 1, 2, 3], plot = True)
+    #kf_bank_test(dataset, subject, trial, side, N = 5, kalman_filter = 'ekf', kidnap = [0, 1, 2, 3], plot = True)
+    #kf_bank_test(dataset, subject, trial, side, N = 5, kalman_filter = 'ukf', kidnap = [0, 1, 2, 3], plot = True)
 
     #kf_test(dataset, subject, trial, side, kalman_filter = 'ekf', kidnap = False, plot = True)
     #kf_test(dataset, subject, trial, side, kalman_filter = 'ukf', kidnap = False, plot = True)
 
     #kf_robustness(kidnap = False, kalman_filter = 'ukf', datasets = ['inclineExp'])
-    #kf_robustness(kidnap = True, kalman_filter = 'ukf', datasets = ['inclineExp'])
+    kf_robustness(kidnap = True, kalman_filter = 'ukf', datasets = ['inclineExp'])
     #print(" ==================== ")
     #kf_robustness(kidnap = False, kalman_filter = 'ekf', datasets = ['inclineExp'])
-    kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'])
+    #kf_robustness(kidnap = True, kalman_filter = 'ekf', datasets = ['inclineExp'])
 
     # Q=[0, 1e-3, 1e-3]
     #Total RMSE phase = 0.029
